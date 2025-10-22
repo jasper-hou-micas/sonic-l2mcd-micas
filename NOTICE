@@ -1,0 +1,18 @@
+sonic-l2mcd-micas
+
+This product includes software originally developed and licensed
+under the Apache License, Version 2.0 by Microsoft Corporation.
+
+Original Repository:
+    https://github.com/Azure/sonic-l2mcd  (empty base repository)
+
+Derived Implementation:
+    https://github.com/benzeerbava/sonic-l2mcd
+    Licensed under the Apache License, Version 2.0
+
+Further development, modifications and maintenance by:
+    Micas Networks, Inc.
+    Copyright (c) 2025 Micas Networks, Inc.
+
+All modifications and additions are released under the Apache License, Version 2.0.
+This NOTICE file must be included in all distributions of this software.
