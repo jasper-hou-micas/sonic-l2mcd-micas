@@ -5,6 +5,7 @@ under the Apache License, Version 2.0 by Microsoft Corporation.
 
 Original Repository:
     https://github.com/Azure/sonic-l2mcd  (empty base repository)
+    Licensed under the Apache License, Version 2.0
 
 Derived Implementation:
     https://github.com/benzeerbava/sonic-l2mcd
