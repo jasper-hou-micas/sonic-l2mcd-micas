@@ -43,7 +43,9 @@ l2mcd_SOURCES = \
                  src/igmp_cu.c \
                  src/igmp_fsm.c \
                  src/igmp_io.c \
-                 src/mld_main.c
+                 src/mld_main.c\
+                 src/mld_cu.c\
+                 src/mld_io.c
 
 l2mcd_CFLAGS = $(DBGFLAGS) $(AM_CFLAGS) $(CFLAGS_COMMON) 
 l2mcd_CPPFLAGS = $(DBGFLAGS) $(AM_CFLAGS) $(CFLAGS_COMMON) $(COV_CFLAGS) $(ASAN_CFLAGS)

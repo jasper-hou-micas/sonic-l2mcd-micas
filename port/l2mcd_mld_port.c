@@ -19,6 +19,7 @@
 #include "l2mcd_portdb.h"
 #include "l2mcd_dbsync.h"
 #include <time.h>
+#include <netinet/in.h>
 
 L2MCD_AVL_TREE *mld_portdb_tree = &gMld.portdb_tree;
 L2MCD_AVL_TREE *ve_mld_portdb_tree = &gMld.ve_portdb_tree;
@@ -207,7 +208,7 @@ int mld_if_set_version_api(int vrf_index, uint32_t vid, int version, int afi,uin
 
     /* handle the case to set version for mld*/
     else if (afi == MLD_IP_IPV6_AFI){ //MLD
-
+        mld_set_if_mld_version(vrf_index, port, version);
     }
     
 
@@ -477,7 +478,7 @@ mld_if_snoop_unset(uint32_t afi, uint32_t vid, int user_cfg, uint8_t type)
 
             mld_unset_vlan_dcm_flag(vlan_node->gvid, vlan_node->type);
             mld_map_port_add_del(MLD_DEFAULT_VRF_ID,vlan_node->ifindex, FALSE, vlan_node->name,vlan_node->type);
-            mld_map_vlan_state(MLD_IP_IPV4_AFI, vlan_node->gvid, FALSE, 1,
+            mld_map_vlan_state(afi, vlan_node->gvid, FALSE, 1,
                          vlan_node->gvid,  vlan_node->name,vlan_node->type);
 
 		}	
@@ -1116,6 +1117,7 @@ void mld_add_vlan_to_protocol(int vrfid, MCGRP_GLOBAL_CLASS * mcgrp_glb,
 void mcgrp_vport_start_querier_process(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_vport)
 {
 	uint32_t ipv4_addr = 0;
+    IPV6_ADDRESS ipv6_addr;
 	portdb_entry_t *port_entry;
 	UINT32 send_port = 0;
 	uint32_t ifindex = 0;
@@ -1136,12 +1138,12 @@ void mcgrp_vport_start_querier_process(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_v
 
 	if (!port_entry)
 	{
-		L2MCD_LOG_NOTICE("%s:%s virport:0x%x coundnt find port_entry", __FUNCTION__, __LINE__, mcgrp_vport->vir_port_id);
+		L2MCD_LOG_NOTICE("%s:%d virport:0x%x coundnt find port_entry", __FUNCTION__, __LINE__, mcgrp_vport->vir_port_id);
 		return;
 	}
 	if (!vlan_node)
 	{
-		L2MCD_LOG_NOTICE("%s:%s gvid:0x%x coundnt find vlan_node", __FUNCTION__, __LINE__, gvid);
+		L2MCD_LOG_NOTICE("%s:%d gvid:0x%x coundnt find vlan_node", __FUNCTION__, __LINE__, gvid);
 		return;
 	}
 
@@ -1193,6 +1195,30 @@ void mcgrp_vport_start_querier_process(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_v
 				FN, LN, port_id, vlan_node->ifindex, mcgrp_vport->querier_router.ip.v4addr);
 
 	} else if (mcgrp->afi == IP_IPV6_AFI) {
+		if (!ve_db_lkup)
+			ipv6_addr = mld_portdb_get_port_lowest_ipv6_addr_from_list(port_id);
+		else {
+			if(l2mcd_ifindex_is_physical(vlan_node->ifindex)) {
+				ipv6_addr = mld_portdb_get_port_lowest_ipv6_addr_from_list(port_id);
+				//L2MCD_LOG_INFO("%s(%d): physical port_id:%d ipv4_addr:0%x ", __FUNCTION__, LN, port_id, ipv4_addr);
+			}else {		
+				ipv6_addr = ve_mld_portdb_get_port_lowest_ipv6_addr_from_list(port_id);
+				//L2MCD_LOG_INFO("%s(%d): VE DB lookup port_id:%d ipv4_addr:0%x ", __FUNCTION__, LN, port_id, ipv4_addr);
+			}
+		}
+
+
+		if (!IPV6_ADDR_SAME(&ipv6_addr, &mcgrp_vport->querier_router.ip.v6addr)) {
+			mcgrp_vport->querier_router.afi = IP_IPV6_AFI;
+			mcgrp_vport->querier_router.ip.v6addr = ipv6_addr;
+		} else {
+			if (IP6_IS_ADDRESS_UNSPECIFIED(mcgrp_vport->querier_router.ip.v6addr.address)){
+				mcgrp_vport->querier_router.ip.v6addr = ipv6_addr;
+				mcgrp_vport->querier_router.afi = IP_IPV6_AFI;
+			}
+		}
+		MLD_LOG(MLD_LOGLEVEL9, MLD_IP_IPV6_AFI, "%s(%d) port_id:%d ifindex:0x%x querier_ip:0x%x  ", 
+				FN, LN, port_id, vlan_node->ifindex, mcgrp_vport->querier_router.ip.v4addr);
         //MLD
 	}
 
@@ -1214,6 +1240,10 @@ void mcgrp_vport_start_querier_process(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_v
 				(mcgrp_vport->max_response_time *
 				 10));
 	} else {
+		mld_send_general_query(mcgrp, mcgrp_vport->vir_port_id, send_port, (UINT8) mcgrp_vport->oper_version, 
+				mcgrp_vport->querier_router.ip.v6addr,	/* Use lowest srcIp */
+				(mcgrp_vport->max_response_time *
+				 10));
         //MLD
 	}
 	if (mcgrp_vport->start_up_query_count > 0)
@@ -1419,7 +1449,7 @@ void mld_map_vlan_state(uint32_t ip_family, uint32_t gvid, int add,
 	} else {
 		vlan_node = mld_vdb_vlan_get(gvid,type);
 		if (vlan_node) {
-			for (afi = IP_IPV4_AFI; afi <= IP_IPV4_AFI; afi++) {
+			for (afi = IP_IPV4_AFI; afi <= MCAST_AFI_MAX; afi++) {
 				mld_set_vlan_flag(vlan_node, afi,
 						  MLD_VLAN_DELETED);
 				mld =
@@ -1858,6 +1888,28 @@ uint32_t mld_portdb_get_port_lowest_ipv4_addr_from_list(uint32_t port_num)
 		return 0;
 }
 
+IPV6_ADDRESS ve_mld_portdb_get_port_lowest_ipv6_addr_from_list(uint32_t port_num)
+{
+    IPV6_ADDRESS ip6_address = {0};
+	PORTDB_IP6_ADDRESS_ENTRY *sptr_addr_entry = NULL;
+	sptr_addr_entry = portdb_get_port_lowest_ipv6_addr_from_list(ve_mld_portdb_tree, port_num);
+	if(sptr_addr_entry)
+		return sptr_addr_entry->ipaddress;
+	else
+		return ip6_address;
+}
+
+IPV6_ADDRESS mld_portdb_get_port_lowest_ipv6_addr_from_list(uint32_t port_num)
+{
+    IPV6_ADDRESS ip6_address = {0};
+    PORTDB_IP6_ADDRESS_ENTRY *sptr_addr_entry = NULL;
+	sptr_addr_entry = portdb_get_port_lowest_ipv6_addr_from_list(mld_portdb_tree, port_num);
+	if(sptr_addr_entry)
+		return sptr_addr_entry->ipaddress;
+	else
+		return ip6_address;
+}
+
 /* clears total cache/ vlan specific/ grp specific cache */
 int pims_clear_snoop_cache(int afi, mld_vid_t vlan_id, MADDR_ST *grp_addr_clr,uint8_t type)
 {
@@ -1994,8 +2046,9 @@ void mcgrp_delete_router_port(MCGRP_CLASS * mcgrp,
 	else
 		mcgrp_vport->rtr_port_list = mcgrp_rport->next;
 
+	BOOLEAN is_igmp = (IS_IGMP_CLASS(mcgrp))?TRUE:FALSE;
 	// Notify to write to the redis AppDB
-	l2mcd_system_mrouter_notify(mcgrp_vport->vir_port_id, phy_port_id, mcgrp_rport->is_static, 0);
+	l2mcd_system_mrouter_notify(mcgrp_vport->vir_port_id, phy_port_id, mcgrp_rport->is_static, 0, is_igmp);
 
     dy_free(mcgrp_rport);
 
@@ -2098,7 +2151,8 @@ mcgrp_add_router_port(MCGRP_CLASS * mcgrp,
 					      (UINT32) time);
 	}
 	// Notify to write to the redis AppDB
-	l2mcd_system_mrouter_notify(mcgrp_vport->vir_port_id, phy_port_id, is_static, 1);
+	BOOLEAN is_igmp = (IS_IGMP_CLASS(mcgrp))?TRUE:FALSE;
+	l2mcd_system_mrouter_notify(mcgrp_vport->vir_port_id, phy_port_id, is_static, 1, is_igmp);
 	mcgrp_pport =   mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
 
     if (mcgrp_pport)
@@ -2240,6 +2294,15 @@ void mcgrp_update_l2_static_group(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_vport,
 			//return;	
 		}
 	} else {
+		if (mld_update_ssm_parameters(mcgrp, &group_addr, &version,
+					       mcgrp_vport->vir_port_id,
+					       phy_port_id, &v3_action,
+						&num_srcs, &src_list) == FALSE)
+		{
+			MLD_LOG(MLD_LOGLEVEL9, MLD_IP_IPV6_AFI, "%s(%d) MLD SSM group:%s ssm-map failed\n",
+				FN, LN, mcast_print_addr(&group_addr));
+		}
+
         //MLD
 	}
 
@@ -2524,6 +2587,15 @@ void mcgrp_refresh_l2_static_group(MCGRP_CLASS * mcgrp,
 					FN, LN, mcast_print_addr(group_address));
 			}
 		} else {
+		    UINT8 mld_action = 0;
+			if (mld_update_ssm_parameters(mcgrp, group_address, &version,
+				       vir_port_id,
+				       phy_port_id, &mld_action,
+					&num_srcs, &src_list) == FALSE)
+    		{
+    			MLD_LOG(MLD_LOGLEVEL9, MLD_IP_IPV6_AFI, "%s(%d) MLD SSM group:%s ssm-map failed\n",
+    				FN, LN, mcast_print_addr(group_address));
+    		}
             //MLD
         }
 		mcgrp_update_group_address_table(mcgrp, vir_port_id, phy_port_id, group_address, &addr,	// use intf's addr as client source
@@ -2910,8 +2982,10 @@ int mld_proto_query_interval_set(uint32_t afi, uint32_t vid, mld_vid_t gvid,
 			}
 			else 
 			{
-				return MLD_SUCCESS;
-                //MLD
+                mld_send_general_query(mcgrp, mcgrp_vport->vir_port_id, send_port,
+                                   (UINT8) mcgrp_vport->oper_version, 0,
+                                   mcgrp_vport->max_response_time * 10);
+
 			}
 		}
 		if (WheelTimerSuccess ==
@@ -3020,7 +3094,7 @@ void mcgrp_start_stop_snooping_querier_api(MCGRP_CLASS * mcgrp,
 		if (flag) {
 			mcgrp_vport_start_querier_process(mcgrp, mcgrp_vport);
  			L2MCD_LOG_INFO
-			    ("%s(): MLD_SNOOPING_QUERIER_ENABLED  SET for vlanid=%d",
+			    ("%s: MLD_SNOOPING_QUERIER_ENABLED  SET for vlanid=%d",
 			     __FUNCTION__, gvid);
 		} else {
 			mcgrp_vport_stop_querier_process(mcgrp, mcgrp_vport, TRUE);

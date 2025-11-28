@@ -60,6 +60,7 @@ typedef struct L2MCD_CONFIG_MSG {
     uint8_t     enabled;
     uint8_t     querier;
     uint8_t     fast_leave;
+    int         afi;
     int         cmd_code;
     int         version;
     int         query_interval;

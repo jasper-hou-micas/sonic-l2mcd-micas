@@ -35,15 +35,10 @@ extern struct cli *gcli;
 extern void mcgrp_vport_start_querier_process(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_vport);
 
 
-/* Max bit/byte length of IPv6 address. */
-#define IPV6_MAX_BYTELEN     16
-#define IPV6_MAX_BITLEN      128
-#define IPV6_ADDR_CMP(D,S)   memcmp ((D), (S), IPV6_MAX_BYTELEN)
-#define IPV6_ADDR_SAME(D,S)  (memcmp ((D), (S), IPV6_MAX_BYTELEN) == 0)
-#define IPV6_ADDR_COPY(D,S)  memcpy ((D), (S), IPV6_MAX_BYTELEN)
 #define PRINT_SEC_OR_MS ((mcgrp_vport->LMQ_100ms_enabled == TRUE) ? "MilliSeconds" : "Seconds") 
 
 extern MCAST_GLOBAL_CLASS			gMulticast; //, gMulticast6,*pgMulticast6;
+extern IP6_IPV6_ADDRESS ip6_unspecified_address;
 
 // Forward declarations
 UINT32 config_version_less_than_3_4();
@@ -166,7 +161,10 @@ void mcgrp_reset_default_values (MCGRP_CLASS *mcgrp)
     {
         igmp_reset_default_values(mcgrp);
     }
-    else { ;}//MLD
+    else 
+    { 
+        mld_reset_default_values(mcgrp);
+    }//MLD
 }
 
 
@@ -182,7 +180,10 @@ void mcgrp_set_max_group_address(UINT32 afi, VRF_INDEX vrf_index, UINT32 val)
         {
             igmp_enable (vrf_index, 0);
         }
-        else {;} //MLD
+        else 
+        {
+            mld_enable(vrf_index, 0);
+        } //MLD
 
         mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX (afi, vrf_index);
 
@@ -238,6 +239,20 @@ BOOLEAN mcgrp_alloc_init (MCGRP_CLASS *mcgrp)
                 (IGMP_STATS*) dy_malloc_zero(sizeof(IGMP_STATS) * num_mcgrp_intfs);
 
             if (mcgrp->igmp_stats == NULL)
+            {
+                L2MCD_LOG_ERR("%s.VRF%d.ERR: memory allocation for stats failed.\n",  __FUNCTION__, mcgrp->vrf_index);
+                return FALSE;
+            }
+        }
+    } 
+    else if(IS_MLD_CLASS(mcgrp))
+    {
+        if (!mcgrp->mld_stats)
+        {
+            mcgrp->mld_stats =
+                (MLD_STATS*) dy_malloc_zero(sizeof(MLD_STATS) * num_mcgrp_intfs);
+
+            if (mcgrp->mld_stats == NULL)
             {
                 L2MCD_LOG_ERR("%s.VRF%d.ERR: memory allocation for stats failed.\n",  __FUNCTION__, mcgrp->vrf_index);
                 return FALSE;
@@ -478,6 +493,11 @@ void mcgrp_update_static_groups (MCGRP_CLASS         *mcgrp,
         }
         else
         {
+            version = ((mcgrp_pport->oper_version >= MLD_VERSION_2) ? MLD_VERSION_2 : MLD_VERSION_1);
+            mcast_set_ipv6_addr(&addr, ip_get_lowest_ip_address_on_port(mcgrp_vport->vir_port_id, mcgrp_vport->type));
+            if (mld_update_ssm_parameters(mcgrp, &group_addr, &version, mcgrp_vport->vir_port_id,
+                        phy_port_id, &v3_action,  &num_srcs, &src_list) == FALSE)
+                continue;
             //MLD   
         }
 
@@ -1310,8 +1330,15 @@ UINT32 mcgrp_age_src_timers (MCGRP_CLASS     *mcgrp,
                     (mcgrp_mbrshp->filter_mode == FILT_EXCL),
                     0, TRUE);     // is retx
         }
-        else
+        else if (IS_MLD_CLASS(mcgrp))
         {
+             mldv2_send_group_source_query(mcgrp, mcgrp_mbrshp,
+                     mcgrp_vport->vir_port_id,
+                     mcgrp_mbrshp->phy_port_id,
+                     mcgrp_entry->group_address.ip.v6addr,
+                     (SORTED_LINKLIST**) &mcgrp_mbrshp->src_list[FILT_INCL],
+                     (mcgrp_mbrshp->filter_mode == FILT_EXCL),
+                     ip6_unspecified_address, TRUE);
              //MLD
         }
     }
@@ -1440,9 +1467,15 @@ UINT32 mcgrp_age_src_lmq_timers (MCGRP_CLASS *mcgrp,
                     (mcgrp_mbrshp->filter_mode == FILT_EXCL),
                     0, TRUE);     // is retx
         }
-        else
+        else if (IS_MLD_CLASS(mcgrp))
         {
-            //MLD
+            mldv2_send_group_source_query(mcgrp, mcgrp_mbrshp,
+                    mcgrp_vport->vir_port_id,
+                    mcgrp_mbrshp->phy_port_id,
+                    mcgrp_entry->group_address.ip.v6addr,
+                    (SORTED_LINKLIST**) &mcgrp_mbrshp->src_list[FILT_INCL],
+                    (mcgrp_mbrshp->filter_mode == FILT_EXCL),
+                    ip6_unspecified_address, TRUE);
         }
     }
 
@@ -1623,9 +1656,25 @@ mcgrp_age_group_mbrshp (MCGRP_CLASS   *mcgrp,
                     mcast_init_addr(&addr, IP_IPV4_AFI, MADDR_GET_FULL_PLEN(IP_IPV4_AFI));
                     mcast_set_ipv4_addr(&addr, 0);
                 }
-                else                                        
+                else if (IS_MLD_CLASS(mcgrp))
                 {
-                    //MLD                 
+                    if (mcgrp_pport == NULL)
+                    {
+                        L2MCD_VLAN_LOG_ERR(vir_port_id,"%s(%d) mcgrp_vport is NULL for phy_port_id, stop igmp send! ", FN, LN);
+                        return;
+                    }
+                    mld_send_group_query(mcgrp, mcgrp_mbrshp,
+                            vir_port_id,
+                            phy_port_id,
+                            (UINT8) mcgrp_pport->oper_version,
+                            mcgrp_entry->group_address.ip.v6addr, //GSQ 
+                            ip6_unspecified_address,   // Use lowest IP addr of this port
+                            ip6_unspecified_address,
+                            TRUE);
+
+                    mcast_init_addr(&addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+                    mcast_set_ipv6_addr(&addr, 0);
+                    //MLD
                 }
             }
             else if (mcgrp_mbrshp->retx_cnt != 0)
@@ -1735,8 +1784,10 @@ mcgrp_age_group_mbrshp (MCGRP_CLASS   *mcgrp,
                 if (IS_IGMP_CLASS(mcgrp)) {
                     igmp_send_igmp_message(mcgrp, vir_port_id, phy_port_id, IGMP_V2_LEAVE_GROUP_TYPE, mcgrp_vport->oper_version,
                             mcgrp_entry->group_address.ip.v4addr, mcgrp_mbrshp->client_source_addr.ip.v4addr, 0, NULL, 0, 0);
-                } else {     
-                    //MLD
+                } else if (IS_MLD_CLASS(mcgrp)){
+                    mld_send_mld_message(mcgrp, vir_port_id, phy_port_id, MLD_V2_MEMBERSHIP_REPORT_TYPE, mcgrp_vport->oper_version,
+                            mcgrp_entry->group_address.ip.v6addr, mcgrp_mbrshp->client_source_addr.ip.v6addr, 0, NULL, 0, 0);
+                //MLD
                 }
             }
             L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] mcgrp_entry->group_address %s pims_mbr_flags 0x%x ", 
@@ -1882,9 +1933,25 @@ mcgrp_age_group_mbrshp_and_lmq (MCGRP_CLASS   *mcgrp,
                         mcast_init_addr(&addr, IP_IPV4_AFI, MADDR_GET_FULL_PLEN(IP_IPV4_AFI));
                         mcast_set_ipv4_addr(&addr, 0);
                     }
-                    else                                        
+                    else if (IS_MLD_CLASS(mcgrp))
                     {
-                        //MLD                  
+                        if (mcgrp_pport == NULL)
+                        {
+                            L2MCD_VLAN_LOG_ERR(vir_port_id,"%s(%d) mcgrp_vport NULL for phy_port_id, stop mld send! ", FN, LN);
+                            return;
+                        }
+                        mld_send_group_query(mcgrp, mcgrp_mbrshp,
+                                vir_port_id,
+                                phy_port_id,
+                                (UINT8) mcgrp_pport->oper_version,
+                                mcgrp_entry->group_address.ip.v6addr, //GSQ 
+                                ip6_unspecified_address,   // Use lowest IP addr of this port
+                                ip6_unspecified_address,
+                                TRUE);  // retx
+
+                        mcast_init_addr(&addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+                        mcast_set_ipv6_addr(&addr, 0);
+                        //MLD 
                     }
                 }
                 else
@@ -1949,7 +2016,9 @@ mcgrp_age_group_mbrshp_and_lmq (MCGRP_CLASS   *mcgrp,
                 if (IS_IGMP_CLASS(mcgrp)) {
                     igmp_send_igmp_message(mcgrp, vir_port_id, phy_port_id, IGMP_V2_LEAVE_GROUP_TYPE, mcgrp_vport->oper_version,
                             mcgrp_entry->group_address.ip.v4addr, mcgrp_mbrshp->client_source_addr.ip.v4addr, 0, NULL, 0, 0);
-                } else {     
+                } else if (IS_MLD_CLASS(mcgrp)) {
+                    mld_send_mld_message(mcgrp, vir_port_id, phy_port_id, MLD_V2_MEMBERSHIP_REPORT_TYPE, mcgrp_vport->oper_version,
+                            mcgrp_entry->group_address.ip.v6addr, mcgrp_mbrshp->client_source_addr.ip.v6addr, 0, NULL, 0, 0);
                     //MLD
                 }
             }
@@ -2191,6 +2260,33 @@ UINT8 mcgrp_val2code (UINT16 val)
     for (; val > 0; val >>= 1, exp++);
 
     return (0x80 | (exp << 4) | mant);
+}
+
+
+UINT16 mcgrp_val2code16(UINT32 val)
+{
+    if (val < 32768u)
+        return (UINT16)val;
+
+    for (UINT16 exp = 0; exp <= 7; ++exp)
+    {
+        UINT32 shift = 1u << (exp + 3); /* shift unit in ms */
+
+        UINT32 mant_with_flag = (UINT32)((val + shift - 1u) / shift);
+
+        if (mant_with_flag > 0x1FFFu)
+            continue;
+
+        if (mant_with_flag < 0x1000u)
+            mant_with_flag = 0x1000u;
+
+        UINT16 mant = (UINT16)(mant_with_flag & 0x0FFFu);
+        UINT16 code = (UINT16)(0x8000u | (exp << 12) | mant);
+        return code;
+    }
+
+    /* max�?exp=7, mant=0xFFF */
+    return (UINT16)(0x8000u | (7u << 12) | 0x0FFFu);
 }
 
 /* *************************************************************
@@ -2614,7 +2710,12 @@ void mcgrp_refresh_static_group (MCGRP_CLASS         *mcgrp,
         }
         else
         {
-            //MLD      
+            mcast_set_ipv6_addr(&addr, ip_get_lowest_ip_address_on_port(vir_port_id, mcgrp_vport->type));
+            UINT mld_action = IS_EXCL ;
+            if(mld_update_ssm_parameters(mcgrp, group_address, &version, vir_port_id,
+                        phy_port_id, &mld_action, &num_srcs, &src_list) == FALSE)
+                continue;
+            //MLD
         }               
 
         mcgrp_update_group_address_table(mcgrp, vir_port_id, phy_port_id,
@@ -2662,7 +2763,13 @@ BOOLEAN mcgrp_send_group_source_query (MCGRP_CLASS        *mcgrp,
     else
     {
         //MLD
-        return 0;                        
+        return mldv2_send_group_source_query(mcgrp, mcgrp_mbrshp,
+        vir_port_id, phy_port_id,
+        group_address->ip.v6addr,
+        (SORTED_LINKLIST**) &mcgrp_mbrshp->src_list[FILT_INCL],
+        was_excl,         // 0 => was not EXCL mode
+        clnt_ip_addr->ip.v6addr,
+        is_retx /* not retx */);
     }   
 }
 
@@ -2824,6 +2931,28 @@ void igmpv3_destroy_client (MCGRP_CLASS   *mcgrp,
     }
 }
 
+// Find and delete (delink + free) an MCGRP_CLIENT from the list of sources
+// anchored in a MCGRP_MBRSHP
+//v6 only
+void mldv2_destroy_client (MCGRP_CLASS   *mcgrp,
+        L2MCD_AVL_TREE   *clnt_tree, 
+        IPV6_ADDRESS      clnt_addr)
+{
+    MCGRP_CLIENT  *mcgrp_clnt = NULL;
+    MADDR_ST       clnt_address;
+
+    mcast_init_addr(&clnt_address, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+    mcast_set_ipv6_addr(&clnt_address, &clnt_addr);
+
+    mcgrp_clnt = M_AVLL_FIND(*clnt_tree, &clnt_address);
+    if (mcgrp_clnt) 
+    {
+        M_AVLL_DELETE(*clnt_tree, mcgrp_clnt);
+        mcgrp_free_client(mcgrp, mcgrp_clnt);
+    }
+}
+
+
 int mcgrp_port_id_cmp_cb (void *keya,
         void *keyb)
 {
@@ -2902,6 +3031,49 @@ int igmpv3_encode_src_list (IGMPV3_MESSAGE  *igmpv3_msg,
 
     return num_srcs;
 }
+
+int mldv2_encode_src_list (MLDV2_MESSAGE  *mldv2_msg, 
+        MCGRP_SOURCE    *p_src,
+        BOOLEAN          all_srcs,
+        BOOLEAN          is_retx)
+{
+    IPV6_ADDRESS  *p_dst = mldv2_msg->source_ary;
+    int      num_srcs = 0;
+
+    for (; p_src; p_src = p_src->next)
+    {
+        if (all_srcs || p_src->include_in_query)
+        {
+            // Include source if this a retransmit or if source is not already scheduled
+            if (is_retx || p_src->retx_cnt == 0)
+            {
+                *p_dst++ = p_src->src_addr.ip.v6addr;
+                num_srcs++;
+
+                // send at most one packet size.
+                // 1500 (MTU)
+                // - 40  (IPv6 header)
+                // - 8   (MLDv2 main header - ICMPv6)
+                // - 20  (MLDv2 Multicast Address Record header)
+                // = 1432 Source List
+                if (num_srcs >= 80)
+                    break;
+            }
+        }
+    }
+
+    // We may have broken out because we exceeded our MTU
+    // If so, make sure we reset the include_in_query flag for the remaining sources
+    for (; p_src; p_src = p_src->next)
+    {
+        p_src->include_in_query = FALSE;
+        p_src->retx_cnt = 0;
+    }
+
+    return num_srcs;
+}
+
+
 
 void mcgrp_process_wte_event (void *wte_param)
 {

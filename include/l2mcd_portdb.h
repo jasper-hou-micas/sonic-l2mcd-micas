@@ -22,6 +22,7 @@
 #include "l2mcd_mld_port.h"
 #include "l2mcd.h"
 #include "l2mcd_mcast_co.h"
+#include <netinet/in.h>
 
 #define MAC_ADDR_LEN 6
 #define PORTDB_DEFAULT_PORT_MTU     1500
@@ -29,22 +30,22 @@
 
 
 
-typedef struct PORTDB_IP6_ADDRESS_ENTRY_S {
-    struct PORTDB_IP6_ADDRESS_ENTRY_S   *sptr_forward_link;
-    IP6_IPV6_ADDRESS                    address; 
-    IP6_IPV6_ADDRESS                    prefix; 
-    UINT8                               prefix_length;
-    UINT8                               flags;
-} PORTDB_IP6_ADDRESS_ENTRY;
-
-typedef struct PORTDB_IP6_S {
-    /* ip6_enabled is enabled if address is configured or  ip6_protocol_enabled is set. */
-    UINT16             ip6_protocol_enabled:1; /* enable ipv6 interface, even if address is not configured */
-    UINT16             spare:15; 
-    UINT8              number_of_ip6_addresses;
-    PORTDB_IP6_ADDRESS_ENTRY *sptr_ip6_link_local_address; //Link Local Address
-    PORTDB_IP6_ADDRESS_ENTRY *sptr_ip6_address_list; //Global Address
-} PORTDB_IP6;
+ typedef struct PORTDB_IP6_ADDRESS_ENTRY_S {
+    UINT32              port_index;
+    IPV6_ADDRESS        ipaddress; 
+    IPV6_ADDRESS        prefix; 
+    VRF_INDEX           vrf_index;
+    UINT8               prefix_length;
+    UINT32              flags;
+ } PORTDB_IP6_ADDRESS_ENTRY;
+ 
+ typedef struct PORTDB_IP6_S {
+    UINT16              ip6_protocol_enabled:1; /* enable ipv6 interface, even if address is not configured */
+    UINT16              spare:15; 
+    UINT8               number_of_ip6_addresses;
+    struct list         *ip6_link_local_address; //Link Local Address
+    struct list         *ip6_address_list; //Global Address
+ } PORTDB_IP6;
 
 
 
@@ -102,6 +103,19 @@ typedef struct PORTDB_VRF_S {
     unsigned char   afi;
 } portdb_vrf_t;
 
+static int ip_addr_cmp(void *val1, void *val2) {
+    PORTDB_IP4 *p1 = (PORTDB_IP4 *)val1;
+    PORTDB_IP4 *p2 = (PORTDB_IP4 *)val2;
+
+    return memcmp(&p1->ipaddress, &p2->ipaddress, sizeof(PORTDB_IP4));
+}
+
+static int ip6_addr_cmp(void *val1, void *val2) {
+    PORTDB_IP6_ADDRESS_ENTRY *p1 = (PORTDB_IP6_ADDRESS_ENTRY *)val1;
+    PORTDB_IP6_ADDRESS_ENTRY *p2 = (PORTDB_IP6_ADDRESS_ENTRY *)val2;
+
+    return memcmp(&p1->ipaddress, &p2->ipaddress, sizeof(IP6_IPV6_ADDRESS));
+}
 
 char *portdb_get_ifname_from_portindex(unsigned long port_index);
 unsigned int portdb_get_portindex_from_ifname(char *ifname);
@@ -119,11 +133,15 @@ int portdb_set_port_state(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index, 
 port_link_list_t *
 portdb_get_port_lowest_ipv4_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index);
 unsigned char portdb_get_port_state(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index);
+struct list *portdb_get_port_ipv6_addr_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index);
+PORTDB_IP6_ADDRESS_ENTRY *portdb_get_port_lowest_ipv6_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index);
 int portdb_delete_ifname(char *ifname);
 int portdb_remove_port_entry_from_tree(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index);
 int portdb_add_port_entry_to_tree(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index, 
             VRF_INDEX vrf_id, unsigned long ifindex);
 int portdb_remove_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
-                            UINT32 ipaddress);
+                           UINT32 ipaddress);
+int portdb_remove_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, UINT32 ipaddress);
+int portdb_remove_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, IPV6_ADDRESS ip6address);
 unsigned long portdb_get_port_ifindex(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index);
 #endif //__L2MCD_PORTDB__

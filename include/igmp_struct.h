@@ -296,7 +296,7 @@ typedef struct IGMP_STATS
     UINT32 pim_hello_pkt_rcvd;
 
 } IGMP_STATS;
-
+#if 0
 typedef struct MLD_STATS
 {
 
@@ -309,6 +309,44 @@ typedef struct MLD_STATS
 	UINT32	xmt_packets;
 	UINT32 pim_hello_pkt_rcvd;
 } MLD_STATS;
+#endif
+
+typedef struct MLD_STATS
+ {
+    // Query - receive
+    UINT32 mld_recv_gen_query_msg[2];    // general query
+    UINT32 mld_recv_grp_query_msg;       // group specific query
+    UINT32 mld_recv_grp_src_query_msg;   // group/source specific query
+    UINT32  mld_wrong_ver_query;
+
+    // Query - transmit
+    UINT32 mld_xmt_gen_query_msg[2];     // general query
+    UINT32 mld_xmt_grp_query_msg;        // group specific query
+    UINT32 mld_xmt_grp_src_query_msg;    // group/source specific query
+
+
+    // Reports
+    UINT32 mld_recv_membership_ary[2];   // Reports
+
+    // Reports, broken down into report-types
+    UINT32 mldv2_msg_type[MCGRP_MAX_ACTION_TYPE];   // IS_IN, IS_EX, TO_IN, TO_EX, ALLOW, BLOCK
+
+    // Leaves
+    UINT32 mld_recv_leave_msg;
+
+    // Miscellaneous error stats
+    UINT32 recv_checksum_error;
+    UINT32 recv_size_or_range_error;
+
+    //SSM Mapping Error
+    UINT32  mld_ssm_map_error;
+
+    UINT32 recv_packets;
+    UINT32 xmt_packets;
+    UINT32  xmt_error;
+
+    UINT32 pim_hello_pkt_rcvd;
+ } MLD_STATS;
 
 extern SORTED_LINKLIST_KEYINFO mldv2_src_keyinfo;
 extern SORTED_LINKLIST_KEYINFO mldv2_clnt_keyinfo;

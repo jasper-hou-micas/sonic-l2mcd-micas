@@ -310,6 +310,51 @@ USHORT calculate_ip_checksum (PSEUDO_IP_PARAMETERS *sptr_pseudo_header, BYTE *bp
     return (return_value);
 }
 
+USHORT calculate_ip6_checksum(IPV6_ADDRESS *source_address, IPV6_ADDRESS *group_address, BYTE *bptr_start_from, UINT32 length, UINT8 protocol)
+{
+    ULONG sum = 0;
+    USHORT word_checksum;
+
+    if (source_address != NULL)
+    {
+        word_checksum = calculate_word_checksum((USHORT *)source_address, (USHORT)(16 >> 1));
+        sum += (ULONG)word_checksum;
+    }
+
+    if (group_address != NULL)
+    {
+        word_checksum = calculate_word_checksum((USHORT *)group_address, (USHORT)(16 >> 1));
+        sum += (ULONG)word_checksum;
+    }
+
+    USHORT high = (USHORT)((length >> 16) & 0xFFFFu);
+    USHORT low = (USHORT)(length & 0xFFFFu);
+    sum += (ULONG)high;
+    sum += (ULONG)low;
+    sum += (ULONG)protocol;
+
+    if (length >= 2)
+    {
+        /* ptr_start_from must be on short word boundary */
+        word_checksum = calculate_word_checksum((USHORT *)bptr_start_from, (USHORT)(length >> 1));
+        sum += (ULONG)word_checksum;
+    }
+
+    /* Handle odd trailing byte */
+    if (length & 1u)
+    {
+#ifndef BIG_ENDIAN
+        sum += (ULONG)((unsigned char)payload[payload_len - 1]);
+#else
+        sum += (ULONG)(((unsigned char)bptr_start_from[length - 1]) << 8);
+#endif
+    }
+
+    /* Do final end-around carry, complement and return */
+    USHORT result = (USHORT)(~end_around_carry(sum) & 0xFFFFu);
+    return result;
+}
+
 BOOLEAN is_trunk_up( TRUNK_ID trunk_id )
 {
     return  FALSE;

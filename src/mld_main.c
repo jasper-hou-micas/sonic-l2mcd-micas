@@ -102,11 +102,14 @@ void mld_vport_state_notify (UINT16   vir_port_id,
         if ((is_mld_snooping_enabled(mld_vport, afi) &&
                     is_mld_snooping_querier_enabled(mld_vport)) ||
                 is_mld_l3_configured(mld_vport)) {
-
-
             {    
                 if ((afi == MCAST_IPV6_AFI) && IP6_IS_ADDRESS_UNSPECIFIED(mld_vport->querier_router.ip.v6addr.address)) {
                    //MLD
+                   L2MCD_LOG_INFO("%s() mld_send_general_query", __FUNCTION__);
+                    if (!IP6_IS_ADDRESS_UNSPECIFIED(mld_vport->querier_router.ip.v6addr.address) || is_mld_l3_configured(mld_vport))
+                        mld_send_general_query(mld, mld_vport->vir_port_id,
+                                mld_pport->phy_port_id, (UINT8) mld_vport->oper_version,
+                                0, (mld_vport->max_response_time * 1000));
                 } else {
                     L2MCD_LOG_INFO("%s() igmp_send_general_query", __FUNCTION__);
                     if (!mld_vport->querier_router.ip.v4addr || is_mld_l3_configured(mld_vport))

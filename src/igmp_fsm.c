@@ -72,7 +72,7 @@ void mcgrp_notify_vif_add (MCGRP_CLASS   *mcgrp,
     else
     {
         L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] unsupported", FN,LN,vir_port_id);
-        return; //MLD
+        mcast_set_ipv6_addr(&src_addr, PIM_ENCODE_SRC_ADDRESS_WC);
     }
 
     L2MCD_VLAN_LOG_INFO(vir_port_id,"%s:%d:[vlan:%d] [ Port %s,%d, %s. Grp %s ] Interface added to group. Chg %d",
@@ -201,8 +201,8 @@ void mcgrp_notify_vif_del(MCGRP_CLASS  *mcgrp,
         mcast_set_ipv4_addr(&src_addr, PIM_ENCODE_SRC_ADDRESS_WC);
     else
     {
+        mcast_set_ipv6_addr(&src_addr, PIM_ENCODE_SRC_ADDRESS_WC);
         L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] unsupported", FN,LN,vir_port_id);
-        return; //MLD
     }
 }
 
@@ -238,8 +238,8 @@ void mcgrp_notify_phy_port_del (MCGRP_CLASS  *mcgrp,
     }
     else
     {
+        mcast_set_ipv6_addr(&src_addr, PIM_ENCODE_SRC_ADDRESS_WC);
         L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] unsupported", FN,LN,vir_port_id);
-        return;
     }
     L2MCD_VLAN_LOG_INFO(vir_port_id,"%s:%d:[vlan:%d][ Port %s,%s. Grp %s ] Physical port deleted from group. Chg %d\n",
             FN,LN,vir_port_id, mld_get_if_name_from_ifindex(phy_port_id), 
@@ -277,7 +277,7 @@ void mcgrp_notify_phy_port_del (MCGRP_CLASS  *mcgrp,
 
         }
     }
-    if (mcgrp_pport->oper_version == IGMP_VERSION_3) 
+    if (mcgrp_pport->oper_version == IGMP_VERSION_3 /*mld to do*/) 
     {
         if (mcgrp_entry)
         {
@@ -1536,6 +1536,14 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
                             else 
                             { 
                                 //MLD
+                                mbrshp_del = mld_send_group_query(mcgrp, mcgrp_mbrshp,
+                                        vir_port_id,
+                                        phy_port_id,
+                                        (UINT8) mcgrp_pport->oper_version,
+                                        group_address->ip.v6addr, // group-specific query
+                                        ip6_unspecified_address,  // Use lowest IP addr of this port
+                                        clnt_src_ip->ip.v6addr,
+                                        FALSE);      // not retx
                             }
        
                         }
@@ -1865,7 +1873,7 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
     // Check and cleanup as required
     if (mbrshp_del)
     {
-        if(new_src_list && mcgrp_pport->oper_version == IGMP_VERSION_3)
+        if(new_src_list && mcgrp_pport->oper_version == IGMP_VERSION_3 || mcgrp_pport->oper_version == MLD_VERSION_2 )
         {
             if (IS_IGMP_CLASS(mcgrp))
             {
@@ -2003,7 +2011,7 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
                 {
                     if (mcgrp_mbrshp && (mcgrp_mbrshp->is_remote!= is_remote))
                     {
-                        mcast_set_ipv4_addr(&src_temp, 0);
+                        mcast_set_ipv4_addr(&src_temp, 0);//TODO
                         mcgrp_mbrshp->is_remote = is_remote;
                         L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] rmt:%d", FN,LN,vir_port_id, is_remote);
                         l2mcd_system_group_entry_notify(group_address, &src_temp, vir_port_id, phy_port_id, TRUE, TRUE);
@@ -2013,7 +2021,7 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
                 {
                     for (j = FILT_INCL; j <= FILT_EXCL; j++)
                     {
-                        mcast_set_ipv4_addr(&src_temp, srcarray[i]);
+                        mcast_set_ipv4_addr(&src_temp, srcarray[i]);//TODO
                         igmpv3_src_temp = mcgrp_find_source(mcgrp_mbrshp, &src_temp, i);
                         if (igmpv3_src_temp && (igmpv3_src_temp->is_remote !=is_remote))
                         {
@@ -2131,9 +2139,10 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
                     phy_port_id);
         }
         else
-        {
-			//MLD not supported
-            flag = FALSE; 
+        { 
+			//MLD 
+            flag = mld_staticGroup_exists_on_port(&(group_address->ip.v6addr), vir_port_id, 
+                    phy_port_id);
         }
         mcast_grp_addr_t grp_addr;
         mcast_set_address(&grp_addr, group_address);
@@ -2162,7 +2171,16 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
             }
             else
             {
-                //MLD         
+                mcast_set_ipv6_addr(&source_address, ip_get_lowest_ipv6_address_on_port(vir_port_id, mcgrp_vport->type));
+                mcgrp_update_group_address_table(mcgrp, vir_port_id, 
+                        phy_port_id,
+                        group_address, 
+                        &source_address,//use intf's addr as clnt src
+                        IS_EXCL,
+                        (mcgrp_pport->oper_version >= MLD_VERSION_2) 
+                        ? MLD_VERSION_2 : MLD_VERSION_1,
+                        0, (void *)NULL /* No sources */);
+                //MLD
             }
         }
     }

@@ -135,8 +135,19 @@ char *mcast_print_addr (MADDR_ST *addr)
 				break;
 
 			case IP_IPV6_AFI:
-                break;
-
+                {
+                    char addr_str[INET6_ADDRSTRLEN] = {0};
+                    inet_ntop(AF_INET6, &addr->ip.v6addr, addr_str, sizeof(addr_str));
+					if ((addr->plen == MADDR_GET_FULL_PLEN(addr->afi)) || (addr->plen == 0))
+					{
+						snprintf(mcast_addr_buff[bidx], MCAST_PRINT_BUF_SIZE, "%s", addr_str);
+					}
+					else
+					{
+						snprintf(mcast_addr_buff[bidx], MCAST_PRINT_BUF_SIZE, "%s/%d", addr_str, addr->plen);
+					}
+					break;
+                }
 			default:
 				snprintf(mcast_addr_buff[bidx], MCAST_PRINT_BUF_SIZE, "-");
 				break;

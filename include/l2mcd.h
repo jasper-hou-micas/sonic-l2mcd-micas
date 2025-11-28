@@ -64,7 +64,7 @@
 #define L2MCD_DEFAULT_VRF_IDX      0
 #define L2MCD_IPV4_AFI             1
 #define L2MCD_IPV6_AFI             2
-#define L2MCD_AFI_MAX              1
+#define L2MCD_AFI_MAX              2
 #define MCAST_IPV4_AFI L2MCD_IPV4_AFI
 #define MCAST_IPV6_AFI L2MCD_IPV6_AFI
 #define L2MCD_LIBEV_PRIO_QUEUES 2
@@ -78,6 +78,8 @@
 #define L2MCD_RX_BUFFER_SIZE  2048
 extern int applog_level_map[APP_LOG_LEVEL_MAX + 2];
 
+#define L2MCD_PROTO_IGMP 1
+#define L2MCD_PROTO_MLD  2
 
 #define L2MCD_BF_RD(reg, off, mask)   (((reg) & (mask)) >> (off))
 #define BITFLD(offset,width)    (((1<<(width))-1) << (offset))
@@ -192,7 +194,13 @@ typedef struct l2mcd_if_tree_s
     uint32_t sock_pkts;
     uint32_t sock_drops;
     uint32_t bm[128];
+    /* IGMP socket/event */
+    int igmp_sock_fd;
     struct event *igmp_rx_event;
+
+    /* MLD socket/event */
+    int mld_sock_fd;
+    struct event *mld_rx_event;
 } l2mcd_if_tree_t;
 
 typedef struct
@@ -210,6 +218,7 @@ typedef struct
     uint32_t igmp_pkts;
     uint32_t pim_pkts;
     uint32_t non_igmp_pkts;
+    uint32_t non_mld_pkts;
     uint32_t no_aux;
     uint32_t no_tag;
     uint32_t inv_tags;
@@ -222,6 +231,7 @@ typedef struct L2MCD_CONTEXT {
     int                 ipc_fd;         //communication with l2mcdmgr, etc.
     int                 igmp_rx_fd;     //Recieve socket for snooped packets
     int                 igmp_tx_fd;     //Tx Socket 
+    int                 mld_tx_fd;
     uint32_t            l2mcd_msg_fd;
     uint32_t            nl_fd;
     L2MCD_LIBEV_STATS   libev_stats;
@@ -269,6 +279,7 @@ typedef struct L2MCD_APP_TABLE_ENTRY {
     uint8_t     is_remote; 
     int         vlan_id; 
     uint32_t    count; 
+    BOOLEAN     is_igmp;
     char        saddr[L2MCD_IP_ADDR_STR_SIZE];
     char        gaddr[L2MCD_IP_ADDR_STR_SIZE];
     PORT_ATTR   ports[L2MCD_IPC_MAX_PORTS]; 
@@ -280,6 +291,7 @@ extern L2MCD_CONTEXT l2mcd_context;
 #define g_l2mcd_ipc_handle                l2mcd_context.ipc_fd
 #define g_l2mcd_igmp_rx_handle            l2mcd_context.igmp_rx_fd
 #define g_l2mcd_igmp_tx_handle            l2mcd_context.igmp_tx_fd
+#define g_l2mcd_mld_tx_handle             l2mcd_context.mld_tx_fd
 #define g_l2mcd_igmp_msg_handle           l2mcd_context.l2mcd_msg_fd
 #define g_l2mcd_nl_fd                     l2mcd_context.nl_fd
 #define g_l2mcd_stats_libev_no_of_sockets l2mcd_context.libev_stats.no_of_sockets
@@ -293,13 +305,14 @@ extern L2MCD_CONTEXT l2mcd_context;
 #define g_l2mcd_pkt_log                   l2mcd_context.pktlog
 #define g_if_to_kif                       l2mcd_context.ifindex_to_kifindex
 #define g_curr_dbg_level                  l2mcd_context.curr_dbg_level
-#define g_l2mcd_vlan_dbg_to_sys_log            l2mcd_context.dbg_to_sys_log     
+#define g_l2mcd_vlan_dbg_to_sys_log       l2mcd_context.dbg_to_sys_log     
 #define g_l2mcd_dbg_vlan_log_all          l2mcd_context.dbg_vlan_log_all     
 #define g_l2mcd_rx_buf                    l2mcd_context.rx_buf
 #define g_l2mcd_if_to_kif_tree            l2mcd_context.if_to_kif_tree
 #define g_l2mcd_kif_to_if_tree            l2mcd_context.kif_to_if_tree
 #define g_l2mcd_rx_is_l2_sock             l2mcd_context.rx_is_l2_sock
 #define g_rx_stats_non_igmp_pkts          l2mcd_context.rx_stats.non_igmp_pkts
+#define g_rx_stats_non_mld_pkts           l2mcd_context.rx_stats.non_mld_pkts
 #define g_rx_stats_igmp_pkts              l2mcd_context.rx_stats.igmp_pkts
 #define g_rx_stats_pim_pkts               l2mcd_context.rx_stats.pim_pkts
 #define g_rx_stats_tot_pkts               l2mcd_context.rx_stats.tot_pkts
@@ -377,9 +390,12 @@ uint32_t l2mcd_ifname_to_kifindex(char *if_name);
 void dump_mcgrp_class (uint32_t afi);
 void l2mcd_print_global_var(void);
 int l2mcd_avl_compare_u32(const void *ptr1, const void *ptr2, void *params);
- struct event *l2mcd_igmprx_sock_init(int *fd, char *iname);
+struct event *l2mcd_igmprx_sock_init(int *fd, char *iname);
+struct event *l2mcd_mldrx_sock_init(int *fd, char *iname);
 int l2mcd_igmprx_sock_close(char *pnames, int fd, struct event *igmp_rx_event);
-int l2mcd_add_kif_to_if(char *ifname, uint32_t ifid, int sock_fd, struct event *ev, int po_id, int vid, int op, int oper);
+int l2mcd_mldrx_sock_close(char *pnames, int fd, struct event *mld_rx_event);
+int l2mcd_add_kif_to_if(char *ifname, uint32_t ifid, int sock_fd, struct event *ev, int po_id, int vid, int op, int oper, int proto);
+
 int l2mcd_del_if_tree(uint32_t ifid);
 l2mcd_if_tree_t* l2mcd_if_to_kif(uint32_t ifid);
 l2mcd_if_tree_t* l2mcd_kif_to_if(uint32_t kif);
@@ -391,6 +407,8 @@ void l2mcd_clear_snooping_stats(int vid);
 void l2mcd_clear_snooping(int vid);
 void portdb_insert_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
                      UINT32 ipaddress, UINT8 prefix_length, VRF_INDEX vrf_index, UINT32 flags);
+void portdb_insert_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
+                     IPV6_ADDRESS ipaddress, UINT8 prefix_length, VRF_INDEX vrf_index, UINT32 flags);
 int l2mcd_portstate_update(int kif, int state, char *iname);
 int l3_time_freq_init(void);
 int l2mcd_port_list_update(char *pnames, int oper_state, int is_add);

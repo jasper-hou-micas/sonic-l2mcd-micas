@@ -55,7 +55,7 @@ void l2mcd_port_state_notify_handler(l2mcd_if_tree_t *l2mcd_if_tree,int state_up
 /*
  * IF Tree  
  */
-int l2mcd_add_kif_to_if(char *ifname, uint32_t ifid, int fd, struct event *igmp_rx_event, int po_id, int vid, int op_code, int oper)
+int l2mcd_add_kif_to_if(char *ifname, uint32_t ifid, int fd, struct event *ev, int po_id, int vid, int op_code, int oper, int proto)
 {
     uint32_t kif;
     kif = if_nametoindex(ifname);
@@ -96,11 +96,19 @@ int l2mcd_add_kif_to_if(char *ifname, uint32_t ifid, int fd, struct event *igmp_
     {
         l2mcd_if_tree1->po_id = l2mcd_if_tree2->po_id = po_id;
     }
-    if (fd !=-1)
-    {
-        l2mcd_if_tree1->sock_fd = l2mcd_if_tree2->sock_fd = fd;
-        l2mcd_if_tree1->igmp_rx_event=l2mcd_if_tree2->igmp_rx_event=igmp_rx_event;
+
+    if (fd != -1 && ev) {
+        if (proto == L2MCD_PROTO_IGMP) {
+            l2mcd_if_tree1->igmp_sock_fd = l2mcd_if_tree2->igmp_sock_fd = fd;
+            l2mcd_if_tree1->igmp_rx_event = l2mcd_if_tree2->igmp_rx_event = ev;
+        } else if (proto == L2MCD_PROTO_MLD) {
+            l2mcd_if_tree1->mld_sock_fd = l2mcd_if_tree2->mld_sock_fd = fd;
+            l2mcd_if_tree1->mld_rx_event = l2mcd_if_tree2->mld_rx_event = ev;
+        } else {
+            return -1;
+        }
     }
+
     if (vid != -1)
     {
         if (op_code) 
@@ -130,11 +138,11 @@ int l2mcd_add_kif_to_if(char *ifname, uint32_t ifid, int fd, struct event *igmp_
         {
             L2MCD_INIT_LOG("%s AVL Insert Error: if_to_kif: kif:%d if:%d iname:%s sk:%d", __FUNCTION__, l2mcd_if_tree2->kif,l2mcd_if_tree2->ifid, l2mcd_if_tree2->iname, l2mcd_if_tree2->sock_fd); 
         }
-  
+
         L2MCD_INIT_LOG("%s kif_to_if: kif:%d if:%d iname:%s sk:%d ev:%p",
-               __FUNCTION__, l2mcd_if_tree1->ifid,l2mcd_if_tree1->kif, l2mcd_if_tree1->iname, l2mcd_if_tree1->sock_fd,l2mcd_if_tree1->igmp_rx_event);
+                       __FUNCTION__, l2mcd_if_tree1->ifid, l2mcd_if_tree1->kif, l2mcd_if_tree1->iname, l2mcd_if_tree1->sock_fd, ev);
         L2MCD_INIT_LOG("%s if_to_kif: if:%d kif:%d iname:%s sk:%d ev:%p",
-               __FUNCTION__, l2mcd_if_tree2->kif,l2mcd_if_tree2->ifid, l2mcd_if_tree2->iname, l2mcd_if_tree2->sock_fd,l2mcd_if_tree1->igmp_rx_event); 
+                       __FUNCTION__, l2mcd_if_tree2->kif, l2mcd_if_tree2->ifid, l2mcd_if_tree2->iname, l2mcd_if_tree2->sock_fd, ev);
     }
     return 0;
 }
@@ -195,12 +203,105 @@ int l2mcd_portstate_update(int kif, int state, char *iname)
     return -1;
 
 }
+int l2mcd_port_list_update(char *pnames, int oper_state, int is_add) 
+{
+    int ifidx, kif, rc;
+    l2mcd_if_tree_t *if_tree = NULL;
+    struct event *igmp_rx_event = NULL;
+    struct event *mld_rx_event = NULL;
+    int sock_fd, mld_sock_fd;
 
+    ifidx = portdb_get_portindex_from_ifname(pnames);
+
+    if ((ifidx <= 0) || (ifidx == NO_SUCH_PORT)) {
+        kif = if_nametoindex(pnames);
+        if (strstr(pnames, "PortChannel")) {
+            ifidx = L2MCD_PORTDB_LAGIF_START_IDX + kif;
+        } else {
+            ifidx = L2MCD_PORTDB_PHYIF_START_IDX + kif;
+        }
+        rc = portdb_add_ifname(pnames, strlen(pnames)+1, ifidx);
+        L2MCD_LOG_NOTICE("%s portdb add port:%s, index:%d rc:%d", __FUNCTION__, pnames, ifidx, rc);
+    }
+
+    if_tree = l2mcd_if_to_kif(ifidx);
+    kif = if_nametoindex(pnames);
+    L2MCD_INIT_LOG("%s PortInfo RX: %s, ifidx:%d oper:%d is_add:%d is_lag:%d, kif:%d", 
+                   __FUNCTION__, pnames, ifidx, oper_state, is_add,
+                   L2MCD_IFINDEX_IS_LAG(ifidx), kif);
+
+    if (L2MCD_IFINDEX_IS_LAG(ifidx)) {
+        L2MCD_INIT_LOG("LAG ifidx:%d %s", ifidx, pnames);
+        if (!is_add) {
+            if (if_tree) l2mcd_del_if_tree(ifidx);
+            return 0;
+        }
+        l2mcd_add_kif_to_if(pnames, ifidx, -1, NULL, -1, -1, -1, oper_state, L2MCD_PROTO_IGMP);
+        l2mcd_add_kif_to_if(pnames, ifidx, -1, NULL, -1, -1, -1, oper_state, L2MCD_PROTO_MLD);//mld
+        return 0;
+    }
+
+    if (!is_add) {
+        if (if_tree) {
+            if (if_tree->igmp_sock_fd)
+                l2mcd_igmprx_sock_close(pnames, if_tree->igmp_sock_fd, if_tree->igmp_rx_event);
+            if (if_tree->mld_sock_fd)
+                l2mcd_mldrx_sock_close(pnames, if_tree->mld_sock_fd, if_tree->mld_rx_event);
+
+            l2mcd_del_if_tree(ifidx);
+            rc = portdb_delete_ifname(pnames);
+            L2MCD_LOG_NOTICE("%s portdb delete port:%s, index:%d rc:%d", __FUNCTION__, pnames, ifidx, rc);
+        }
+        return 0;
+    }
+
+    if (kif <= 0) {
+        L2MCD_INIT_LOG("%s PortInfo RX: %s, if:%d is_add:%d oper_state:%d not available",
+                        __FUNCTION__, pnames, kif, is_add, oper_state);
+        return -1;
+    }
+
+    if (if_tree && if_tree->kif != kif) {
+        if (if_tree->igmp_sock_fd)
+            l2mcd_igmprx_sock_close(pnames, if_tree->igmp_sock_fd, if_tree->igmp_rx_event);
+        if (if_tree->mld_sock_fd)
+            l2mcd_mldrx_sock_close(pnames, if_tree->mld_sock_fd, if_tree->mld_rx_event);
+
+        l2mcd_del_if_tree(ifidx);
+        rc = portdb_delete_ifname(pnames);
+        L2MCD_LOG_NOTICE("%s portdb delete2 port:%s, index:%d rc:%d", __FUNCTION__, pnames, ifidx, rc);
+        if_tree = NULL;
+    }
+
+    if (if_tree && if_tree->igmp_sock_fd && if_tree->mld_sock_fd) {
+        L2MCD_INIT_LOG("%s if:%s(%d) IGMP/MLD sockets already exist", __FUNCTION__, pnames, ifidx);
+        return 0;
+    }
+
+    igmp_rx_event = l2mcd_igmprx_sock_init(&sock_fd, pnames);
+    if (igmp_rx_event) {
+        rc = l2mcd_add_kif_to_if(pnames, ifidx, sock_fd, igmp_rx_event, -1, -1, -1, oper_state, L2MCD_PROTO_IGMP);
+    } else {
+        L2MCD_INIT_LOG("IGMP socket create failed for %s, if:%d", pnames, kif);
+    }
+
+    mld_rx_event = l2mcd_mldrx_sock_init(&mld_sock_fd, pnames);
+    if (mld_rx_event) {
+        rc = l2mcd_add_kif_to_if(pnames, ifidx, mld_sock_fd, mld_rx_event,-1, -1, -1, oper_state, L2MCD_PROTO_MLD);
+    } else {
+        L2MCD_INIT_LOG("MLD socket create failed for %s, if:%d", pnames, kif);
+    }
+
+    return rc;
+}
+
+#if 0
 int l2mcd_port_list_update(char *pnames, int oper_state, int is_add) 
 {
     int ifidx, kif, rc;
     l2mcd_if_tree_t *l2mcd_if_tree;
     struct event *igmp_rx_event=NULL;
+    struct event *mld_rx_event=NULL;
     int sock_fd;
     
     ifidx = portdb_get_portindex_from_ifname(pnames);
@@ -216,7 +317,10 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
 		}
         else
         {
-            return -1;
+            kif = if_nametoindex(pnames);
+            ifidx = L2MCD_PORTDB_PHYIF_START_IDX+kif;
+            rc= portdb_add_ifname(pnames, strlen(pnames) + 1, ifidx);
+            L2MCD_LOG_NOTICE("%s portdb_portindex_to_ifname_hash add2  port:%s, index:%d rc:%d", FN, pnames, ifidx, rc);
         }
     }
     l2mcd_if_tree = l2mcd_if_to_kif(ifidx);
@@ -256,6 +360,16 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
                         __FUNCTION__, pnames,kif,is_add,oper_state);
         return -1;
     }
+    
+    if ((l2mcd_if_tree && l2mcd_if_tree->kif != kif))
+    {
+        l2mcd_igmprx_sock_close(pnames, l2mcd_if_tree->sock_fd, l2mcd_if_tree->igmp_rx_event);
+        l2mcd_del_if_tree(ifidx);
+        rc=portdb_delete_ifname(pnames);
+        L2MCD_LOG_NOTICE("%s portdb_portindex_to_ifname_hash del2  port:%s, index:%d rc:%d", FN, pnames, ifidx, rc);
+        return 0;
+    }
+    
     if (l2mcd_if_tree && l2mcd_if_tree->sock_fd)
     {
         L2MCD_INIT_LOG("%s if:%s(%d) rx_sock:%d exists", __FUNCTION__, pnames, ifidx, l2mcd_if_tree->sock_fd);
@@ -267,10 +381,18 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
         L2MCD_INIT_LOG("socket create failed for RX: %s, if:%d",pnames,kif);
     }
     rc=l2mcd_add_kif_to_if(pnames, ifidx, sock_fd, igmp_rx_event, -1, -1, -1, oper_state);
+
+    mld_rx_event = l2mcd_mldrx_sock_init(&sock_fd, pnames);
+    if (!mld_rx_event)
+    {
+        L2MCD_INIT_LOG("socket create failed for mld RX: %s, if:%d", pnames,kif);
+    }
+    rc=l2mcd_add_kif_to_if(pnames, ifidx, sock_fd, mld_rx_event, -1, -1, -1, oper_state);
+
     return rc;
 }
 
-
+#endif
 int l2mcd_del_if_tree(uint32_t ifid)
 {
 

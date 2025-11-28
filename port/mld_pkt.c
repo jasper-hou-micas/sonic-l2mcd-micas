@@ -216,7 +216,8 @@ int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid,
     char  ifname[L2MCD_IFNAME_SIZE];
     struct sockaddr_ll sa;
     l2mcd_if_tree_t *l2mcd_if_tree;
-
+    uint16_t ether_type;
+    
 	int	send_pkt_size = 0;
     int	ip_pkt_total_len = 0;
 
@@ -256,18 +257,22 @@ int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid,
     eth_hdr = (struct ethhdr *)send_pkt;
 
     //Fill SMAC and DMAC 
+    memcpy(eth_hdr->h_source, mcgrp_glb->mac, ETHER_ADDR_LEN);
     if(grp_addr->afi == IP_IPV6_AFI) 
     {
         MLD_CONVERT_IPV6MCADDR_TO_MAC ((char *)&grp_addr->ip.v6addr, eth_hdr->h_dest);
         //Fill v6 Ether type.
         eth_hdr->h_proto = htons(HSL_ETHER_TYPE_IPV6); 
+        ether_type = HSL_ETHER_TYPE_IPV6;
     } else {
-        uint32_t ipv4 = (grp_addr->ip.v4addr);
-		memcpy(eth_hdr->h_source, mcgrp_glb->mac, ETHER_ADDR_LEN);
-        MLD_CONVERT_IPV4MCADDR_TO_MAC ((char *)&(ipv4), eth_hdr->h_dest);
-        eth_hdr->h_proto = htons(HSL_ETHER_TYPE_IP); 
+        //uint32_t ipv4 = (grp_addr->ip.v4addr);
+		//memcpy(eth_hdr->h_source, mcgrp_glb->mac, ETHER_ADDR_LEN);
+        MLD_CONVERT_IPV4MCADDR_TO_MAC ((char *)&(grp_addr->ip.v4addr), eth_hdr->h_dest);
+        //eth_hdr->h_proto = htons(HSL_ETHER_TYPE_IP); 
+        ether_type = HSL_ETHER_TYPE_IP;
     }
-
+    eth_hdr->h_proto = htons(ether_type);
+    
     if (is_bcast)
     {
         snprintf(ifname, L2MCD_IFNAME_SIZE,"Vlan%d",ivid);
@@ -305,8 +310,10 @@ int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid,
         *vlanhdr++ = 0x00;
         *vlanhdr++ = (prio | (ivid & 0xf00) >> 8);
         *vlanhdr++ = (ivid & 0xff);
-        *vlanhdr++ = 0x08;
-        *vlanhdr++ = 0x00;
+        //*vlanhdr++ = 0x08;
+        //*vlanhdr++ = 0x00;
+        *vlanhdr++ = (ether_type >> 8) & 0xff;
+        *vlanhdr++ = (ether_type & 0xff);
     }
 
     snprintf(smac, sizeof(smac), "%02x:%02x:%02x:%02x:%02x:%02x",
@@ -316,6 +323,7 @@ int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid,
 
     sa.sll_halen = ETH_ALEN;
     memcpy(sa.sll_addr, eth_hdr->h_dest, ETHER_ADDR_LEN);
+#if 0
     L2MCD_PKT_PRINT(ivid,
             "IGMP_TX Packet %s  ETH DA:%s,SA:%s,etype:0x%x  IP: v:0x%x ihl:0x%x len:0x%x tttl:0x%x prot:0x%x csum:0x%x sip:0x%x dip:0x%x option:0x%x option:length:%d, IGMP:type:0x%x mrt:0x%x csum:0x%x ga:0x%x outif:0x%x is_bcast:%d vlan_type:%d",
             ifname, dmac,smac,eth_hdr->h_proto,
@@ -324,11 +332,41 @@ int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid,
             igmp_pkt->ip_header.destination_ip_address,igmp_pkt->ip_options.code.option_number,igmp_pkt->ip_options.length,
             igmp_pkt->igmp_message.type, igmp_pkt->igmp_message.maximum_response_time, igmp_pkt->igmp_message.checksum, 
             igmp_pkt->igmp_message.group_address,sa.sll_ifindex, is_bcast, vlan_type);
-    if (sendto(g_l2mcd_igmp_tx_handle, pkt, pkt_len, 0, (struct sockaddr*)&sa,sizeof(sa)) == -1)
+#endif
+    if(grp_addr->afi == IP_IPV4_AFI)
     {
-        L2MCD_PKT_PRINT(ivid, "IGMP_TX Err is_bcast:%d vlan_type:%d  port:%d ret:%s\n", is_bcast, vlan_type,  phy_port_id, strerror(errno));
-        L2MCD_LOG_NOTICE("sock send  handle ivid:%d  %d pklen:%d port:%d ret: %s",g_l2mcd_igmp_tx_handle,pkt_len, phy_port_id, ivid, strerror(errno));
-		ret=-1;
+        IGMP_PACKET *igmp_pkt = NULL;
+        igmp_pkt = (IGMP_PACKET *)((char *)pkt + eth_hdr_size);
+        L2MCD_PKT_PRINT(ivid,
+                        "IGMP_TX Packet %s  ETH DA:%s,SA:%s,etype:0x%x  IP: v:0x%x ihl:0x%x len:0x%x tttl:0x%x prot:0x%x csum:0x%x sip:0x%x dip:0x%x option:0x%x option:length:%d, IGMP:type:0x%x mrt:0x%x csum:0x%x ga:0x%x outif:0x%x is_bcast:%d vlan_type:%d",
+                        ifname, dmac, smac, eth_hdr->h_proto,
+                        igmp_pkt->ip_header.version_header_length.version, igmp_pkt->ip_header.version_header_length.header_length, igmp_pkt->ip_header.total_length,
+                        igmp_pkt->ip_header.time_to_live, igmp_pkt->ip_header.protocol, igmp_pkt->ip_header.header_checksum, igmp_pkt->ip_header.source_ip_address,
+                        igmp_pkt->ip_header.destination_ip_address, igmp_pkt->ip_options.code.option_number, igmp_pkt->ip_options.length,
+                        igmp_pkt->igmp_message.type, igmp_pkt->igmp_message.maximum_response_time, igmp_pkt->igmp_message.checksum,
+                        igmp_pkt->igmp_message.group_address, sa.sll_ifindex, is_bcast, vlan_type);
+    }
+    else
+    {
+        L2MCD_PKT_PRINT(ivid, "MLD_TX Packet %s  ETH DA:%s,SA:%s,etype:0x%x",
+                        ifname, dmac, smac, eth_hdr->h_proto);
+    }
+
+    if(grp_addr->afi == IP_IPV4_AFI){
+        if (sendto(g_l2mcd_igmp_tx_handle, pkt, pkt_len, 0, (struct sockaddr*)&sa,sizeof(sa)) == -1)
+        {
+            L2MCD_PKT_PRINT(ivid, "IGMP_TX Err is_bcast:%d vlan_type:%d  port:%d ret:%s\n", is_bcast, vlan_type,  phy_port_id, strerror(errno));
+            L2MCD_LOG_NOTICE("sock send  handle ivid:%d  %d pklen:%d port:%d ret: %s",g_l2mcd_igmp_tx_handle,pkt_len, phy_port_id, ivid, strerror(errno));
+    		ret=-1;
+        }
+    }else if (grp_addr->afi == IP_IPV6_AFI)
+    {
+        if (sendto(g_l2mcd_mld_tx_handle, pkt, pkt_len, 0, (struct sockaddr*)&sa,sizeof(sa)) == -1)
+        {
+            L2MCD_PKT_PRINT(ivid, "mld_TX Err is_bcast:%d vlan_type:%d  port:%d ret:%s\n", is_bcast, vlan_type,  phy_port_id, strerror(errno));
+            L2MCD_LOG_NOTICE("sock send  handle ivid:%d  %d pklen:%d port:%d ret: %s",g_l2mcd_igmp_tx_handle,pkt_len, phy_port_id, ivid, strerror(errno));
+    		ret=-1;
+        }
     }
 
 	free(send_pkt);

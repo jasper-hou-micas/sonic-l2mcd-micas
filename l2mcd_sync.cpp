@@ -253,12 +253,21 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     std::vector<FieldValueTuple> fvVector1;
     std::vector<swss::FieldValueTuple> entry;
 
-    key = VLAN_PREFIX + to_string(msg->vlan_id)+L2MCD_DEFAULT_KEY_SEPARATOR;
+    key = VLAN_PREFIX + to_string(msg->vlan_id) + L2MCD_DEFAULT_KEY_SEPARATOR;
     key.append(msg->ports[0].pnames);
-
-    stateKey = VLAN_PREFIX + to_string(msg->vlan_id)+L2MCD_STATE_KEY_SEPARATOR;
+    stateKey = VLAN_PREFIX + to_string(msg->vlan_id) + L2MCD_STATE_KEY_SEPARATOR;
     stateKey.append(msg->ports[0].pnames);
-    
+    if (msg->is_igmp)
+    {
+        key = key + ":V4";
+        stateKey = stateKey + ":V4";
+    }
+    else
+    {
+        key = key + ":V6";
+        stateKey = stateKey + ":V6";
+    }
+
     if(msg->is_static) type.assign("static");
     FieldValueTuple s("type", type.c_str());
     fvVector.push_back(s);

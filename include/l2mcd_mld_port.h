@@ -25,6 +25,12 @@
 #define UNSET_FLAG(V,F)      (V) = (V) & ~(F)
 #define COMPARE(A,B)  strncmp(A, B, strlen(A))
 
+#define IPV6_MAX_BYTELEN     16
+#define IPV6_MAX_BITLEN      128
+#define IPV6_ADDR_CMP(D,S)   memcmp ((D), (S), IPV6_MAX_BYTELEN)
+#define IPV6_ADDR_COPY(D,S)  memcpy ((D), (S), IPV6_MAX_BYTELEN)
+#define IPV6_ADDR_SAME(D,S)  (memcmp ((D), (S), IPV6_MAX_BYTELEN) == 0)
+
 #define ONE_SEC_MILLISECOND (1000)
 #define HALFSEC_MILLISEC    (500)
 #define MSEC2SECROUND(a)  (((a % ONE_SEC_MILLISECOND) > HALFSEC_MILLISEC) ? \
@@ -103,6 +109,8 @@ int mld_map_set_if_mld_mode(int ip_family, ifindex_t ifindex, int enable,
 														VRF_INDEX vrf_index ,uint8_t type);
 uint32_t ve_mld_portdb_get_port_lowest_ipv4_addr_from_list(uint32_t port_num);
 uint32_t mld_portdb_get_port_lowest_ipv4_addr_from_list(uint32_t port_num);
+IPV6_ADDRESS mld_portdb_get_port_lowest_ipv6_addr_from_list(uint32_t port_num);
+IPV6_ADDRESS ve_mld_portdb_get_port_lowest_ipv6_addr_from_list(uint32_t port_num);
 int pims_clear_snoop_cache(int afi, mld_vid_t vlan_id, MADDR_ST *grp_addr_clr,uint8_t type);
 void pims_clear_statistics(int afi, mld_vid_t vlan_id, uint8_t type);
 
