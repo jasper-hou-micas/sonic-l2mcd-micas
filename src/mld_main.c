@@ -142,38 +142,30 @@ void mld_vport_state_notify (UINT16   vir_port_id,
 
 } /* mld_vport_state_notify */
 
-
-int mldv2_src_compare (void *keya, 
-        void *keyb)
+int mldv2_src_compare(void *keya, void *keyb)
 {
-    IPV6_ADDRESS *src_addr_a = (IPV6_ADDRESS *)(keya);
-    IPV6_ADDRESS *src_addr_b = (IPV6_ADDRESS *)(keyb);
+    IPV6_ADDRESS *addr_a = &((MADDR_ST*) keya)->ip.v6addr;
+    IPV6_ADDRESS *addr_b = &((MADDR_ST*) keyb)->ip.v6addr;
 
-    if (IP6_ARE_ADDRESSES_SAME(src_addr_a->address, src_addr_b->address))
-    {
-        return 0;
-    }
-
-    return (IP6_IS_ADDRESS_LESS(src_addr_a->address, src_addr_b->address) ? -1 : 1);
+    return memcmp(addr_a, addr_b, sizeof(IPV6_ADDRESS));
 }
 
-
-void mldv2_src_assign (void *keya, void *keyb)
+void mldv2_src_assign(void *keya, void *keyb)
 {
-    MCGRP_SOURCE* to_src = (MCGRP_SOURCE*)((unsigned long)keya - 4); 
-    mcast_set_ipv6_addr(&to_src->src_addr,(IPV6_ADDRESS *) keyb);
+    MCGRP_SOURCE *to_src = (MCGRP_SOURCE *)((unsigned long)keya - sizeof(unsigned long));
+    ;
+    mcast_set_ipv6_addr(&to_src->src_addr, &((MADDR_ST *)keyb)->ip.v6addr);
     to_src->src_timer = 0;
-    to_src->retx_cnt  = 0;
+    to_src->retx_cnt = 0;
     to_src->include_in_query = FALSE;
-    static int to_src_clnt_addr_offset=M_AVLL_OFFSETOF(MCGRP_CLIENT, clnt_addr);
-    to_src->clnt_tree= L2MCD_AVL_CREATE(mcgrp_addr_cmp_cb_param, (void *) &to_src_clnt_addr_offset, NULL);
+    static int to_src_clnt_addr_offset = M_AVLL_OFFSETOF(MCGRP_CLIENT, clnt_addr.ip.v6addr);
+    to_src->clnt_tree = L2MCD_AVL_CREATE(mcgrp_addr_cmp_cb_param, (void *)&to_src_clnt_addr_offset, NULL);
     return;
 }
 
-
 MCGRP_CLASS *g_mld_destroy;
 
-void mldv2_src_destroy(generic_pool_struct  *pool, void  *item)
+void mldv2_src_destroy(generic_pool_struct *pool, void *item)
 {
     MCGRP_CLASS *mld = g_mld_destroy;
 

@@ -2171,7 +2171,8 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
             }
             else
             {
-                mcast_set_ipv6_addr(&source_address, ip_get_lowest_ipv6_address_on_port(vir_port_id, mcgrp_vport->type));
+                IPV6_ADDRESS lowest_ipv6 = ip_get_lowest_ipv6_address_on_port(vir_port_id, mcgrp_vport->type);
+                mcast_set_ipv6_addr(&source_address, &lowest_ipv6);
                 mcgrp_update_group_address_table(mcgrp, vir_port_id, 
                         phy_port_id,
                         group_address, 

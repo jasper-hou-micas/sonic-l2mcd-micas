@@ -450,7 +450,7 @@ typedef struct s_MCGRP_SOURCE
 typedef struct MCGRP_MBRSHP
 {
 	UINT32            phy_port_id;
-	L2MCD_AVL_NODE       node;
+	L2MCD_AVL_NODE    node;
 	UINT8             retx_cnt;
 
 	UINT8             static_mmbr     : 1;
@@ -467,7 +467,7 @@ typedef struct MCGRP_MBRSHP
 	MCGRP_SOURCE*     src_list[2];
 
 	// List of clients for this group on this port
-	L2MCD_AVL_TREE       clnt_tree;
+	L2MCD_AVL_TREE    clnt_tree;
 
 	// Wheel timer element
 	MCGRP_TIMER_ELEM  mbrshp_tmr;
@@ -529,7 +529,7 @@ typedef struct MCGRP_PORT_ENTRY
 	UINT16            spare             : 6;
 	UINT32            verwarn_intvl_start;      // Can we add a syslog...msg for this????
 	UINT32            verwarn_count;
-	BOOLEAN			snooping_mrouter_detected;
+	BOOLEAN			  snooping_mrouter_detected;
 } MCGRP_PORT_ENTRY ;
 
 /* This data structure represents IGMP/MLD's state on each IP interface */
@@ -805,18 +805,18 @@ typedef struct
 
 typedef struct IP6_PARAMETERS
 {
-	UINT8						hop_limit;
+    UINT8                       hop_limit;
     UINT8                       version;
-	UINT8						next_header;
-	UINT32						traffic_class;
-	UINT16						payload_length;
-	IP6_IPV6_ADDRESS 			source_address;
-	IP6_IPV6_ADDRESS 			destination_address;
+    UINT8                       next_header;
+    UINT32                      traffic_class;
+    UINT16                      payload_length;
+    IP6_IPV6_ADDRESS            source_address;
+    IP6_IPV6_ADDRESS            destination_address;
 
-	IPV6_INTERFACE_ID			rx_port_number;
-    UINT32						rx_physical_port_number;
-	UINT32						vrf_index;
-	VLAN_ID						vlan_id;
+    IPV6_INTERFACE_ID           rx_port_number;
+    UINT32                      rx_physical_port_number;
+    UINT32                      vrf_index;
+    VLAN_ID                     vlan_id;
 } IP6_PARAMETERS;
 
 typedef struct IP6_RX_PKT_MSG
@@ -1236,10 +1236,10 @@ int mcgrp_port_id_cmp_cb_param(void *keya, void *keyb, void *param);
 void mcgrp_process_wte_event(void *wte_param);
 int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters);
 
-void l2mcd_mld_process_query(IP6_RX_PKT_MSG* mld_msg, const char *ifname);
-void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_msg, const char *ifname);
-void l2mcd_mld_process_v1_report(IP6_RX_PKT_MSG* mld_msg, const char *ifname);
-void l2mcd_mld_process_done(IP6_RX_PKT_MSG* mld_msg, const char *ifname);
+void l2mcd_mld_process_query(IP6_RX_PKT_MSG* mld_pkt_msg, const char *ifname);
+void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_pkt_msg, const char *ifname);
+void l2mcd_mld_process_v1_report(IP6_RX_PKT_MSG* mld_pkt_msg, const char *ifname);
+void l2mcd_mld_process_done(IP6_RX_PKT_MSG* mld_pkt_msg, const char *ifname);
 
 MCGRP_MBRSHP* mcgrp_find_mbrshp_entry_for_grpaddr (MCGRP_CLASS  *mcgrp, 
         MADDR_ST     *group_address, 
@@ -1275,6 +1275,7 @@ MCGRP_MBRSHP* mcgrp_alloc_add_mbrshp_entry (MCGRP_CLASS  *mcgrp,
 GROUP_ENTRY* mld_mcgrp_find_insert_glb_group_entry (MCGRP_CLASS  *mcgrp, 
                                                 MADDR_ST     *grp_address);
 MCGRP_MBRSHP* mcgrp_find_mbrshp_entry (MCGRP_ENTRY  *grp_entry, UINT32 phy_port_id);
+MCGRP_ROUTER_ENTRY *mcgrp_find_rtr_port_entry(MCGRP_CLASS *mcgrp, MCGRP_L3IF *mcgrp_vport, UINT32 phy_port_id);
 BOOLEAN igmp_send_igmp_message (MCGRP_CLASS *igmp, UINT16 tx_port_number,
         UINT32 physical_port, UINT8 type, UINT8 version,
         UINT32 group_address,  UINT32 source_address,
@@ -1301,11 +1302,15 @@ void mcgrp_delete_veport (MCGRP_CLASS *mcgrp, MCGRP_L3IF *mcgrp_vport, UINT32 ph
 void igmp_send_general_query( MCGRP_CLASS *igmp, UINT16       tx_port_number,
         UINT32       physical_port, UINT8        version, UINT32       use_src,
         UINT16       response_time);
+void mld_send_general_query(MCGRP_CLASS *mcgrp, UINT16 tx_port_number,
+        UINT32 physical_port, UINT8 version, IPV6_ADDRESS *use_src,
+        UINT16 response_time);
 MCGRP_PORT_ENTRY* mcgrp_find_phy_port_entry (MCGRP_CLASS  *mcgrp, MCGRP_L3IF   *mcgrp_vport,
         UINT32        phy_port_id);
 void mld_tx_static_report_leave_on_mrtr_port(MCGRP_CLASS  *mld, MADDR_ST *grp_addr, MCGRP_L3IF *mld_vport, 
 											 uint32_t rx_phy_port, uint8_t joinflag);
 UINT32 ip_get_lowest_ip_address_on_port(UINT16 port_number, uint8_t type);
+IPV6_ADDRESS ip_get_lowest_ipv6_address_on_port(UINT16 port_number, uint8_t type);
 BOOLEAN igmp_update_ssm_parameters(MCGRP_CLASS *mcgrp, MADDR_ST *group_addr, UINT8 *version,
         PORT_ID vir_port_id, UINT32 phy_port_id, UINT8 *igmp_action, UINT16 *num_srcs,
         UINT32 **src_list);

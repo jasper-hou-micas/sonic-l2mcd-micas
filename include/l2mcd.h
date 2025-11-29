@@ -216,6 +216,7 @@ typedef struct
 {
     uint32_t tot_pkts;
     uint32_t igmp_pkts;
+    uint32_t mld_pkts;
     uint32_t pim_pkts;
     uint32_t non_igmp_pkts;
     uint32_t non_mld_pkts;
@@ -314,6 +315,7 @@ extern L2MCD_CONTEXT l2mcd_context;
 #define g_rx_stats_non_igmp_pkts          l2mcd_context.rx_stats.non_igmp_pkts
 #define g_rx_stats_non_mld_pkts           l2mcd_context.rx_stats.non_mld_pkts
 #define g_rx_stats_igmp_pkts              l2mcd_context.rx_stats.igmp_pkts
+#define g_rx_stats_mld_pkts               l2mcd_context.rx_stats.mld_pkts
 #define g_rx_stats_pim_pkts               l2mcd_context.rx_stats.pim_pkts
 #define g_rx_stats_tot_pkts               l2mcd_context.rx_stats.tot_pkts
 #define g_rx_stats_no_aux                 l2mcd_context.rx_stats.no_aux
@@ -390,6 +392,7 @@ uint32_t l2mcd_ifname_to_kifindex(char *if_name);
 void dump_mcgrp_class (uint32_t afi);
 void l2mcd_print_global_var(void);
 int l2mcd_avl_compare_u32(const void *ptr1, const void *ptr2, void *params);
+int l2mcd_avl_compare_addr6(const void *ptr1, const void *ptr2, void *params);
 struct event *l2mcd_igmprx_sock_init(int *fd, char *iname);
 struct event *l2mcd_mldrx_sock_init(int *fd, char *iname);
 int l2mcd_igmprx_sock_close(char *pnames, int fd, struct event *igmp_rx_event);

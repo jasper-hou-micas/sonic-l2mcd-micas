@@ -296,20 +296,6 @@ typedef struct IGMP_STATS
     UINT32 pim_hello_pkt_rcvd;
 
 } IGMP_STATS;
-#if 0
-typedef struct MLD_STATS
-{
-
-	UINT32  mld_wrong_ver_query;
-	// Miscellaneous error stats
-	UINT32	recv_checksum_error;
-	UINT32	recv_size_or_range_error;
-
-	UINT32	recv_packets;
-	UINT32	xmt_packets;
-	UINT32 pim_hello_pkt_rcvd;
-} MLD_STATS;
-#endif
 
 typedef struct MLD_STATS
  {

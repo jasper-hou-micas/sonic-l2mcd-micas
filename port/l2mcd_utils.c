@@ -295,104 +295,6 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
     return rc;
 }
 
-#if 0
-int l2mcd_port_list_update(char *pnames, int oper_state, int is_add) 
-{
-    int ifidx, kif, rc;
-    l2mcd_if_tree_t *l2mcd_if_tree;
-    struct event *igmp_rx_event=NULL;
-    struct event *mld_rx_event=NULL;
-    int sock_fd;
-    
-    ifidx = portdb_get_portindex_from_ifname(pnames);
-
-    if ((ifidx<=0)|| (ifidx == NO_SUCH_PORT))
-    {
-		if (strstr((char*)pnames, "PortChannel")) 
-        {
-            kif = if_nametoindex(pnames);
-            ifidx = L2MCD_PORTDB_LAGIF_START_IDX+kif;
-            rc= portdb_add_ifname(pnames, strlen(pnames) + 1, ifidx);
-            L2MCD_LOG_NOTICE("%s portdb_portindex_to_ifname_hash add  port:%s, index:%d rc:%d", FN, pnames, ifidx, rc);
-		}
-        else
-        {
-            kif = if_nametoindex(pnames);
-            ifidx = L2MCD_PORTDB_PHYIF_START_IDX+kif;
-            rc= portdb_add_ifname(pnames, strlen(pnames) + 1, ifidx);
-            L2MCD_LOG_NOTICE("%s portdb_portindex_to_ifname_hash add2  port:%s, index:%d rc:%d", FN, pnames, ifidx, rc);
-        }
-    }
-    l2mcd_if_tree = l2mcd_if_to_kif(ifidx);
-    kif = if_nametoindex(pnames);
-    L2MCD_INIT_LOG("%s PortInfo RX: %s, ifidx:%d oper:%d is_add:%d is_lag:%d, kif:%d", 
-         __FUNCTION__, pnames,  ifidx, oper_state, is_add, L2MCD_IFINDEX_IS_LAG(ifidx), kif);
-    if (L2MCD_IFINDEX_IS_LAG(ifidx)) 
-    {
-        /*
-         * socket/event is not created for LAG interface. Packet received on member port is 
-         * mapped to corresponding Po and is processed.
-         */
-        L2MCD_INIT_LOG("LAG  ifidx:%d %s", ifidx,pnames);
-        if (!is_add) 
-		{
-		    l2mcd_del_if_tree(ifidx); 
-			return 0;
-		}
-        l2mcd_add_kif_to_if(pnames, ifidx, -1, NULL, -1, -1, -1, oper_state);
-        return 0; 
-    }
-    if (!is_add) 
-    {
-       if (l2mcd_if_tree)
-       {
-            l2mcd_igmprx_sock_close(pnames, l2mcd_if_tree->sock_fd, l2mcd_if_tree->igmp_rx_event);
-            l2mcd_del_if_tree(ifidx);
-            rc=portdb_delete_ifname(pnames);
-            L2MCD_LOG_NOTICE("%s portdb_portindex_to_ifname_hash del  port:%s, index:%d rc:%d", FN, pnames, ifidx, rc);
-       }
-       return 0;
-    }
-    
-    if (kif <=0)
-    {
-        L2MCD_INIT_LOG("%s PortInfo RX: %s, if:%d is_add:%d oper_state:%d not available",
-                        __FUNCTION__, pnames,kif,is_add,oper_state);
-        return -1;
-    }
-    
-    if ((l2mcd_if_tree && l2mcd_if_tree->kif != kif))
-    {
-        l2mcd_igmprx_sock_close(pnames, l2mcd_if_tree->sock_fd, l2mcd_if_tree->igmp_rx_event);
-        l2mcd_del_if_tree(ifidx);
-        rc=portdb_delete_ifname(pnames);
-        L2MCD_LOG_NOTICE("%s portdb_portindex_to_ifname_hash del2  port:%s, index:%d rc:%d", FN, pnames, ifidx, rc);
-        return 0;
-    }
-    
-    if (l2mcd_if_tree && l2mcd_if_tree->sock_fd)
-    {
-        L2MCD_INIT_LOG("%s if:%s(%d) rx_sock:%d exists", __FUNCTION__, pnames, ifidx, l2mcd_if_tree->sock_fd);
-        return 0;
-    }
-    igmp_rx_event = l2mcd_igmprx_sock_init(&sock_fd, pnames);
-    if (!igmp_rx_event)
-    {
-        L2MCD_INIT_LOG("socket create failed for RX: %s, if:%d",pnames,kif);
-    }
-    rc=l2mcd_add_kif_to_if(pnames, ifidx, sock_fd, igmp_rx_event, -1, -1, -1, oper_state);
-
-    mld_rx_event = l2mcd_mldrx_sock_init(&sock_fd, pnames);
-    if (!mld_rx_event)
-    {
-        L2MCD_INIT_LOG("socket create failed for mld RX: %s, if:%d", pnames,kif);
-    }
-    rc=l2mcd_add_kif_to_if(pnames, ifidx, sock_fd, mld_rx_event, -1, -1, -1, oper_state);
-
-    return rc;
-}
-
-#endif
 int l2mcd_del_if_tree(uint32_t ifid)
 {
 
@@ -431,6 +333,28 @@ int l2mcd_avl_compare_u32(const void *ptr1, const void *ptr2, void *params)
     }
     return 0;
 }
+
+int l2mcd_avl_compare_addr6(const void *ptr1, const void *ptr2, void *params)
+{
+    int offset = *(int *)params;
+    IPV6_ADDRESS *key1 = (IPV6_ADDRESS *)ptr1;
+    IPV6_ADDRESS *key2 = (IPV6_ADDRESS *)ptr2;
+
+    int cmp = memcmp(key1, key2, sizeof(IPV6_ADDRESS));
+
+    L2MCD_LOG_DEBUG("%s offset:%d ptrs(%p,%p) cmp_result:%d", __FUNCTION__, offset, ptr1, ptr2, cmp);
+
+    if (cmp > 0)
+    {
+        return 1;
+    }
+    else if (cmp < 0)
+    {
+        return -1;
+    }
+    return 0;
+}
+
 int l2mcd_avll_init()
 {
     static int offset_kif=M_AVLL_OFFSETOF(l2mcd_if_tree_t, kif);

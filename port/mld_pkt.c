@@ -34,10 +34,6 @@ extern uint32_t hsl_sock_fd[MCAST_AFI_MAX];
 #define VLAN_HDR_LEN 4
 #define ETH_ADDR_LEN 6
 
-extern MCGRP_ROUTER_ENTRY* mcgrp_find_rtr_port_entry (MCGRP_CLASS  *mcgrp,
-                                             MCGRP_L3IF   *mcgrp_vport,
-                                             UINT32        phy_port_id);
-
 extern L2MCD_AVL_TREE *mld_portdb_tree;
 
 int mld_ok_to_send_over_edge_port(ifindex_t source, ifindex_t destination)

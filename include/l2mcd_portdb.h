@@ -103,13 +103,6 @@ typedef struct PORTDB_VRF_S {
     unsigned char   afi;
 } portdb_vrf_t;
 
-static int ip_addr_cmp(void *val1, void *val2) {
-    PORTDB_IP4 *p1 = (PORTDB_IP4 *)val1;
-    PORTDB_IP4 *p2 = (PORTDB_IP4 *)val2;
-
-    return memcmp(&p1->ipaddress, &p2->ipaddress, sizeof(PORTDB_IP4));
-}
-
 static int ip6_addr_cmp(void *val1, void *val2) {
     PORTDB_IP6_ADDRESS_ENTRY *p1 = (PORTDB_IP6_ADDRESS_ENTRY *)val1;
     PORTDB_IP6_ADDRESS_ENTRY *p2 = (PORTDB_IP6_ADDRESS_ENTRY *)val2;

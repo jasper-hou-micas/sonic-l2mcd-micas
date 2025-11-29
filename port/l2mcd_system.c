@@ -73,32 +73,55 @@ struct sock_filter g_igmp_filter[] = {
 int l2mcd_system_group_entry_notify(MADDR_ST *group_address, MADDR_ST *src_address, int vir_port, int phy_port_id, int is_static, int insert)
 {  
     L2MCD_APP_TABLE_ENTRY msg;
-    struct sockaddr_in sa;
     l2mcd_if_tree_t *l2mcd_if_tree;
     int rmt1=0, rmt2=0;
     MCGRP_SOURCE *igmpv3_src;
-    MCGRP_CLASS         *mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(L2MCD_IPV4_AFI, L2MCD_DEFAULT_VRF_IDX);
+    int afi = group_address->afi;
+    MCGRP_CLASS         *mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, L2MCD_DEFAULT_VRF_IDX);
     MCGRP_MBRSHP        *mcgrp_mbrshp=NULL;
-
     memset(&msg,0, sizeof(L2MCD_APP_TABLE_ENTRY));
     msg.vlan_id=vir_port;
-    sa.sin_addr.s_addr = htonl(group_address->ip.v4addr);
-    inet_ntop(AF_INET, &(sa.sin_addr), msg.gaddr, INET_ADDRSTRLEN);
+    
+    if (afi == IP_IPV4_AFI)
+    {
+        struct sockaddr_in sa;
+        sa.sin_addr.s_addr = htonl(group_address->ip.v4addr);
+        inet_ntop(AF_INET, &(sa.sin_addr), msg.gaddr, INET_ADDRSTRLEN);
+        
+        if (!src_address ||  !src_address->ip.v4addr)
+        {
+            snprintf(msg.saddr, L2MCD_IP_ADDR_STR_SIZE, "0.0.0.0");
+        }
+        else 
+        {
+            sa.sin_addr.s_addr = htonl(src_address->ip.v4addr);
+            inet_ntop(AF_INET, &(sa.sin_addr), msg.saddr, INET_ADDRSTRLEN);
+        }
+    }
+    else if (afi == IP_IPV6_AFI) 
+    {
+        struct sockaddr_in6 sa6;
+        memcpy(&sa6.sin6_addr, &group_address->ip.v6addr, sizeof(struct in6_addr));
+        inet_ntop(AF_INET6, &(sa6.sin6_addr), msg.gaddr, INET6_ADDRSTRLEN);
+        
+        if (!src_address || !IP6_IS_ADDRESS_NOT_NULL(src_address->ip.v6addr.address))
+        {
+            snprintf(msg.saddr, L2MCD_IP_ADDR_STR_SIZE, "::");
+        }
+        else 
+        {
+            memcpy(&sa6.sin6_addr, &src_address->ip.v6addr, sizeof(struct in6_addr));
+            inet_ntop(AF_INET6, &(sa6.sin6_addr), msg.saddr, INET6_ADDRSTRLEN);
+        }
+    }
+
     l2mcd_if_tree = l2mcd_if_to_kif(phy_port_id);
     if (l2mcd_if_tree)
     {
         memcpy(msg.ports[0].pnames, l2mcd_if_tree->iname, sizeof(msg.ports[0].pnames));
         msg.port_oper = l2mcd_if_tree->oper;
     }
-    if (!src_address ||  !src_address->ip.v4addr)
-    {
-        snprintf(msg.saddr, L2MCD_IP_ADDR_STR_SIZE, "0.0.0.0");
-    }
-    else 
-    {
-        sa.sin_addr.s_addr = htonl(src_address->ip.v4addr);
-        inet_ntop(AF_INET, &(sa.sin_addr), msg.saddr, INET_ADDRSTRLEN);
-    }
+
     if (!vir_port || vir_port>L2MCD_VLAN_MAX)
     {
         L2MCD_LOG_NOTICE("%s:%d:[vir_port:%d] inv  op:%d GA:%s SA:%s phyport:%d", FN,LN,vir_port,insert,msg.gaddr, msg.saddr,phy_port_id);
@@ -445,6 +468,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             g_curr_dbg_level = data->count;
             memcpy(&g_l2mcd_global_mac, &data->mac_addr, ETHER_ADDR_LEN);
             memcpy((char *) gIgmp.mac, (const char *) g_l2mcd_global_mac, ETHER_ADDR_LEN);
+            memcpy((char *) gMld.mac, (const char *) g_l2mcd_global_mac, ETHER_ADDR_LEN);
             APP_LOG_SET_LEVEL(g_curr_dbg_level);
 	        L2MCD_INIT_LOG("Global MAC set for IPV4  0x%x:0x%x:0x%x:0x%x:0x%x:0x%x: dbglevel:%d",
                    gIgmp.mac[0],gIgmp.mac[1],gIgmp.mac[2],gIgmp.mac[3],gIgmp.mac[4],gIgmp.mac[5],
@@ -1680,6 +1704,11 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
             // rx_mld_msg.port_number = vlan_node->ifindex;
             ip6_rx_msg.ip_param.rx_port_number  = vlan_node->ifindex;
         }
+        else
+        {
+            g_rx_stats_inv_tags++;
+            continue;
+        }
         
 
         if (len < sizeof(struct ethhdr) + sizeof(struct ipv6hdr)){ 
@@ -1743,6 +1772,25 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         ip6_rx_msg.pkt_size = len - sizeof(struct ether_header);
 
         L2MCD_LOG_NOTICE("[MLD RX] if:%s ifindex:%d icmp6_type=%u len=%zd", ifname, ifindex, icmp_type, len);
+        g_rx_stats_igmp_pkts++;
+
+        // if (igmp_packet_size < sizeof(IGMP_MESSAGE))
+        // {
+
+        //     L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] ERR: Rx packet len %d too small. Dropping packet",FN,LN, 
+        //             vid, igmp_packet_size);
+        //     igmp->igmp_stats[rx_port_number].recv_size_or_range_error++;
+
+        //     goto free_packet;
+        // }
+        // if (igmp_check_if_checksum_is_valid (sptr_igmp_message, igmp_packet_size) == FALSE)
+        // {
+        //     L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] ERR Rx packet has invalid checksum. Dropping packet",FN,LN, vid);
+        //     igmp->igmp_stats[rx_port_number].recv_checksum_error++;
+
+        //     goto free_packet;
+        // }
+        // igmpver = igmp_eval_version(sptr_igmp_message, igmp_packet_size);
 
         /* ---------------- Dispatch ---------------- */
         switch (icmp_type) {

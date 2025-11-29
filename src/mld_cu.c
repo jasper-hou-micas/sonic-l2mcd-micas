@@ -30,7 +30,7 @@ void mld_enable (VRF_INDEX  vrf_index,  UINT8   protocol)
     mld->enabled |= TRUE;
 
     static int group_address_offset = M_AVLL_OFFSETOF(GROUP_ENTRY, group_address.ip.v6addr);
-    mld->group_tree= L2MCD_AVL_CREATE(l2mcd_avl_compare_u32, (void *) &group_address_offset, NULL);
+    mld->group_tree= L2MCD_AVL_CREATE(l2mcd_avl_compare_addr6, (void *) &group_address_offset, NULL);
     L2MCD_LOG_NOTICE("%s Completed vrf:%d protocol:%d mld:%p group_tree:%p", __FUNCTION__,vrf_index, protocol, mld, mld->group_tree);
     return;
 }
@@ -217,48 +217,42 @@ enum BOOLEAN mld_check_valid_range(IPV6_ADDRESS *group_address)
         return TRUE;
 
     return FALSE;
+
+
+    // // 1. 必须是组播
+    // if (group_address->address.address8[0] != 0xFF)
+    //     return FALSE;
+
+    // IPV6_ADDRESS allnodes = IP6_ADDRESS_LINKLOCAL_ALLNODES_INIT;
+    // IPV6_ADDRESS allrouters = IP6_ADDRESS_LINKLOCAL_ALLROUTERS_INIT;
+
+    // // 2. 排除全节点和全路由器 (这两个必须泛洪)
+    // if (memcmp(group_address, &allnodes, sizeof(IPV6_ADDRESS)) == 0 ||
+    //     memcmp(group_address, &allrouters, sizeof(IPV6_ADDRESS)) == 0)
+    // {
+    //     return FALSE;
+    // }
+
+    // // 3. [新增] 排除被请求节点组播地址 (Solicited-Node Multicast)
+    // // 格式前缀: FF02:0:0:0:0:1:FFxx:xxxx
+    // // 简单判断: 前13个字节匹配 FF02::1:FF
+    // if (group_address->address.address8[1] == 0x02 && // Scope Link-Local
+    //     group_address->address.address16[1] == 0x0000 &&
+    //     group_address->address.address16[2] == 0x0000 &&
+    //     group_address->address.address16[3] == 0x0000 &&
+    //     group_address->address.address16[4] == 0x0000 &&
+    //     group_address->address.address16[5] == 0x0100 && // big-endian issue based on arch
+    //     group_address->address.address8[12] == 0xFF)
+    // {
+    //     return FALSE; // 节省表项，让它泛洪或走ND Snooping
+    // }
+
+    // // 4. 检查 Scope
+    // UINT8 scope = group_address->address.address8[1] & 0x0F;
+    
+    // // 扩展支持 Site-Local (5) 和 Organization-Local (8)
+    // if (scope == 0x2 || scope == 0x5 || scope == 0x8 || scope == 0xE)
+    //     return TRUE;
+
+    // return FALSE;
 }
-#if 0
-void print_mld_msg(mld_common_msg* mld_msg)
-{
-    if (NULL == mld_msg)
-    {
-        L2MCD_LOG_ERR("invalid mld_msg");
-        return;
-    }
-    L2MCD_LOG_NOTICE("port_number:%d, phy_port_number:%d, vlan_id:%d, group_address:%s, clnt_src_ip:%s",
-                    mld_msg->port_number, mld_msg->phy_port_number,mld_msg->vlan_id,
-                    mcast_print_addr(&mld_msg->group_address),mcast_print_addr(&mld_msg->clnt_src_ip)
-                   );
-}
-
-void parse_mld_snoop(uint8_t *buf, MLD_PAKCET *mld)
-{
-    uint8_t *ptr = buf;
-
-    // 1. Skip Ethernet header
-    ptr += 14;
-
-    // 2. IPv6 Header
-    memcpy(&mld->ip6, ptr, sizeof(mld->ip6));
-    ptr += 40;
-
-    // 3. Hop-by-Hop Header (next header = 0)
-    if (mld->ip6.next_header == 0) {
-        mld->hbh_start = ptr;
-        mld->hbh_len   = (ptr[1] + 1) * 8;
-        ptr += mld->hbh_len;
-    } else {
-        mld->hbh_start = NULL;
-        mld->hbh_len = 0;
-    }
-
-    // 4. ICMPv6 Header (4 bytes)
-    memcpy(&mld->icmp6, ptr, 4);
-    ptr += 4;
-
-    // 5. ICMPv6 Payload
-    mld->data = ptr;
-}
-#endif
-
