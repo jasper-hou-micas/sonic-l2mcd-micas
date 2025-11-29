@@ -632,12 +632,6 @@ void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_pkt_msg, const char *ifname
     {
         return;
     }
-    // todo ff02::16
-    // if (IP6_ARE_ADDRESSES_SAME(mldv2_group_packet->ip_header.destination_ip_address))
-    // {
-    //     L2MCD_VLAN_LOG_ERR(vid,"%s:%d:[vlan:%d] .ERR: Rx Port %s Rcvd V3 Report Type with Des IP addr 0x%x. Dropping packet",FN,LN, 
-    //             vid, mld_get_if_name_from_port(rx_port_number), ntohl(ip_hdr->destination_ip_address));
-    // }
     mld->mld_stats[rx_port_number].recv_packets++;
 
     UINT16 num_grps = ntohs(mld_v2_report->num_grps);

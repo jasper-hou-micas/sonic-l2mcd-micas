@@ -202,57 +202,26 @@ enum BOOLEAN mld_check_valid_range(IPV6_ADDRESS *group_address)
     if (group_address->address.address8[0] != 0xFF)
         return FALSE;
 
-
     IPV6_ADDRESS allnodes = IP6_ADDRESS_LINKLOCAL_ALLNODES_INIT;
     IPV6_ADDRESS allrouters = IP6_ADDRESS_LINKLOCAL_ALLROUTERS_INIT;
+    IPV6_ADDRESS mldv2 = IP6_ADDRESS_MLDV2_ALLROUTERS_INIT;
 
     if (memcmp(group_address, &allnodes, sizeof(IPV6_ADDRESS)) == 0 ||
-        memcmp(group_address, &allrouters, sizeof(IPV6_ADDRESS)) == 0)
+        memcmp(group_address, &allrouters, sizeof(IPV6_ADDRESS)) == 0 ||
+        memcmp(group_address, &mldv2, sizeof(IPV6_ADDRESS)) == 0)
+    {
+        return FALSE;
+    }
+
+    if (IP6_IS_ADDRESS_MC_SOLICITEDNODE(group_address->address))
     {
         return FALSE;
     }
 
     UINT8 scope = group_address->address.address8[1] & 0x0F;
+    // maybe Site-Local (5)  Organization-Local (8)
     if (scope == 0x2 || scope == 0xE)
         return TRUE;
 
     return FALSE;
-
-
-    // // 1. 必须是组播
-    // if (group_address->address.address8[0] != 0xFF)
-    //     return FALSE;
-
-    // IPV6_ADDRESS allnodes = IP6_ADDRESS_LINKLOCAL_ALLNODES_INIT;
-    // IPV6_ADDRESS allrouters = IP6_ADDRESS_LINKLOCAL_ALLROUTERS_INIT;
-
-    // // 2. 排除全节点和全路由器 (这两个必须泛洪)
-    // if (memcmp(group_address, &allnodes, sizeof(IPV6_ADDRESS)) == 0 ||
-    //     memcmp(group_address, &allrouters, sizeof(IPV6_ADDRESS)) == 0)
-    // {
-    //     return FALSE;
-    // }
-
-    // // 3. [新增] 排除被请求节点组播地址 (Solicited-Node Multicast)
-    // // 格式前缀: FF02:0:0:0:0:1:FFxx:xxxx
-    // // 简单判断: 前13个字节匹配 FF02::1:FF
-    // if (group_address->address.address8[1] == 0x02 && // Scope Link-Local
-    //     group_address->address.address16[1] == 0x0000 &&
-    //     group_address->address.address16[2] == 0x0000 &&
-    //     group_address->address.address16[3] == 0x0000 &&
-    //     group_address->address.address16[4] == 0x0000 &&
-    //     group_address->address.address16[5] == 0x0100 && // big-endian issue based on arch
-    //     group_address->address.address8[12] == 0xFF)
-    // {
-    //     return FALSE; // 节省表项，让它泛洪或走ND Snooping
-    // }
-
-    // // 4. 检查 Scope
-    // UINT8 scope = group_address->address.address8[1] & 0x0F;
-    
-    // // 扩展支持 Site-Local (5) 和 Organization-Local (8)
-    // if (scope == 0x2 || scope == 0x5 || scope == 0x8 || scope == 0xE)
-    //     return TRUE;
-
-    // return FALSE;
 }

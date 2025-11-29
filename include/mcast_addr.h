@@ -93,7 +93,15 @@ typedef struct MADDR_ST
 	 ((a).address32[2] != 0) ||	\
 	 ((a).address32[3] != 0))
 
-
+#define IP6_IS_ADDRESS_MC_SOLICITEDNODE(a) \
+    ((a).address8[0] == 0xff && \
+     (a).address8[1] == 0x02 && \
+     (a).address32[1] == 0   && \
+     (a).address16[1] == 0   && \
+     (a).address16[4] == 0   && \
+     (a).address8[10] == 0   && \
+     (a).address8[11] == 1   && \
+     (a).address8[12] == 0xff)
 
 #define IP6_ARE_ADDRESSES_SAME(a ,b)	\
 	(((a).address32[0] == (b).address32[0] ) \
@@ -217,6 +225,10 @@ typedef struct MADDR_ST
 #define IP6_ADDRESS_SITE_ALL_DHCP6_ROUTERS_INIT \
 	{{{ 0xff, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
 	    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x03 }}}
+
+#define IP6_ADDRESS_MLDV2_ALLROUTERS_INIT \
+    {{{ 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16 }}}
 
 #define MADDR_IS_V4_AFI(p_maddr)     ((p_maddr)->afi == IP_IPV4_AFI)
 #define MADDR_IS_V6_AFI(p_maddr)     ((p_maddr)->afi == IP_IPV6_AFI)

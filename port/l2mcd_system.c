@@ -100,18 +100,23 @@ int l2mcd_system_group_entry_notify(MADDR_ST *group_address, MADDR_ST *src_addre
     }
     else if (afi == IP_IPV6_AFI) 
     {
-        struct sockaddr_in6 sa6;
-        memcpy(&sa6.sin6_addr, &group_address->ip.v6addr, sizeof(struct in6_addr));
-        inet_ntop(AF_INET6, &(sa6.sin6_addr), msg.gaddr, INET6_ADDRSTRLEN);
-        
+        UINT16 *addr6 = group_address->ip.v6addr.address.address16;
+        snprintf(msg.gaddr, L2MCD_IP_ADDR_STR_SIZE,
+                    "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x",
+                    ntohs(addr6[0]), ntohs(addr6[1]), ntohs(addr6[2]), ntohs(addr6[3]),
+                    ntohs(addr6[4]), ntohs(addr6[5]), ntohs(addr6[6]), ntohs(addr6[7]));
+       
         if (!src_address || !IP6_IS_ADDRESS_NOT_NULL(src_address->ip.v6addr.address))
         {
-            snprintf(msg.saddr, L2MCD_IP_ADDR_STR_SIZE, "::");
+            snprintf(msg.saddr, L2MCD_IP_ADDR_STR_SIZE, "0000:0000:0000:0000:0000:0000:0000:0000");
         }
         else 
         {
-            memcpy(&sa6.sin6_addr, &src_address->ip.v6addr, sizeof(struct in6_addr));
-            inet_ntop(AF_INET6, &(sa6.sin6_addr), msg.saddr, INET6_ADDRSTRLEN);
+            addr6 = src_address->ip.v6addr.address.address16;
+            snprintf(msg.saddr, L2MCD_IP_ADDR_STR_SIZE,
+                     "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x",
+                     ntohs(addr6[0]), ntohs(addr6[1]), ntohs(addr6[2]), ntohs(addr6[3]),
+                     ntohs(addr6[4]), ntohs(addr6[5]), ntohs(addr6[6]), ntohs(addr6[7]));
         }
     }
 
