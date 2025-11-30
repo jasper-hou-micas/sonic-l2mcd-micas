@@ -208,6 +208,15 @@ int mld_if_set_version_api(int vrf_index, uint32_t vid, int version, int afi,uin
 
     /* handle the case to set version for mld*/
     else if (afi == MLD_IP_IPV6_AFI){ //MLD
+		if(cfg->cfg_version != version) {
+            /* If there is a config version change for a vlan, then clear the  
+             *	snooping DB for that vlan.
+             */
+            mld_snoop_clear_on_version_change(vid, afi, type);
+        }
+
+        vlan_node->cfg_version = version;
+        cfg->cfg_version = version; //assign this to l3if in case protocol enable/disable.
         mld_set_if_mld_version(vrf_index, port, version);
     }
     

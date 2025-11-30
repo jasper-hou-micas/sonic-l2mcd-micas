@@ -1294,6 +1294,7 @@ void mcgrp_destroy_group_addr (MCGRP_CLASS  *mcgrp, MCGRP_L3IF   *vport,
         MCGRP_ENTRY  *del_group);
 int l3_get_port_from_ifindex(int ifindex);
 int igmp_set_if_igmp_version (VRF_INDEX vrf_index, UINT16 vport, UINT8 version);
+int mld_set_if_mld_version (VRF_INDEX vrf_index, UINT16 vport, UINT8 version);
 MCGRP_PORT_ENTRY* mcgrp_add_phy_port (MCGRP_CLASS  *mcgrp, MCGRP_L3IF   *mcgrp_vport,
         UINT32        phy_port_id);
 void mcgrp_vport_state_notify (MCGRP_CLASS  *mcgrp, UINT16        vir_port_id,

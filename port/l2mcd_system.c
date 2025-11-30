@@ -2177,9 +2177,9 @@ int l2mcd_system_init(int flag)
         return -1;
     }
 
-    l2mcd_avll_init();
     mcast_igmp_init();
     mcast_mld_init();
+    l2mcd_avll_init();
     portdb_init();
     mld_portdb_gvid_hash_init();
 
@@ -2194,6 +2194,7 @@ int l2mcd_system_init(int flag)
         L2MCD_INIT_LOG("%s event_config_new failed", __FUNCTION__);
         return -1;
     }
+    
     L2MCD_LOG_INFO("LIBEVENT VER : 0x%x", event_get_version_number());
     L2MCD_INIT_LOG("LIBEVENT VER : 0x%x", event_get_version_number());
     event_config_set_max_dispatch_interval(cfg, &l2mcd_ipc_msec_50/*max_interval*/, -1/*max_callbacks*/, 1/*min-prio*/);
