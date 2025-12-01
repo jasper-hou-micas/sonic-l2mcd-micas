@@ -174,6 +174,7 @@ BOOLEAN mld_l2_staticGroup_exists_on_port(mcast_grp_addr_t * group_addr,
 				  PORT_ID port_id, UINT32 phy_port);
 BOOLEAN mcast_validate_igmp_packet(IGMP_MESSAGE * sptr_igmp_message,
 			   UINT16 igmp_pkt_size, BOOLEAN dbg_enabled);
+BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg);
 void mcgrp_notify_l2_staticGroup_change(UINT32 afi, VRF_INDEX vrf_index, MADDR_ST * group_addr, 
         PORT_ID vir_port_id, UINT32 phy_port_id, enum BOOLEAN   insert_flag);
 uint32_t pim_get_ifindex_from_port(int port);

@@ -195,6 +195,175 @@ void mld_tx_reports_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP
 	}
 }
 
+void mld_tx_query_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_L3IF *mld_vport)
+{
+	MCGRP_ROUTER_ENTRY* mcgrp_rport = NULL;
+	MADDR_ST dest_addr;
+	uint8_t afi;
+	MCGRP_GLOBAL_CLASS *mcgrp_glb = (IS_IGMP_CLASS(mld) ? &gIgmp : &gMld);
+	ifindex_t source,destination;
+	uint32_t rx_phy_port;
+	MCGRP_PORT_ENTRY* mcgrp_pport;
+	BOOL is_general_query = FALSE;
+
+
+	if (mld_vport == NULL) 
+	{
+		L2MCD_LOG_INFO("%s(%d) mld_vport is NULL. ", FN, LN);	
+		return;
+    }
+
+	if(!IS_IGMP_CLASS(mld)) {
+	    afi = MCAST_IPV6_AFI;
+        mcast_init_addr(&dest_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+	    mcast_set_ipv6_addr(&dest_addr, &grp_addr->ip.v6addr);
+		rx_phy_port = ((IP6_RX_PKT_MSG *)req)->ip_param.rx_physical_port_number;
+		
+	}
+    else {
+	    afi = MCAST_IPV4_AFI;
+        mcast_init_addr(&dest_addr, IP_IPV4_AFI, MADDR_GET_FULL_PLEN(IP_IPV4_AFI));
+	    mcast_set_ipv4_addr(&dest_addr, grp_addr->ip.v4addr);
+		rx_phy_port = ((IP_RX_PKT_MSG *)req)->ip_param.rx_phy_port_number;
+	}
+	source = rx_phy_port;
+
+	/* Now scan through the edge ports and whichever matches tunnel, forward it.
+	   We will exclude mrouter ports since we already forwarded over mrouter ports. */
+
+	if (!IP6_IS_ADDRESS_NOT_NULL(grp_addr->ip.v6addr.address))
+	{
+		is_general_query = TRUE;
+		L2MCD_VLAN_LOG_INFO(mld_vport->vir_port_id, "MLD:%s()%d Transparent General Query", FN, LN);
+	}
+	else
+	{
+		is_general_query = FALSE;
+		L2MCD_VLAN_LOG_INFO(mld_vport->vir_port_id, "MLD:%s()%d Transparent GSQ/GSSQ Query", FN, LN);
+	}
+
+	MCGRP_PORT_ENTRY *p = mld_vport->phy_port_list;
+	while (p)
+	{
+		L2MCD_VLAN_LOG_INFO(mld_vport->vir_port_id, "port_list contains: %s (%d)\n",
+							portdb_get_ifname_from_portindex(p->phy_port_id),
+							p->phy_port_id);
+		p = p->next;
+	}
+
+	mcgrp_pport = mld_vport->phy_port_list;
+	L2MCD_VLAN_LOG_INFO(mld_vport->vir_port_id, "MLD:%s()%d Transparent GSQ/GSSQ Query", FN, LN);
+	L2MCD_LOG_INFO("mcgrp_pport initial=%p", mcgrp_pport);
+	while (mcgrp_pport)
+	{
+		L2MCD_VLAN_LOG_INFO(mld_vport->vir_port_id, "MLD:%s()%d Transparent GSQ/GSSQ Query", FN, LN);
+		destination = mcgrp_pport->phy_port_id;
+		L2MCD_VLAN_LOG_INFO(mld_vport->vir_port_id, "%s: Inspecting mcgrp_pport phy_port_id=%u", FN, destination);
+		if (is_general_query)
+		{
+			if (mld_ok_to_send_over_edge_port(source, destination))
+			{
+				L2MCD_VLAN_LOG_INFO(mld_vport->vir_port_id, "%s:%d:[vlan:%d] mcgrp_pport %s vlan_id %s %s",
+									__FUNCTION__, LN, mld_vport->vir_port_id, mld_get_if_name_from_ifindex(mcgrp_pport->phy_port_id),
+									mld_get_if_name_from_port(mld_vport->vir_port_id), mcast_print_addr(grp_addr));
+				l2mcd_tx_send_pkt(req, mcgrp_pport->phy_port_id, mld_vport->vir_port_id, &dest_addr, mld, mcgrp_glb, TRUE, FALSE);
+				L2MCD_LOG_DEBUG("%s: Packet sent over edge port %s", FN,
+								mld_get_if_name_from_ifindex(mcgrp_pport->phy_port_id));
+			}
+		}
+		else
+		{
+			MCGRP_MBRSHP *mld_mbrshp;
+			mld_mbrshp = mcgrp_find_mbrshp_entry_for_grpaddr(mld, &dest_addr, mld_vport->vir_port_id, mcgrp_pport->phy_port_id);
+			if (mld_mbrshp)
+			{
+				L2MCD_VLAN_LOG_DEBUG(mld_vport->vir_port_id, "%s:%d:[vlan:%d] mcgrp_pport %s vlan_id %s %s",
+									 __FUNCTION__, LN, mld_vport->vir_port_id, mld_get_if_name_from_ifindex(mcgrp_pport->phy_port_id),
+									 mld_get_if_name_from_port(mld_vport->vir_port_id), mcast_print_addr(grp_addr));
+				l2mcd_tx_send_pkt(req, mcgrp_pport->phy_port_id, mld_vport->vir_port_id, &dest_addr, mld, mcgrp_glb, TRUE, FALSE);
+				L2MCD_LOG_DEBUG("%s: Packet sent over edge port %s (membership case)", FN,
+								mld_get_if_name_from_ifindex(mcgrp_pport->phy_port_id));
+			}
+		}
+		mcgrp_pport = mcgrp_pport->next;
+	}
+}
+
+void mld_tx_reports_and_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_L3IF *mld_vport)
+{
+	MCGRP_ROUTER_ENTRY* mcgrp_rport = NULL;
+	MADDR_ST dest_addr;
+	uint8_t afi;
+	MCGRP_GLOBAL_CLASS *mcgrp_glb = (IS_IGMP_CLASS(mld) ? &gIgmp : &gMld);
+	ifindex_t source,destination;
+	uint32_t rx_phy_port;
+	MCGRP_PORT_ENTRY* mcgrp_pport;
+	BOOL is_general_query = FALSE;
+
+
+	if (mld_vport == NULL) 
+	{
+		L2MCD_LOG_INFO("%s(%d) mld_vport is NULL. ", FN, LN);	
+		return;
+    }
+
+	if(!IS_IGMP_CLASS(mld)) {
+	    afi = MCAST_IPV6_AFI;
+	    mcast_set_ipv6_addr(&dest_addr, &grp_addr->ip.v6addr);
+		rx_phy_port = ((IP6_RX_PKT_MSG *)req)->ip_param.rx_physical_port_number;
+	}
+    else {
+	    afi = MCAST_IPV4_AFI;
+	    mcast_set_ipv4_addr(&dest_addr, grp_addr->ip.v4addr);
+		//For Non-bcast case use source as rx_phy_port_numder, 
+		//vaddr.port contains ifindex for bcast case
+		rx_phy_port = ((IP_RX_PKT_MSG *)req)->ip_param.rx_phy_port_number;
+	}
+	source = rx_phy_port;
+
+	if (is_mld_snooping_enabled(mld_vport, afi)) {
+		mcgrp_rport = mld_vport->rtr_port_list;
+		
+		while (mcgrp_rport) {
+			L2MCD_VLAN_LOG_DEBUG(mld_vport->vir_port_id, "%s:%d:[vlan:%d] port_ifindex:0x%x", 
+				__FUNCTION__, __LINE__, mld_vport->vir_port_id, mcgrp_rport->phy_port_id);
+
+			/* This is for stopping looping the joins, received on vlag , sending them to again on the
+ 			** the same vlag */ 
+			//destination = mld_get_port_ifindex(mcgrp_rport->phy_port_id);
+			destination = mcgrp_rport->phy_port_id;
+			L2MCD_LOG_INFO("%s(%d) src_port:0x%x (%s) dst_port:0x%x", FN, LN, 
+				source, mld_get_if_name_from_ifindex(rx_phy_port), destination);
+			if (mld_ok_to_send_over_edge_port(source, destination)) {
+				L2MCD_VLAN_LOG_DEBUG(mld_vport->vir_port_id,"%s:%d:[vlan:%d] %s:mcgrp_rport %s vlan_id %s %s",
+							FN, LN, mld_vport->vir_port_id, afi == MLD_IP_IPV4_AFI ? "IGMP":"MLD", 
+							mld_get_if_name_from_ifindex(mcgrp_rport->phy_port_id), 
+							mld_get_if_name_from_port(mld_vport->vir_port_id), mcast_print_addr(grp_addr));
+				l2mcd_tx_send_pkt(req, mcgrp_rport->phy_port_id, mld_vport->vir_port_id, &dest_addr, mld, mcgrp_glb, TRUE, FALSE);
+
+			}
+			mcgrp_rport = mcgrp_rport->next;
+		}
+		/* Now scan through the edge ports and whichever matches tunnel, forward it.
+		   We will exclude mrouter ports since we already forwarded over mrouter ports. */	
+		mcgrp_pport = mld_vport->phy_port_list;
+		while (mcgrp_pport)
+		{ 	
+			destination = mcgrp_pport->phy_port_id;
+			if(l2mcd_ifindex_is_tunnel(destination)
+				  && mld_ok_to_send_over_edge_port(source, destination)
+				  && !mcgrp_find_rtr_port_entry(mld, mld_vport, mcgrp_pport->phy_port_id))	
+			{
+				L2MCD_VLAN_LOG_DEBUG(mld_vport->vir_port_id, "%s:%d:[vlan:%d] mcgrp_pport %s vlan_id %s %s",
+					  __FUNCTION__, LN,mld_vport->vir_port_id, mld_get_if_name_from_ifindex(mcgrp_pport->phy_port_id), 
+					  mld_get_if_name_from_port(mld_vport->vir_port_id), mcast_print_addr(grp_addr));
+				l2mcd_tx_send_pkt(req, mcgrp_pport->phy_port_id, mld_vport->vir_port_id, &dest_addr, mld, mcgrp_glb, FALSE, FALSE);
+			}
+			mcgrp_pport = mcgrp_pport->next;
+		}
+	}
+}
+
 int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid, 
 					MADDR_ST *grp_addr, 
 					MCGRP_CLASS *mld, 
@@ -344,6 +513,314 @@ int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid,
     }
     else
     {
+        L2MCD_PKT_PRINT(ivid, "MLD_TX Packet %s  ETH DA:%s,SA:%s,etype:0x%x",
+                        ifname, dmac, smac, eth_hdr->h_proto);
+    }
+
+    if(grp_addr->afi == IP_IPV4_AFI){
+        if (sendto(g_l2mcd_igmp_tx_handle, pkt, pkt_len, 0, (struct sockaddr*)&sa,sizeof(sa)) == -1)
+        {
+            L2MCD_PKT_PRINT(ivid, "IGMP_TX Err is_bcast:%d vlan_type:%d  port:%d ret:%s\n", is_bcast, vlan_type,  phy_port_id, strerror(errno));
+            L2MCD_LOG_NOTICE("sock send  handle ivid:%d  %d pklen:%d port:%d ret: %s",g_l2mcd_igmp_tx_handle,pkt_len, phy_port_id, ivid, strerror(errno));
+    		ret=-1;
+        }
+    }else if (grp_addr->afi == IP_IPV6_AFI)
+    {
+        if (sendto(g_l2mcd_mld_tx_handle, pkt, pkt_len, 0, (struct sockaddr*)&sa,sizeof(sa)) == -1)
+        {
+            L2MCD_PKT_PRINT(ivid, "mld_TX Err is_bcast:%d vlan_type:%d  port:%d ret:%s\n", is_bcast, vlan_type,  phy_port_id, strerror(errno));
+            L2MCD_LOG_NOTICE("sock send  handle ivid:%d  %d pklen:%d port:%d ret: %s",g_l2mcd_igmp_tx_handle,pkt_len, phy_port_id, ivid, strerror(errno));
+    		ret=-1;
+        }
+    }
+
+	free(send_pkt);
+    return (ret);
+}
+
+int l2mcd_tx_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid, 
+					MADDR_ST *grp_addr, 
+					MCGRP_CLASS *mld, 
+					MCGRP_GLOBAL_CLASS  *mcgrp_glb, 
+					bool_t is_forwarded, bool_t is_bcast)
+{
+    int					ret = 0;
+    struct ethhdr *eth_hdr;
+	struct IPV6_HEADER *ip6h = NULL;
+	struct IP_HEADER *ip4h = NULL;
+    char *ip_pkt = NULL, *vlanhdr = NULL;
+    int                 eth_hdr_size=0;
+    uint8_t vlan_type=0, prio = (7 << 5);
+    char *pkt=NULL, *send_pkt=NULL;
+    IGMP_PACKET  *igmp_pkt = NULL; 
+    int pkt_len=0;
+    char  ifname[L2MCD_IFNAME_SIZE];
+    struct sockaddr_ll sa;
+    l2mcd_if_tree_t *l2mcd_if_tree;
+    uint16_t ether_type;
+    
+	int	send_pkt_size = 0;
+    int	ip_pkt_total_len = 0;
+	UINT8 *src_mac = NULL;
+    BOOL querier = FALSE;
+    IPV6_ADDRESS src_ipv6_addr;
+	IP_ADDRESS src_ipv4_addr;
+	int version = MLD_VERSION_2;
+
+	memset(ifname, 0, sizeof(ifname));
+	memset(&sa, 0, sizeof(sa));
+
+    if (is_forwarded)
+        eth_hdr_size = ((ETH_ADDR_LEN * 2) + VLAN_HDR_LEN + 2);
+    else
+        eth_hdr_size = ((ETH_ADDR_LEN * 2) + 2);
+
+    if (!IS_IGMP_CLASS(mld)) 
+    {
+       ip_pkt = ((IP6_RX_PKT_MSG *)msg)->pkt_data;
+       ip_pkt_total_len = 	((IP6_RX_PKT_MSG *)msg)->pkt_size;
+	   version = ((IP6_RX_PKT_MSG *)msg)->ip_param.version;
+	   src_mac = ((IP6_RX_PKT_MSG *)msg)->ip_param.smac;
+    } else {
+        ip_pkt = ((IP_RX_PKT_MSG *)msg)->ip_param.data;
+        ip_pkt_total_len = ((IP_RX_PKT_MSG *)msg)->ip_param.total_length;
+		src_mac = ((IP_RX_PKT_MSG *)msg)->ip_param.smac;
+    }
+
+	L2MCD_LOG_NOTICE("ip_pkt=%p, ip_pkt_total_len=%d, IS_IGMP_CLASS(mld)=%d",
+                ip_pkt, ip_pkt_total_len, IS_IGMP_CLASS(mld));
+	L2MCD_LOG_NOTICE("msg type: %p, sizeof(IP6_RX_PKT_MSG)=%lu, sizeof(IP_RX_PKT_MSG)=%lu",
+                msg, sizeof(IP6_RX_PKT_MSG), sizeof(IP_RX_PKT_MSG));
+
+    send_pkt_size = eth_hdr_size + ip_pkt_total_len;
+    
+    send_pkt = calloc(1, send_pkt_size);
+	if (send_pkt)
+	{
+		memset(send_pkt, 0, send_pkt_size);
+	} else
+	{
+		L2MCD_LOG_ERR("%s(%d) calloc failed, send_pkt is NULL.", FN, LN);
+		return -1;
+	}
+	
+	if (!ip_pkt) {
+		L2MCD_LOG_ERR("ip_pkt is NULL or invalid, abort memcpy");
+		return -1;
+	}
+	if (ip_pkt_total_len <= 0 || ip_pkt_total_len > 2000) {
+		L2MCD_LOG_ERR("ip_pkt_total_len=%d invalid, abort memcpy", ip_pkt_total_len);
+		return -1;
+	}
+	memcpy(((char *)send_pkt +  eth_hdr_size) , (char *)ip_pkt , ip_pkt_total_len);
+
+    eth_hdr = (struct ethhdr *)send_pkt;
+	MCGRP_L3IF *mld_vport = gMld.port_list[((IP6_RX_PKT_MSG *)msg)->ip_param.rx_port_number];
+	int vir_port_id = mld_vport->vir_port_id;
+	int gvid = mld_get_vlan_id(vir_port_id);
+	mld_vlan_node_t *vlan_node = NULL;
+	vlan_node = mld_vdb_vlan_get(gvid, mld_vport->type);
+	int port_id = 0;
+	port_id = mld_l3_get_port_from_ifindex(vlan_node->ve_ifindex, vlan_node->type);
+
+	if(grp_addr->afi == IP_IPV6_AFI) 
+    {
+		ip6h = (struct IPV6_HEADER *)(send_pkt + eth_hdr_size);
+		L2MCD_LOG_DEBUG("%s: eth_hdr=%p, ip6h=%p", __FUNCTION__, eth_hdr, ip6h);
+		L2MCD_LOG_INFO("%s: Using original port SMAC=%02x:%02x:%02x:%02x:%02x:%02x, VLAN=%d, port_index=%d",
+					__FUNCTION__,
+					src_mac[0], src_mac[1], src_mac[2], src_mac[3], src_mac[4], src_mac[5],
+					mld_vport->vir_port_id,
+					vir_port_id);
+
+		if (vlan_node && vlan_node->ve_ifindex)
+		{
+			if (l2mcd_ifindex_is_svi(vlan_node->ve_ifindex))
+			{
+				src_ipv6_addr = ve_mld_portdb_get_port_lowest_ipv6_addr_from_list(port_id);
+
+				L2MCD_VLAN_LOG_DEBUG(port_id,
+					"%s:%d:[vlan:%d] VE ipv6 lookup ifindex=0x%x port=0x%x",
+					__FUNCTION__, __LINE__, port_id,
+					vlan_node->ve_ifindex, port_id);
+			}
+		}
+	}
+	else
+	{
+		ip4h =(struct IP_HEADER *)(send_pkt + eth_hdr_size);
+		L2MCD_LOG_INFO("%s: Using original port SMAC=%02x:%02x:%02x:%02x:%02x:%02x, VLAN=%d, port_index=%d",
+					__FUNCTION__,
+					src_mac[0], src_mac[1], src_mac[2], src_mac[3], src_mac[4], src_mac[5],
+					mld_vport->vir_port_id,
+					port_id);
+
+		if (vlan_node && vlan_node->ve_ifindex)
+		{
+			if (l2mcd_ifindex_is_svi(vlan_node->ve_ifindex))
+			{
+				src_ipv4_addr = ve_mld_portdb_get_port_lowest_ipv4_addr_from_list(port_id);
+
+				L2MCD_VLAN_LOG_DEBUG(port_id,
+					"%s:%d:[vlan:%d] VE ipv6 lookup ifindex=0x%x port=0x%x",
+					__FUNCTION__, __LINE__, port_id,
+					vlan_node->ve_ifindex, port_id);
+			}
+		}
+	}
+
+
+    if (mld_vport->querier == FALSE) {
+        memcpy(eth_hdr->h_source, src_mac, ETHER_ADDR_LEN);
+        L2MCD_LOG_DEBUG("%s: Using original port SMAC", __FUNCTION__);
+    } else {
+        memcpy(eth_hdr->h_source, mcgrp_glb->mac, ETHER_ADDR_LEN);
+		if(grp_addr->afi == IP_IPV6_AFI) 
+		{
+			memcpy(&ip6h->source_ip_address, src_ipv6_addr.address.address8, 16);
+			L2MCD_LOG_DEBUG("%s: Using global MAC, src_ipv6_addr set", __FUNCTION__);
+			char ipv6_str[INET6_ADDRSTRLEN];
+			inet_ntop(AF_INET6, src_ipv6_addr.address.address8, ipv6_str, sizeof(ipv6_str));
+
+			L2MCD_LOG_INFO(
+				"%s: Using global MAC, src IPv6 addr = %s (raw=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x: ...)",
+				__FUNCTION__,
+				ipv6_str,
+				src_ipv6_addr.address.address8[0],
+				src_ipv6_addr.address.address8[1],
+				src_ipv6_addr.address.address8[2],
+				src_ipv6_addr.address.address8[3],
+				src_ipv6_addr.address.address8[4],
+				src_ipv6_addr.address.address8[5],
+				src_ipv6_addr.address.address8[6],
+				src_ipv6_addr.address.address8[7]
+			);
+
+		}
+		else
+		{
+			memcpy(&ip4h->source_ip_address, &src_ipv4_addr, 4);
+			L2MCD_LOG_DEBUG("%s: Using global MAC, src_ipv6_addr set", __FUNCTION__);
+		}
+    }
+    if(grp_addr->afi == IP_IPV6_AFI) 
+    {
+        MLD_CONVERT_IPV6MCADDR_TO_MAC ((char *)&grp_addr->ip.v6addr, eth_hdr->h_dest);
+        //Fill v6 Ether type.
+        eth_hdr->h_proto = htons(HSL_ETHER_TYPE_IPV6); 
+        ether_type = HSL_ETHER_TYPE_IPV6;
+    } else {
+        //uint32_t ipv4 = (grp_addr->ip.v4addr);
+		//memcpy(eth_hdr->h_source, mcgrp_glb->mac, ETHER_ADDR_LEN);
+        MLD_CONVERT_IPV4MCADDR_TO_MAC ((char *)&(grp_addr->ip.v4addr), eth_hdr->h_dest);
+        //eth_hdr->h_proto = htons(HSL_ETHER_TYPE_IP); 
+        ether_type = HSL_ETHER_TYPE_IP;
+    }
+    eth_hdr->h_proto = htons(ether_type);
+    
+    if (is_bcast)
+    {
+        snprintf(ifname, L2MCD_IFNAME_SIZE,"Vlan%d",ivid);
+        sa.sll_ifindex = if_nametoindex(ifname);
+    } else  {
+        vlan_type = mld_get_vlan_type(ivid);
+        if (vlan_type == MLD_VLAN) 
+		{
+            l2mcd_if_tree = M_AVLL_FIND(g_l2mcd_if_to_kif_tree, &phy_port_id);
+            if (l2mcd_if_tree)
+            {
+                memcpy(ifname, l2mcd_if_tree->iname, L2MCD_IFNAME_SIZE);
+                sa.sll_ifindex = l2mcd_if_tree->kif;
+            }
+        }
+		else 
+		{
+			L2MCD_LOG_INFO("Invalid type %s:%d is_bcast:%d vlan_type:%d phy:%d", __FUNCTION__, __LINE__, is_bcast, vlan_type, phy_port_id);
+			L2MCD_VLAN_LOG_ERR(ivid, "Invalid type %s:%d is_bcast:%d vlan_type:%d phy:%d", __FUNCTION__, __LINE__, is_bcast, vlan_type, phy_port_id);
+            
+        }
+    }
+    
+    pkt = (char *)eth_hdr;
+	if(grp_addr->afi == IP_IPV4_AFI)
+    	igmp_pkt=(IGMP_PACKET*)((char *) pkt + eth_hdr_size);
+    pkt_len= eth_hdr_size + ip_pkt_total_len;
+    char dmac[20];
+    char smac[20];
+
+    if (is_forwarded)
+    {
+        // TODO : Make it endian agnostic 
+        vlanhdr = (char *) pkt + (ETH_ADDR_LEN * 2);
+        *vlanhdr++ = 0x81;
+        *vlanhdr++ = 0x00;
+        *vlanhdr++ = (prio | (ivid & 0xf00) >> 8);
+        *vlanhdr++ = (ivid & 0xff);
+        //*vlanhdr++ = 0x08;
+        //*vlanhdr++ = 0x00;
+        *vlanhdr++ = (ether_type >> 8) & 0xff;
+        *vlanhdr++ = (ether_type & 0xff);
+    }
+
+    snprintf(smac, sizeof(smac), "%02x:%02x:%02x:%02x:%02x:%02x",
+            eth_hdr->h_source[0], eth_hdr->h_source[1], eth_hdr->h_source[2], eth_hdr->h_source[3], eth_hdr->h_source[4], eth_hdr->h_source[5]);
+    snprintf(dmac, sizeof(dmac), "%02x:%02x:%02x:%02x:%02x:%02x",
+            eth_hdr->h_dest[0], eth_hdr->h_dest[1], eth_hdr->h_dest[2], eth_hdr->h_dest[3], eth_hdr->h_dest[4], eth_hdr->h_dest[5]);
+
+    sa.sll_halen = ETH_ALEN;
+    memcpy(sa.sll_addr, eth_hdr->h_dest, ETHER_ADDR_LEN);
+#if 0
+    L2MCD_PKT_PRINT(ivid,
+            "IGMP_TX Packet %s  ETH DA:%s,SA:%s,etype:0x%x  IP: v:0x%x ihl:0x%x len:0x%x tttl:0x%x prot:0x%x csum:0x%x sip:0x%x dip:0x%x option:0x%x option:length:%d, IGMP:type:0x%x mrt:0x%x csum:0x%x ga:0x%x outif:0x%x is_bcast:%d vlan_type:%d",
+            ifname, dmac,smac,eth_hdr->h_proto,
+            igmp_pkt->ip_header.version_header_length.version, igmp_pkt->ip_header.version_header_length.header_length,igmp_pkt->ip_header.total_length,
+            igmp_pkt->ip_header.time_to_live,igmp_pkt->ip_header.protocol,igmp_pkt->ip_header.header_checksum,igmp_pkt->ip_header.source_ip_address, 
+            igmp_pkt->ip_header.destination_ip_address,igmp_pkt->ip_options.code.option_number,igmp_pkt->ip_options.length,
+            igmp_pkt->igmp_message.type, igmp_pkt->igmp_message.maximum_response_time, igmp_pkt->igmp_message.checksum, 
+            igmp_pkt->igmp_message.group_address,sa.sll_ifindex, is_bcast, vlan_type);
+#endif
+    if(grp_addr->afi == IP_IPV4_AFI)
+    {
+        IGMP_PACKET *igmp_pkt = NULL;
+        igmp_pkt = (IGMP_PACKET *)((char *)pkt + eth_hdr_size);
+        L2MCD_PKT_PRINT(ivid,
+                        "IGMP_TX Packet %s  ETH DA:%s,SA:%s,etype:0x%x  IP: v:0x%x ihl:0x%x len:0x%x tttl:0x%x prot:0x%x csum:0x%x sip:0x%x dip:0x%x option:0x%x option:length:%d, IGMP:type:0x%x mrt:0x%x csum:0x%x ga:0x%x outif:0x%x is_bcast:%d vlan_type:%d",
+                        ifname, dmac, smac, eth_hdr->h_proto,
+                        igmp_pkt->ip_header.version_header_length.version, igmp_pkt->ip_header.version_header_length.header_length, igmp_pkt->ip_header.total_length,
+                        igmp_pkt->ip_header.time_to_live, igmp_pkt->ip_header.protocol, igmp_pkt->ip_header.header_checksum, igmp_pkt->ip_header.source_ip_address,
+                        igmp_pkt->ip_header.destination_ip_address, igmp_pkt->ip_options.code.option_number, igmp_pkt->ip_options.length,
+                        igmp_pkt->igmp_message.type, igmp_pkt->igmp_message.maximum_response_time, igmp_pkt->igmp_message.checksum,
+                        igmp_pkt->igmp_message.group_address, sa.sll_ifindex, is_bcast, vlan_type);
+    }
+    else
+    {
+		if (version == MLD_VERSION_2)
+		{
+			MLDV2_PACKET *mldv2_pkt = (MLDV2_PACKET *)(pkt + eth_hdr_size);
+			MLDV2_MESSAGE *mldv2_msg = &mldv2_pkt->mld_message;
+			mldv2_msg->checksum = 0;
+			mldv2_msg->checksum = calculate_ip6_checksum(
+				&ip6h->source_ip_address, 
+            	&ip6h->destination_ip_address,
+				(UINT8*)mldv2_msg,
+				sizeof(MLDV2_MESSAGE),
+				IP6_ICMPV6
+			);
+		}
+		else
+		{
+			MLD_PACKET  *mldv1_pkt = (MLD_PACKET *)(pkt + eth_hdr_size);
+			MLD_MESSAGE *mldv1_msg = &mldv1_pkt->mld_message;
+			mldv1_msg->checksum = 0;
+			
+			mldv1_msg->checksum = calculate_ip6_checksum(
+				&ip6h->source_ip_address, 
+            	&ip6h->destination_ip_address,
+				(BYTE *)mldv1_msg,
+				sizeof(MLD_MESSAGE),
+				IP6_ICMPV6
+			);
+		}
         L2MCD_PKT_PRINT(ivid, "MLD_TX Packet %s  ETH DA:%s,SA:%s,etype:0x%x",
                         ifname, dmac, smac, eth_hdr->h_proto);
     }

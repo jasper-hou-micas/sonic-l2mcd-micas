@@ -222,43 +222,54 @@ static USHORT end_around_carry (ULONG sum)              /* Carries in high order
 {
     USHORT csum;
     USHORT return_value;
-
     csum = (USHORT) (sum >> 16);
-
     while (csum != 0x0000)
     {
         sum = csum + (sum & 0xffffL);
-
         csum = (USHORT) (sum >> 16);
     }
-    
     /* Chops to 16 bits */
-    
     return_value = (USHORT) (sum & 0x0000ffffL);
-        
     return (return_value);
-}       
+}
 
 static USHORT calculate_word_checksum (USHORT *usptr_short, USHORT length)
 {
     ULONG sum;
     USHORT result;
-
     sum = 0x00000000L;
-
     while (length != 0x0000)
     {   
         --length;
-        
         sum += *usptr_short;
-    
         ++usptr_short;
     }
-    
-    result = end_around_carry (sum);
 
+    result = end_around_carry (sum);
     return (result);
-}   
+}
+
+static ULONG calculate_sum_safe(BYTE *data_ptr, UINT32 length)
+{
+    ULONG sum = 0;
+    while (length > 1)
+    {
+#ifdef BIG_ENDIAN 
+        sum += (USHORT)((data_ptr[0] << 8) | data_ptr[1]);
+#else
+        sum += (USHORT)((data_ptr[0] << 8) | data_ptr[1]);
+#endif
+        data_ptr += 2;
+        length -= 2;
+    }
+
+    if (length > 0)
+    {
+        sum += (USHORT)(data_ptr[0] << 8);
+    }
+    
+    return sum;
+}
 
 /****************************************************************************/
 /* the data order is assumed to be network order. */
@@ -310,49 +321,30 @@ USHORT calculate_ip_checksum (PSEUDO_IP_PARAMETERS *sptr_pseudo_header, BYTE *bp
     return (return_value);
 }
 
-USHORT calculate_ip6_checksum(IPV6_ADDRESS *source_address, IPV6_ADDRESS *group_address, BYTE *bptr_start_from, UINT32 length, UINT8 protocol)
+USHORT calculate_ip6_checksum(IPV6_ADDRESS *source_address, IPV6_ADDRESS *dest_address, BYTE *bptr_start_from, UINT32 length, UINT8 protocol)
 {
     ULONG sum = 0;
-    USHORT word_checksum;
+    USHORT result;
+    
+    if (source_address != NULL) 
+        sum += calculate_sum_safe((BYTE*)source_address, 16);
+        
+    if (dest_address != NULL) 
+        sum += calculate_sum_safe((BYTE*)dest_address, 16);
+        
+    sum += (length >> 16) & 0xFFFF;
+    sum += length & 0xFFFF;
+    
+    sum += (USHORT)protocol;
 
-    if (source_address != NULL)
-    {
-        word_checksum = calculate_word_checksum((USHORT *)source_address, (USHORT)(16 >> 1));
-        sum += (ULONG)word_checksum;
+    sum += calculate_sum_safe(bptr_start_from, length);
+
+    while (sum >> 16) {
+        sum = (sum & 0xFFFF) + (sum >> 16);
     }
 
-    if (group_address != NULL)
-    {
-        word_checksum = calculate_word_checksum((USHORT *)group_address, (USHORT)(16 >> 1));
-        sum += (ULONG)word_checksum;
-    }
-
-    USHORT high = (USHORT)((length >> 16) & 0xFFFFu);
-    USHORT low = (USHORT)(length & 0xFFFFu);
-    sum += (ULONG)high;
-    sum += (ULONG)low;
-    sum += (ULONG)protocol;
-
-    if (length >= 2)
-    {
-        /* ptr_start_from must be on short word boundary */
-        word_checksum = calculate_word_checksum((USHORT *)bptr_start_from, (USHORT)(length >> 1));
-        sum += (ULONG)word_checksum;
-    }
-
-    /* Handle odd trailing byte */
-    if (length & 1u)
-    {
-#ifndef BIG_ENDIAN
-        sum += (ULONG)((unsigned char)payload[payload_len - 1]);
-#else
-        sum += (ULONG)(((unsigned char)bptr_start_from[length - 1]) << 8);
-#endif
-    }
-
-    /* Do final end-around carry, complement and return */
-    USHORT result = (USHORT)(~end_around_carry(sum) & 0xFFFFu);
-    return result;
+    result = (USHORT)(~sum & 0xFFFF);
+    return (result);
 }
 
 BOOLEAN is_trunk_up( TRUNK_ID trunk_id )

@@ -1235,11 +1235,7 @@ int mcgrp_port_id_cmp_cb(void *keya, void *keyb);
 int mcgrp_port_id_cmp_cb_param(void *keya, void *keyb, void *param);
 void mcgrp_process_wte_event(void *wte_param);
 int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters);
-
-void l2mcd_mld_process_query(IP6_RX_PKT_MSG* mld_pkt_msg, const char *ifname);
-void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_pkt_msg, const char *ifname);
-void l2mcd_mld_process_v1_report(IP6_RX_PKT_MSG* mld_pkt_msg, const char *ifname);
-void l2mcd_mld_process_done(IP6_RX_PKT_MSG* mld_pkt_msg, const char *ifname);
+int receive_mld_packet (IP6_RX_PKT_MSG  *mld_pkt_msg);
 
 MCGRP_MBRSHP* mcgrp_find_mbrshp_entry_for_grpaddr (MCGRP_CLASS  *mcgrp, 
         MADDR_ST     *group_address, 
@@ -1391,7 +1387,11 @@ int igmpv3_encode_src_list (IGMPV3_MESSAGE *igmpv3_msg, MCGRP_SOURCE *p_src, BOO
 int mldv2_encode_src_list (MLDV2_MESSAGE *mldv2_msg, MCGRP_SOURCE *p_src, BOOLEAN all_srcs, BOOLEAN is_retx);
 int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t vlan_id ,  MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_GLOBAL_CLASS  *mcgrp_glb, 
     bool_t is_forwarded, bool_t is_bcast);
+int l2mcd_tx_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t vlan_id ,  MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_GLOBAL_CLASS  *mcgrp_glb, 
+    bool_t is_forwarded, bool_t is_bcast);
 void mld_tx_reports_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_L3IF *mld_vport);
+void mld_tx_query_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_L3IF *mld_vport);
+void mld_tx_reports_and_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_L3IF *mld_vport);
 void igmpv3_destroy_client (MCGRP_CLASS *mcgrp, L2MCD_AVL_TREE *clnt_tree, UINT32 clnt_addr);
 void mldv2_destroy_client (MCGRP_CLASS *mcgrp, L2MCD_AVL_TREE *clnt_tree, IPV6_ADDRESS clnt_addr);
 void mcgrp_notify_source_list_add_blocked (MCGRP_CLASS   *mcgrp, MADDR_ST      *group_address,

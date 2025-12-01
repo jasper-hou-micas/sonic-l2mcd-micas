@@ -164,103 +164,13 @@ typedef struct MLDV2_GROUP_PACKET
     MLDV2_REPORT_MESSAGE            mld_report;
 } MLDV2_GROUP_PACKET;
 
-
- #if 0
-typedef struct MLD_MESSGAGE{
+typedef struct ICMP6_PSEUDO_HDR
+{
     UINT8   type;
-    UINT8   max_resp_time;
+    UINT8   code;       // 0 for send
     UINT16  checksum;
-    MADDR_ST  group_address;
-}MLD_MESSAGE;
+} ICMP6_PSEUDO_HDR_MESSAGE;
 
-typedef struct MLD_PAKCET {
-    // IPv6 ͷ
-    struct ipv6_hdr_fixed {
-        uint32_t ver_tc_fl;
-        uint16_t payload_len;
-        uint8_t  next_header;
-        uint8_t  hop_limit;
-        uint8_t  src[16];
-        uint8_t  dst[16];
-    } ip6;
-
-    // Hop-by-Hop Header(��ѡ)�����ȸ��� hbh_len ����
-    uint8_t *hbh_start;
-    uint16_t hbh_len;
-
-    // ICMPv6 ����ͷ������ MLDv1/v2 ���У�
-    struct {
-        uint8_t  type;      // 130/131/132/143
-        uint8_t  code;      // always 0
-        uint16_t checksum;
-    } icmp6;
-    
-    MLD_MESSAGE mld_msg;
-} MLD_PAKCET;
-
-struct MLDV1_QUERY {
-	UINT8	type;
-	UINT8	max_resp_time;
-	UINT16	checksum;
-	MADDR_ST group_address;
-} __attribute__((packed));
-
-struct MLDV1_REPORT_DONE {
-    uint16_t max_delay;  // always 0
-    uint16_t reserved;
-    MADDR_ST group_address;
-} __attribute__((packed));
-
-struct MLDV2_REPORT_HDR {
-    uint16_t reserved;
-    uint16_t num_records;
-    MADDR_ST group_address;
-    MADDR_ST records[];     // variable
-} __attribute__((packed));
-
-// MLD Query Message
-typedef struct MLD_QRY_MESSAGE
-{
-	UINT8	type;
-	UINT8	max_resp_time;
-	UINT16	checksum;
-	MADDR_ST group_address;
-
-	UINT8	reserved                : 4;
-	UINT8	suppress_router_process : 1;
-	UINT8	robustness_var          : 3;       // querier's robustness variable
-
-	UINT8	query_interval_code;               // querier's interval code
-	UINT16	num_srcs;
-	UINT32	source_ary[1];         // num_srcs number
-
-} MLD_QRY_MESSAGE;
-
-typedef struct MLDV2_GROUP_RECORD
-{
-    UINT8   type;             // Record Type: 1~6
-    UINT8   aux_data_len;     // in 32bit words
-    UINT16  num_srcs;         // number of source addresses
-    MADDR_ST  group_address;     // IPv6 multicast address
-    MADDR_ST  source_address_ary[1];  // placeholder for num_srcs*16 bytes
-                                     // (each source is 16 bytes IPv6 addr)
-} MLDV2_GROUP_RECORD;
-
-typedef struct MLDV2_REPORT
-{
-    UINT8   type;            // 143
-    UINT8   reserved_uint8;  // 0
-    UINT16  checksum;
-    UINT16  reserved_uint16; // 0
-    UINT16  num_grps;        // number of group records
-
-    MLDV2_GROUP_RECORD group_record[1]; // num_grps records (variable)
-} MLDV2_REPORT;
-#endif 
-
-
-
-
-void mld_enable (VRF_INDEX  vrf_index, UINT8      protocol);
+void mld_enable(VRF_INDEX vrf_index, UINT8 protocol);
 BOOLEAN mcgrp_initialize_port_db_array(UINT32 afi);
 #endif /*MLD_STRUCT*/

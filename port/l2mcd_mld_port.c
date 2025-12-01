@@ -19,7 +19,14 @@
 #include "l2mcd_portdb.h"
 #include "l2mcd_dbsync.h"
 #include <time.h>
+
+#include <ifaddrs.h>
+#include <string.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <linux/ipv6.h>
+#include <linux/if_vlan.h>
+#include <netinet/icmp6.h>
 
 L2MCD_AVL_TREE *mld_portdb_tree = &gMld.portdb_tree;
 L2MCD_AVL_TREE *ve_mld_portdb_tree = &gMld.ve_portdb_tree;
@@ -3562,6 +3569,264 @@ BOOLEAN mcast_validate_igmp_packet(IGMP_MESSAGE * sptr_igmp_message,
 	return TRUE;
 }
 
+BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
+{
+    USHORT vir_port_id = mld_pkt_msg->ip_param.rx_port_number;
+    VRF_INDEX vrf_index = mld_pkt_msg->ip_param.vrf_index;
+    MCGRP_CLASS *mld = MLD_GET_INSTANCE_FROM_VRFINDEX(vrf_index);
+
+    MCGRP_L3IF *mld_vport = NULL;
+    ICMP6_PSEUDO_HDR_MESSAGE *icmp6h = NULL;
+    IPV6_HEADER *ip6h = (IPV6_HEADER *)mld_pkt_msg->pkt_data;
+    UINT16 pkt_size = mld_pkt_msg->pkt_size;
+    int vid = 0;
+    UINT8 mldver = MLD_VERSION_NONE;
+    UINT16 mesg_size = NULL;
+    MADDR_ST dest_addr, group_addr;
+
+    mcast_init_addr(&dest_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+    mcast_set_ipv6_addr(&dest_addr, &mld_pkt_msg->ip_param.destination_address);
+
+    UINT8 nexthdr = ip6h->next_header;
+    if (nexthdr == IPPROTO_HOPOPTS)
+    {
+        struct ipv6_hopopt_hdr *hbh = (struct ipv6_hopopt_hdr *)(mld_pkt_msg->pkt_data + sizeof(IPV6_HEADER));
+        if (hbh->nexthdr != IPPROTO_ICMPV6)
+        {
+            L2MCD_LOG_INFO("[MLD RX] Hop-by-Hop nexthdr %d, but need IPPROTO_ICMPV6 %d", hbh->nexthdr, IPPROTO_ICMPV6);
+            return FALSE;
+        }
+        UINT16 hhb_len = (hbh->hdrlen + 1) * 8;
+        icmp6h = (ICMP6_PSEUDO_HDR_MESSAGE *)(mld_pkt_msg->pkt_data + sizeof(IPV6_HEADER) + hhb_len);
+        // RAO check
+        BOOLEAN hbh_rao = FALSE;
+        UINT8 *hbh_opt = (UINT8 *)hbh + 2;
+        UINT8 *hbh_end = (UINT8 *)hbh + hhb_len;
+        while (hbh_opt < hbh_end)
+        {
+            uint8_t opt_type = hbh_opt[0];
+            if (opt_type == 0) // Pad1
+            {
+                hbh_opt++;
+                continue;
+            }
+            if (hbh_opt + 1 >= hbh_end)
+                break;
+            uint8_t opt_data_len = hbh_opt[1];
+            if (hbh_opt + opt_data_len + 2 >= hbh_end)
+                break;
+            if (opt_type == 5 && opt_data_len == 2)
+            {
+                if ((hbh_opt[2] | hbh_opt[3]) == 0)
+                {
+                    hbh_rao = TRUE;
+                    break;
+                }
+            }
+            hbh_opt = hbh_opt + opt_data_len + 2;
+        }
+        if (!hbh_rao)
+        {
+            L2MCD_LOG_INFO("[MLD RX] Hop-by-Hop Opt need RAO, But not found");
+            return FALSE;
+        }
+        mesg_size = pkt_size - sizeof(IPV6_HEADER) - hhb_len;
+    }
+    else if (nexthdr == IPPROTO_ICMPV6)
+    {
+        icmp6h = (ICMP6_PSEUDO_HDR_MESSAGE *)(mld_pkt_msg->pkt_data + sizeof(IPV6_HEADER));
+        mesg_size = pkt_size - sizeof(IPV6_HEADER);
+    }
+
+    MADDR_ST allnodes_addr, allrouters_addr, mldv2_addr;
+    IPV6_ADDRESS allnodes = IP6_ADDRESS_LINKLOCAL_ALLNODES_INIT;
+    IPV6_ADDRESS allrouters = IP6_ADDRESS_LINKLOCAL_ALLROUTERS_INIT;
+    IPV6_ADDRESS mldv2 = IP6_ADDRESS_MLDV2_ALLROUTERS_INIT;
+    mcast_init_addr(&allnodes_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+    mcast_init_addr(&allrouters_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+    mcast_init_addr(&mldv2_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+    mcast_set_ipv6_addr(&allnodes_addr, &allnodes);
+    mcast_set_ipv6_addr(&allrouters_addr, &allrouters);
+    mcast_set_ipv6_addr(&mldv2_addr, &mldv2);
+    char *if_name = portdb_get_ifname_from_portindex(mld_pkt_msg->ip_param.rx_physical_port_number);
+    mld_vport = gMld.port_list[vir_port_id];
+    vid = mld_l3_get_port_from_ifindex(vir_port_id, MLD_VLAN);
+    switch (icmp6h->type)
+    {
+    case MLD_MEMBERSHIP_QUERY_TYPE: // MLDv1v2 Query
+        if (mesg_size == sizeof(MLD_MESSAGE))
+        {
+            mldver = MLD_VERSION_1;
+        }
+        else if (mesg_size >= (sizeof(MLDV2_MESSAGE) - sizeof(IPV6_ADDRESS)))
+        {
+            mldver = MLD_VERSION_2;
+        }
+        break;
+    case MLD_V2_MEMBERSHIP_REPORT_TYPE: // MLDv2 Report
+        mldver = MLD_VERSION_2;
+        break;
+    case MLD_V1_MEMBERSHIP_REPORT_TYPE: // MLDv1 Report
+    case MLD_V1_MEMBERSHIP_DONE_TYPE: // MLDv1 Done
+        mldver = MLD_VERSION_1;
+        break;
+    default:
+        L2MCD_LOG_WARN("Ignore ICMPv6 type=%d", icmp6h->type);
+        return FALSE;
+    }
+    L2MCD_LOG_INFO("[MLDv%d RX] MLD_MESSAGE rx size: %d", mldver, mesg_size);
+
+    if (mldver == MLD_VERSION_1)
+    {
+        MLD_MESSAGE* mesg = (MLD_MESSAGE *)icmp6h;
+        if (mesg_size != sizeof(MLD_MESSAGE))
+        {
+            L2MCD_LOG_WARN("[MLDv%d RX] MLD_MESSAGE size: %d, rx size: %d", mldver, sizeof(MLD_MESSAGE), mesg_size);
+            mld->mld_stats[vir_port_id].recv_size_or_range_error++;
+            return FALSE;
+        }
+        mcast_init_addr(&group_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+        mcast_set_ipv6_addr(&group_addr, &mesg->group_address);
+        if (icmp6h->type == MLD_MEMBERSHIP_QUERY_TYPE)
+        {
+            if (mcast_addr_any(&group_addr))
+            {
+                // General Query -> ff02::1
+                if (!mcast_same_addr(&dest_addr, &allnodes_addr))
+                {
+                    L2MCD_LOG_WARN("[MLDv%d RX] General Query dest ip: %s, wanted: %s",
+                                   mldver, mcast_print_addr(&dest_addr), mcast_print_addr(&allnodes_addr));
+                    return FALSE;
+                }
+            }
+            else
+            {
+                // Specific Query -> group addr
+                if (!mcast_same_addr(&dest_addr, &group_addr))
+                {
+                    L2MCD_LOG_WARN("[MLDv%d RX] Specific Query dest ip: %s, wanted: %s",
+                                   mldver, mcast_print_addr(&dest_addr), mcast_print_addr(&group_addr));
+                    return FALSE;
+                }
+            }
+        }
+        else if (icmp6h->type == MLD_V1_MEMBERSHIP_REPORT_TYPE)
+        {
+            // Report v1 -> group addr
+            if (!mcast_same_addr(&dest_addr, &group_addr))
+            {
+                L2MCD_LOG_WARN("[MLDv%d RX] Report dest ip: %s, wanted: %s",
+                               mldver, mcast_print_addr(&dest_addr), mcast_print_addr(&group_addr));
+                return FALSE;
+            }
+        }
+        else if (icmp6h->type == MLD_V1_MEMBERSHIP_DONE_TYPE)
+        {
+            // Done v1 -> ff02::2
+            if (!mcast_same_addr(&dest_addr, &allrouters_addr))
+            {
+                L2MCD_LOG_WARN("[MLDv%d RX] Done dest ip: %s, wanted: %s",
+                               mldver, mcast_print_addr(&dest_addr), mcast_print_addr(&allrouters_addr));
+                return FALSE;
+            }
+        }
+    }
+    else if (icmp6h->type == MLD_V2_MEMBERSHIP_REPORT_TYPE)
+    {
+        MLDV2_REPORT_MESSAGE* mesg = (MLDV2_REPORT_MESSAGE *)icmp6h;
+        if (mld_vport->oper_version < mldver)
+        {
+            L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] ERR Rx packet has %d version MLDV2, but enable MLDv1. Dropping packet", FN, LN, vid, icmp6h->type);
+            return FALSE;
+        }
+
+        UINT16 offset = 0;
+        UINT16 num_grps = ntohs(mesg->num_grps);
+        MLDV2_GROUP_RECORD *mldv2_group_rec = &mesg->group_record;
+        for (int n = 0; n < num_grps; n++)
+        {
+            int num_srcs = ntohs(mldv2_group_rec->num_srcs);
+            offset = offset + sizeof(MLDV2_GROUP_RECORD) + (num_srcs - 1) * sizeof(IPV6_ADDRESS);
+            mldv2_group_rec = (MLDV2_GROUP_RECORD *)((UINT8 *)mldv2_group_rec + offset);
+        }
+        if (mesg_size != offset + sizeof(MLDV2_REPORT_MESSAGE) - sizeof(MLDV2_GROUP_RECORD))
+        {
+            L2MCD_LOG_WARN("[MLDv%d RX] MLDV2_REPORT_MESSAGE size: %d, rx size: %d", mldver, offset + sizeof(MLDV2_REPORT_MESSAGE) - sizeof(MLDV2_GROUP_RECORD), mesg_size);
+            mld->mld_stats[vir_port_id].recv_size_or_range_error++;
+            return FALSE;
+        }
+
+        // Report v2 -> ff02::16 OR group addr(V1)
+        if (!mcast_same_addr(&dest_addr, &mldv2_addr))
+        {
+            if (num_grps != 1)
+            {
+                L2MCD_LOG_WARN("[MLDv%d RX] Report dest ip: %s, wanted: %s",
+                               mldver, mcast_print_addr(&dest_addr), mcast_print_addr(&mldv2_addr));
+                return FALSE;
+            }
+            MLDV2_GROUP_RECORD *mldv2_group_rec = &mesg->group_record;
+            int num_srcs = ntohs(mldv2_group_rec->num_srcs);
+            if (num_srcs != 1)
+            {
+                L2MCD_LOG_WARN("[MLDv%d RX] Report dest ip: %s, wanted: %s",
+                               mldver, mcast_print_addr(&dest_addr), mcast_print_addr(&mldv2_addr));
+                return FALSE;
+            }
+
+            mcast_init_addr(&group_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+            mcast_set_ipv6_addr(&group_addr, &mesg->group_record->group_address);
+            if (!mcast_same_addr(&dest_addr, &group_addr))
+            {
+                L2MCD_LOG_WARN("[MLDv%d RX] Report dest ip: %s, wanted: %s or %s",
+                               mldver, mcast_print_addr(&dest_addr), mcast_print_addr(&mldv2_addr), mcast_print_addr(&group_addr));
+                return FALSE;
+            }
+        }
+    }
+    else if (icmp6h->type == MLD_MEMBERSHIP_QUERY_TYPE)
+    {
+        MLDV2_MESSAGE* mesg = (MLDV2_MESSAGE *)icmp6h;
+        if (mld_vport->oper_version < mldver)
+        {
+            L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] ERR Rx packet has %d version MLDV2, but enable MLDv1. Dropping packet", FN, LN, vid, icmp6h->type);
+            return FALSE;
+        }
+        int num_grps = ntohs(mesg->num_srcs);
+        if (mesg_size != sizeof(MLDV2_MESSAGE) - (num_grps - 1) * sizeof(IPV6_ADDRESS))
+        {
+            L2MCD_LOG_WARN("[MLDv%d RX] MLDV2_MESSAGE size: %d, rx size: %d", mldver, sizeof(MLDV2_MESSAGE) - (num_grps - 1) * sizeof(IPV6_ADDRESS), mesg_size);
+            mld->mld_stats[vir_port_id].recv_size_or_range_error++;
+            return FALSE;
+        }
+        mcast_init_addr(&group_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+        mcast_set_ipv6_addr(&group_addr, &mesg->group_address);
+        if (!mcast_same_addr(&dest_addr, &allnodes_addr))
+        {
+            if (mcast_addr_any(&group_addr))
+            {
+                // General Query -> ff02::1
+                if (!mcast_same_addr(&dest_addr, &allnodes_addr))
+                {
+                    L2MCD_LOG_WARN("[MLDv%d RX] General Query dest ip: %s, wanted: %s",
+                                   mldver, mcast_print_addr(&dest_addr), mcast_print_addr(&allnodes_addr));
+                    return FALSE;
+                }
+            }
+            else
+            {
+                // Specific Query -> group addr
+                if (!mcast_same_addr(&dest_addr, &group_addr))
+                {
+                    L2MCD_LOG_WARN("[MLDv%d RX] Specific Query dest ip: %s, wanted: %s",
+                                   mldver, mcast_print_addr(&dest_addr), mcast_print_addr(&group_addr));
+                    return FALSE;
+                }
+            }
+        }
+    }
+    return TRUE;
+}
 
 void mld_process_pimv2_query(MCGRP_CLASS * mld, MADDR_ST * src,
 			PIM_V2_HDR * pim_v2_hdr,

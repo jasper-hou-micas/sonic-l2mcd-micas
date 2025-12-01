@@ -1547,11 +1547,11 @@ static struct sockaddr_ll rx_sa6[L2MCD_MM_SOCKET_BATCH_SIZE];
 ucmsgbuf cmsgbuf6[L2MCD_MM_SOCKET_BATCH_SIZE];
 
 struct vlan_ethhdr {
-    unsigned char   h_dest[ETH_ALEN];   // 目的 MAC (6字节)
-    unsigned char   h_source[ETH_ALEN]; // 源 MAC (6字节)
-    __be16          h_vlan_proto;       // TPID (通常是 0x8100)
-    __be16          h_vlan_TCI;         // TCI (包含 Priority, CFI, VLAN ID)
-    __be16          h_vlan_encapsulated_proto; // 真实的被封装协议类型 (例如 IPv6 0x86DD)
+    unsigned char   h_dest[ETH_ALEN];           // dmac len 6
+    unsigned char   h_source[ETH_ALEN];         // smac len 6
+    __be16          h_vlan_proto;               // TPID 8100
+    __be16          h_vlan_TCI;                 // TCI such as: Priority, CFI, VLAN ID
+    __be16          h_vlan_encapsulated_proto;  // real proto such as: IPv6 0x86DD
 };
 
 void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
@@ -1559,22 +1559,16 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
     struct msghdr *msg_ptr;
     struct cmsghdr *cmsg;
     struct tpacket_auxdata *auxdata;
+    IPV6_HEADER *ip6h;
 
-    ssize_t num_pkts;
-    int i;
-
-    struct ipv6hdr *ip6h;
-    
     l2mcd_if_tree_t *l2mcd_if_tree = NULL;
     mld_vlan_node_t *vlan_node = NULL;
+    ssize_t num_pkts;
     IP6_RX_PKT_MSG ip6_rx_msg;
     memset(&ip6_rx_msg, 0, sizeof(IP6_RX_PKT_MSG));
 
-    // mld_common_msg rx_mld_msg;
-    // memset(&rx_mld_msg, 0, sizeof(mld_common_msg));
-    
-
-    for (i = 0; i < L2MCD_MM_SOCKET_BATCH_SIZE; i++) {
+    for (int i = 0; i < L2MCD_MM_SOCKET_BATCH_SIZE; i++)
+    {
         iov6[i][0].iov_base = buf6[i];
         iov6[i][0].iov_len = sizeof(buf6[i]);
 
@@ -1590,26 +1584,31 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
     num_pkts = recvmmsg(fd, &mmsg6[0], L2MCD_MM_SOCKET_BATCH_SIZE, 0, &timeout);
     L2MCD_LOG_INFO("%s mld sock_rx Received %d packets", __FUNCTION__, num_pkts);
 
-    if (num_pkts <= 0) {
+    if (num_pkts <= 0)
+    {
         if (num_pkts == -1)
             L2MCD_LOG_ERR("recvmmsg failed err=%s", strerror(errno));
         return;
     }
 
-    for (i = 0; i < num_pkts; i++) {
+    for (int i = 0; i < num_pkts; i++)
+    {
 
         struct ethhdr *eth = (struct ethhdr *)buf6[i];
         uint16_t ether_type = ntohs(eth->h_proto);
+        ssize_t len = mmsg6[i].msg_len;
+        uint16_t vlan_id = 0;
 
         if (ether_type == ETH_P_8021Q)
         {
             L2MCD_LOG_NOTICE("ether_type == ETH_P_8021Q: %d", ether_type);
-            struct vlan_ethhdr  *vhdr = (struct vlan_ethhdr *)buf6[i];
+            struct vlan_ethhdr *vhdr = (struct vlan_ethhdr *)buf6[i];
 
             uint16_t real_proto = ntohs(vhdr->h_vlan_encapsulated_proto);
             uint16_t vid2 = ntohs(vhdr->h_vlan_TCI) & 0xFFF; // mask 0x0FFF
-            if (real_proto == ETH_P_IPV6) {
-                ip6h = (struct ipv6hdr *)(buf6 + sizeof(struct vlan_ethhdr));
+            if (real_proto == ETH_P_IPV6)
+            {
+                ip6h = (IPV6_HEADER *)(buf6 + sizeof(struct vlan_ethhdr));
                 L2MCD_LOG_NOTICE("real_proto == ETH_P_IPV6: %d", real_proto);
             }
             L2MCD_LOG_NOTICE("vid: %d", vid2);
@@ -1619,45 +1618,42 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
             L2MCD_LOG_ERR("ether_type is mpt sopport  %d", ether_type);
             continue;
         }
-
-        msg_ptr = &mmsg6[i].msg_hdr;
-        ip6h  = (struct ipv6hdr *) (buf6[i] + sizeof(struct ether_header));
-
-        uint16_t vlan_id = 0;
-
-        ssize_t len = mmsg6[i].msg_len;
+        else 
+        {
+            ip6h = (IPV6_HEADER *)(buf6[i] + sizeof(struct ether_header));
+        }
         L2MCD_LOG_INFO("packet size: %d", len);
 
-        if (len < sizeof(struct ethhdr)){ 
+        msg_ptr = &mmsg6[i].msg_hdr;
+        if (msg_ptr->msg_flags & MSG_TRUNC)
+        {
+            L2MCD_LOG_NOTICE("%s message too large for buffer", __FUNCTION__);
             continue;
         }
+        g_rx_stats_tot_pkts++;
 
-        if (msg_ptr->msg_flags & MSG_TRUNC) 
+        uint8_t nexthdr = ip6h->next_header;
+        if (nexthdr != IPPROTO_ICMPV6 && nexthdr != IPPROTO_HOPOPTS) // 0 is HOPOPT
         {
-            L2MCD_LOG_NOTICE("%s message too large for buffer", __FUNCTION__); 
-            continue;
-        }
-
-        if (ip6h->nexthdr != IPPROTO_ICMPV6 && ip6h->nexthdr != IPPROTO_HOPOPTS) // 0 is HOPOPT
-        {
-            L2MCD_LOG_ERR("nexthdr is not IPPROTO_ICMPV6 or IPPROTO_HOPOPTS, payload_len %d, next %d", ip6h->payload_len, ip6h->nexthdr);
+            L2MCD_LOG_ERR("hbh nexthdr is not IPPROTO_ICMPV6 or IPPROTO_HOPOPTS, payload_len %d, next %d", ip6h->payload_length, nexthdr);
             g_rx_stats_non_mld_pkts++;
             continue;
         }
+        L2MCD_LOG_INFO("hbh nexthdr %d", nexthdr);
 
         int ifindex = rx_sa6[i].sll_ifindex;
         L2MCD_LOG_NOTICE("ifindex:%d", ifindex);
 
         if (rx_sa6[i].sll_pkttype == PACKET_OUTGOING)
         {
-            L2MCD_LOG_NOTICE("Ignore sending mesg");
+            L2MCD_LOG_NOTICE("Ignore packet sent by kernel");
             continue;
         }
 
-        for (cmsg = CMSG_FIRSTHDR(msg_ptr); cmsg != NULL; cmsg = CMSG_NXTHDR(msg_ptr,cmsg))
+        for (cmsg = CMSG_FIRSTHDR(msg_ptr); cmsg != NULL; cmsg = CMSG_NXTHDR(msg_ptr, cmsg))
         {
             auxdata = (struct tpacket_auxdata *)CMSG_DATA(cmsg);
-            if (cmsg->cmsg_type != PACKET_AUXDATA) 
+            if (cmsg->cmsg_type != PACKET_AUXDATA)
             {
                 g_rx_stats_no_aux++;
                 continue;
@@ -1673,151 +1669,85 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
             }
         }
 
-        if (ifindex == 0 && msg_ptr->msg_name != NULL) {
+        char ifname[IFNAMSIZ] = {0};
+        if (ifindex == 0 && msg_ptr->msg_name != NULL)
+        {
             struct sockaddr_ll *sll = (struct sockaddr_ll *)msg_ptr->msg_name;
             if (sll->sll_family == AF_PACKET)
             {
                 ifindex = sll->sll_ifindex;
-                L2MCD_LOG_NOTICE("ifindex:%d", ifindex);
+                L2MCD_LOG_NOTICE("ifindex:%d sll ifindex: %d", ifindex, rx_sa6[i].sll_ifindex);
             }
         }
-
-        char ifname[IFNAMSIZ] = {0};
-        if (ifindex > 0) {
+        if (ifindex > 0)
+        {
             if_indextoname(ifindex, ifname);
             L2MCD_LOG_NOTICE("ifname:%s", ifname);
         }
-
-        if (vlan_id <= 0)
-        {
-            L2MCD_LOG_ERR("vlan id is invaild: %d", vlan_id);
-            continue;
-        }
-
-        if (vlan_id < L2MCD_VLAN_MAX)
-        {
-            vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
-        }
-        
-        if (vlan_node)
-        {
-            if (!mld_is_flag_set(vlan_node, L2MCD_IPV6_AFI, MLD_SNOOPING_ENABLED)) 
-            {
-                L2MCD_LOG_ERR("vlan_node is not set");
-                continue; 
-            }
-            // rx_mld_msg.port_number = vlan_node->ifindex;
-            ip6_rx_msg.ip_param.rx_port_number  = vlan_node->ifindex;
-        }
         else
         {
-            g_rx_stats_inv_tags++;
+            g_rx_stats_no_tag++;
+            L2MCD_LOG_NOTICE("ifindex id is invaild: %d", ifindex);
             continue;
         }
-        
-
-        if (len < sizeof(struct ethhdr) + sizeof(struct ipv6hdr)){ 
-            L2MCD_LOG_ERR("len < sizeof(struct ethhdr) + sizeof(struct ipv6hdr)");
-            continue;
-        }
-
-        memcpy(&ip6_rx_msg.ip_param.destination_address, &ip6h->daddr, sizeof(IPV6_ADDRESS));
-        memcpy(&ip6_rx_msg.ip_param.source_address, &ip6h->saddr, sizeof(IPV6_ADDRESS));
-
-        if (len < sizeof(struct ethhdr) + sizeof(struct ipv6hdr) + sizeof(struct icmp6_hdr)){ 
-            L2MCD_LOG_ERR("len < sizeof(struct ethhdr) + sizeof(struct ipv6hdr) + sizeof(struct icmp6_hdr)");
-            continue;
-        }
-
-        uint8_t nexthdr = ip6h->nexthdr;
-        uint8_t *current_ptr = (uint8_t *)(buf6[i] + sizeof(struct ether_header) + sizeof(struct ipv6hdr));
-        struct icmp6_hdr *icmp6h;
-
-        L2MCD_LOG_INFO("hbhb nexthdr %d on %s", nexthdr, ifname);
-        if (nexthdr == IPPROTO_HOPOPTS)
-        {
-            // --- Hop-by-Hop Header ---
-            struct ipv6_hopopt_hdr *hbh = (struct ipv6_hopopt_hdr *)current_ptr;
-            if (hbh->nexthdr != IPPROTO_ICMPV6)
-            {
-                L2MCD_LOG_INFO("Ignore Hop-by-Hop nexthdr %d on %s", hbh->nexthdr, ifname);
-                continue;
-            }
-            icmp6h = (struct icmp6_hdr *)(current_ptr + (hbh->hdrlen + 1) * 8);
-        }
-        else if(nexthdr == IPPROTO_ICMPV6)
-        {
-            icmp6h = (struct icmp6_hdr *)current_ptr;
-        }
-        else {
-            L2MCD_LOG_INFO("Ignore nexthdr %d on %s", nexthdr, ifname);
-            continue;
-        }
-
-        uint8_t icmp_type = icmp6h->icmp6_type;
-        L2MCD_LOG_INFO("icmp type %d ", icmp_type);
-
-        // rx_mld_msg.vlan_id = vlan_id;
-        ip6_rx_msg.ip_param.vlan_id = vlan_id;
-
         l2mcd_if_tree = l2mcd_kif_to_rx_if(rx_sa6[i].sll_ifindex);
         if (!l2mcd_if_tree)
         {
             L2MCD_LOG_NOTICE("%s unknown RX interface :kif:%d iname:%d", __FUNCTION__, rx_sa6[i].sll_ifindex, ifname);
             continue;
         }
-        ip6_rx_msg.ip_param.rx_physical_port_number = l2mcd_if_tree->ifid;
-        l2mcd_if_tree->rx_pkts++;
+        if (vlan_id <= 0)
+        {
+            g_rx_stats_no_tag++;
+            L2MCD_LOG_ERR("vlan id is invaild: %d", vlan_id);
+            continue;
+        }
+        else if (vlan_id < L2MCD_VLAN_MAX)
+        {
+            vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
+            if (!vlan_node)
+            {
+                g_rx_stats_inv_tags++;
+                continue;
+            }
+        }
+        if (!mld_is_flag_set(vlan_node, L2MCD_IPV6_AFI, MLD_SNOOPING_ENABLED))
+        {
+            L2MCD_LOG_ERR("vlan_node is not set");
+            continue;
+        }
+        if (len < sizeof(struct ethhdr) + sizeof(IPV6_HEADER) + sizeof(struct ipv6_hopopt_hdr) + sizeof(ICMP6_PSEUDO_HDR_MESSAGE))
+        {
+            L2MCD_LOG_ERR("len < sizeof(struct ethhdr) + sizeof(IPV6_HEADER) + sizeof(struct ipv6_hopopt_hdr) + sizeof(ICMP6_PSEUDO_HDR_MESSAGE)");
+            continue;
+        }
 
-        // rx_mld_msg.phy_port_number = l2mcd_if_tree->ifid;
-        // print_mld_msg(&rx_mld_msg);
-        ip6_rx_msg.ip_param.rx_physical_port_number  = l2mcd_if_tree->ifid;
+        ip6_rx_msg.ip_param.rx_port_number = vlan_node->ifindex;
+        ip6_rx_msg.ip_param.rx_physical_port_number = l2mcd_if_tree->ifid;
+        ip6_rx_msg.ip_param.vrf_index = L2MCD_DEFAULT_VRF_IDX;
+        ip6_rx_msg.ip_param.vlan_id = vlan_id;
+
+        ip6_rx_msg.ip_param.hop_limit = ip6h->hop_limit;
+        ip6_rx_msg.ip_param.version = ip6h->version;
+        ip6_rx_msg.ip_param.next_header = ip6h->next_header;
+        ip6_rx_msg.ip_param.traffic_class = ip6h->traffic_class;
+        ip6_rx_msg.ip_param.payload_length = ntohs(ip6h->payload_length);
+        memcpy(&ip6_rx_msg.ip_param.destination_address, &ip6h->destination_ip_address, sizeof(IPV6_ADDRESS));
+        memcpy(&ip6_rx_msg.ip_param.source_address, &ip6h->source_ip_address, sizeof(IPV6_ADDRESS));
+        l2mcd_if_tree->rx_pkts++;
 
         ip6_rx_msg.pkt_data = buf6[i] + sizeof(struct ether_header);
         ip6_rx_msg.pkt_size = len - sizeof(struct ether_header);
 
-        L2MCD_LOG_NOTICE("[MLD RX] if:%s ifindex:%d icmp6_type=%u len=%zd", ifname, ifindex, icmp_type, len);
-        g_rx_stats_igmp_pkts++;
+        // ip6_rx_msg.pkt_data = (uint8_t *)ip6h;
+        // ip6_rx_msg.pkt_size = (UINT16)((buf6[i] + len) - (uint8_t *)ip6_rx_msg.pkt_data);
 
-        // if (igmp_packet_size < sizeof(IGMP_MESSAGE))
-        // {
+        L2MCD_LOG_NOTICE("[MLD RX] if:%s ifindex:%d len=%zd pkt_len:%d", ifname, ifindex, len, ip6_rx_msg.pkt_size);
+        g_rx_stats_mld_pkts++;
 
-        //     L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] ERR: Rx packet len %d too small. Dropping packet",FN,LN, 
-        //             vid, igmp_packet_size);
-        //     igmp->igmp_stats[rx_port_number].recv_size_or_range_error++;
-
-        //     goto free_packet;
-        // }
-        // if (igmp_check_if_checksum_is_valid (sptr_igmp_message, igmp_packet_size) == FALSE)
-        // {
-        //     L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] ERR Rx packet has invalid checksum. Dropping packet",FN,LN, vid);
-        //     igmp->igmp_stats[rx_port_number].recv_checksum_error++;
-
-        //     goto free_packet;
-        // }
-        // igmpver = igmp_eval_version(sptr_igmp_message, igmp_packet_size);
-
-        /* ---------------- Dispatch ---------------- */
-        switch (icmp_type) {
-        case MLD_MEMBERSHIP_QUERY_TYPE: // MLDv1v2 Query
-            l2mcd_mld_process_query(&ip6_rx_msg, ifname);
-            break;
-        case MLD_V1_MEMBERSHIP_REPORT_TYPE: // MLDv1 Report
-            l2mcd_mld_process_v1_report(&ip6_rx_msg, ifname);
-            break;
-        case MLD_V2_MEMBERSHIP_REPORT_TYPE: // MLDv2 Report
-            l2mcd_mld_process_v2_report(&ip6_rx_msg, ifname);
-            break;
-        case MLD_V1_MEMBERSHIP_DONE_TYPE: // MLDv1 Done
-            l2mcd_mld_process_done(&ip6_rx_msg, ifname);
-            break;
-        default:
-            L2MCD_LOG_INFO("Ignore ICMPv6 type=%d on %s", icmp_type, ifname);
-            break;
-        }
+        receive_mld_packet(&ip6_rx_msg);
     }
 }
-
 
 #define MLD_RX_BUF_SIZE (8*1024*1024)
 struct sock_filter g_mld_filter[] = {
