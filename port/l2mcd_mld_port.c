@@ -2532,8 +2532,9 @@ int _mld_clear_group(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_vport,
 
 			mcast_set_address(grp_addr, &mcgrp_entry->group_address);
             if (mcgrp_vport) {
-
-				if(mcgrp_vport->oper_version == IGMP_VERSION_3 && mcgrp_mbrshp->filter_mode == FILT_INCL)
+				if(((afi == MCAST_IPV4_AFI && mcgrp_vport->oper_version == IGMP_VERSION_3) ||
+                     (afi == MCAST_IPV6_AFI && mcgrp_vport->oper_version == MLD_VERSION_2)) &&
+                     mcgrp_mbrshp->filter_mode == FILT_INCL)
 				{
 					MCGRP_SOURCE* p_src = mcgrp_mbrshp->src_list[FILT_INCL];
 					for (; p_src; p_src = p_src->next)
@@ -2971,6 +2972,7 @@ void mld_snoop_clear_on_version_change(uint32_t vid, int afi, uint8_t type)
 	MADDR_ST grp_addr_clr = {0};
 	int clr_grp_flag = 0;
 	uint16_t ivid = 0;
+	//afi = MCAST_IPV4_AFI;
 
     grp_addr_clr.afi = afi;
 	if(type == MLD_BD)	
@@ -3652,8 +3654,8 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
         }
         UINT16 hhb_len = (hbh->hdrlen + 1) * 8;
         icmp6h = (ICMP6_PSEUDO_HDR_MESSAGE *)(mld_pkt_msg->pkt_data + sizeof(IPV6_HEADER) + hhb_len);
-        // RAO check
-        BOOLEAN hbh_rao = FALSE;
+		// RAO check
+		BOOLEAN hbh_rao = FALSE;
         UINT8 *hbh_opt = (UINT8 *)hbh + 2;
         UINT8 *hbh_end = (UINT8 *)hbh + hhb_len;
         while (hbh_opt < hbh_end)
@@ -3739,8 +3741,10 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
             mld->mld_stats[vir_port_id].recv_size_or_range_error++;
             return FALSE;
         }
+
         mcast_init_addr(&group_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
         mcast_set_ipv6_addr(&group_addr, &mesg->group_address);
+
         if (icmp6h->type == MLD_MEMBERSHIP_QUERY_TYPE)
         {
             if (mcast_addr_any(&group_addr))
@@ -3830,6 +3834,7 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
 
             mcast_init_addr(&group_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
             mcast_set_ipv6_addr(&group_addr, &mesg->group_record->group_address);
+
             if (!mcast_same_addr(&dest_addr, &group_addr))
             {
                 L2MCD_LOG_WARN("[MLDv%d RX] Report dest ip: %s, wanted: %s or %s",
@@ -3881,6 +3886,8 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
     }
     return TRUE;
 }
+
+
 
 void mld_process_pimv2_query(MCGRP_CLASS * mld, MADDR_ST * src,
 			PIM_V2_HDR * pim_v2_hdr,

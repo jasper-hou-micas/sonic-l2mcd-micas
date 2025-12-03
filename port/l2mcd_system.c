@@ -133,7 +133,6 @@ int l2mcd_system_group_entry_notify(MADDR_ST *group_address, MADDR_ST *src_addre
         L2MCD_LOG_NOTICE("%s:%d:[vir_port:%d] inv  op:%d GA:%s SA:%s phyport:%d", FN,LN,vir_port,insert,msg.gaddr, msg.saddr,phy_port_id);
         return 0;
     }
-    L2MCD_VLAN_LOG_INFO(vir_port, "%s:%d: input is_static:%d", FN,LN, is_static);
 
     msg.is_static=is_static;
     mcgrp_mbrshp = mcgrp_find_mbrshp_entry_for_grpaddr(mcgrp, group_address, vir_port, phy_port_id);

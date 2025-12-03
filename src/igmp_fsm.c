@@ -1245,8 +1245,8 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
                     // X = A*B
                     // This takes care of Delete (A-B)
                     if ((num_srcs == 0) && (mcgrp_vport->tracking_enabled) && 
-                            ((mcgrp_pport->oper_version == IGMP_VERSION_3) || 
-                             (mcgrp_pport->oper_version == MLD_VERSION_2)))
+                            ((mcgrp_pport->oper_version == IGMP_VERSION_3 && IS_IGMP_CLASS(mcgrp)) || 
+                             (mcgrp_pport->oper_version == MLD_VERSION_2 && IS_MLD_CLASS(mcgrp))))
                     {
                         //this case could be combined with v2 case
                         //add this v3 client to the common client list 
@@ -1705,8 +1705,8 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
                     }
 
                     if ((num_srcs == 0) && (mcgrp_vport->tracking_enabled) && 
-                            ((mcgrp_pport->oper_version == IGMP_VERSION_3) ||
-                             (mcgrp_pport->oper_version == MLD_VERSION_2)))
+                         ((mcgrp_pport->oper_version == IGMP_VERSION_3 && IS_IGMP_CLASS(mcgrp)) ||
+                         (mcgrp_pport->oper_version == MLD_VERSION_2 && IS_MLD_CLASS(mcgrp))))
                     {
                         //this case could be combined with v2 case
                         //add this v3 client to the common client list 
@@ -1871,25 +1871,22 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
     // Check and cleanup as required
     if (mbrshp_del)
     {
-        if(new_src_list && mcgrp_pport->oper_version == IGMP_VERSION_3 || mcgrp_pport->oper_version == MLD_VERSION_2 )
+        if (new_src_list && ((IS_IGMP_CLASS(mcgrp) && mcgrp_pport->oper_version == IGMP_VERSION_3) ||
+                             (IS_MLD_CLASS(mcgrp) && mcgrp_pport->oper_version == MLD_VERSION_2)))
         {
-            if (IS_IGMP_CLASS(mcgrp))
+            MCGRP_SOURCE *p_src = (MCGRP_SOURCE *)new_src_list;
+            MCGRP_SOURCE *p_del;
+
+            for (; p_src; p_src = p_src->next)
             {
-                MCGRP_SOURCE* p_src = (MCGRP_SOURCE*) new_src_list;             
-                MCGRP_SOURCE* p_del;
+                // Delete sources from the group;
+                p_del = mcgrp_delist_source(mcgrp_mbrshp, &p_src->src_addr, FILT_INCL);
 
-                for (; p_src; p_src = p_src->next)
-                {
-                    // Delete sources from the group;
-                    p_del = mcgrp_delist_source(mcgrp_mbrshp, &p_src->src_addr, FILT_INCL);
-
-                    // Notify mcast routing protocols et al
-                    mcgrp_notify_source_del_allowed(mcgrp, group_address, mcgrp_vport, 
-                            mcgrp_mbrshp, &p_src->src_addr, TRUE);
-                    // TBD: host tracking..
-                    mcgrp_free_source(mcgrp, p_del);
-
-                }
+                // Notify mcast routing protocols et al
+                mcgrp_notify_source_del_allowed(mcgrp, group_address, mcgrp_vport,
+                                                mcgrp_mbrshp, &p_src->src_addr, TRUE);
+                // TBD: host tracking..
+                mcgrp_free_source(mcgrp, p_del);
             }
         }
         else
