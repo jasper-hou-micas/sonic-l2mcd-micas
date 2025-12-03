@@ -219,8 +219,9 @@ enum BOOLEAN mld_check_valid_range(IPV6_ADDRESS *group_address)
     }
 
     UINT8 scope = group_address->address.address8[1] & 0x0F;
-    // maybe Site-Local (5)  Organization-Local (8)
-    if (scope == 0x2 || scope == 0xE)
+    // Link-Local(2) Admin-Local(4) Site-Local(5)
+    // Organization-Local(8) Global(E) Reserve(0,3,F)
+    if (scope == 0x0 || scope == 0x2 || scope == 0x3 || scope == 0x4 || scope == 0x5 || scope == 0x8 || scope == 0xE || scope == 0xF)
         return TRUE;
 
     return FALSE;
