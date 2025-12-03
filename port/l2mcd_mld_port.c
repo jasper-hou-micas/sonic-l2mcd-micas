@@ -586,7 +586,7 @@ mld_if_snoop_set(uint32_t afi, uint16_t vid, int user_cfg, uint8_t type)
 			cfg->cfg_version = IGMP_VERSION_2;
 	} else if (afi == MLD_IP_IPV6_AFI) {
 		if(cfg->cfg_version == MLD_VERSION_NONE)
-			cfg->cfg_version = MLD_VERSION_1;
+			cfg->cfg_version = MLD_VERSION_2;
 	}
 
 	if(user_cfg) {
@@ -1257,9 +1257,8 @@ void mcgrp_vport_start_querier_process(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_v
 				 10));
 	} else {
 		mld_send_general_query(mcgrp, mcgrp_vport->vir_port_id, send_port, (UINT8) mcgrp_vport->oper_version, 
-				mcgrp_vport->querier_router.ip.v6addr,	/* Use lowest srcIp */
-				(mcgrp_vport->max_response_time *
-				 10));
+				&mcgrp_vport->querier_router.ip.v6addr,	/* Use lowest srcIp */
+				(mcgrp_vport->max_response_time * 10));
         //MLD
 	}
 	if (mcgrp_vport->start_up_query_count > 0)
@@ -1926,6 +1925,57 @@ IPV6_ADDRESS mld_portdb_get_port_lowest_ipv6_addr_from_list(uint32_t port_num)
 		return ip6_address;
 }
 
+void insert_linklocal_ipv6_into_portdb(int port_id)
+{
+    char ifname_buf[IFNAMSIZ] = {0};
+    const char *ifname = portdb_get_ifname_from_portindex(port_id);
+
+    if (!ifname) {
+        L2MCD_LOG_ERR("%s: Failed to get interface name for port %d", __FUNCTION__, port_id);
+        return;
+    }
+	L2MCD_LOG_DEBUG("%s: Original ifname for port %d is '%s'", __FUNCTION__, port_id, ifname);
+    // VLAN -> Vlan
+    if (strncmp(ifname, "VLAN", 4) == 0 && strlen(ifname) > 4) {
+        snprintf(ifname_buf, sizeof(ifname_buf), "Vlan%s", ifname + 4);
+        ifname = ifname_buf;
+    }
+	L2MCD_LOG_DEBUG("%s: Original ifname for port %d is '%s'", __FUNCTION__, port_id, ifname);
+
+    struct ifaddrs *ifaddr = NULL, *ifa = NULL;
+    if (getifaddrs(&ifaddr) != 0) {
+        L2MCD_LOG_ERR("%s: getifaddrs failed", __FUNCTION__);
+        return;
+    }
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) 
+	{
+        if (!ifa->ifa_addr || strcmp(ifa->ifa_name, ifname) != 0)
+            continue;
+
+        if (ifa->ifa_addr->sa_family == AF_INET6) {
+            struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+            char addr_str[INET6_ADDRSTRLEN] = {0};
+            inet_ntop(AF_INET6, &sin6->sin6_addr, addr_str, sizeof(addr_str));
+
+            if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+                IPV6_ADDRESS ip6_address;
+                memset(&ip6_address, 0, sizeof(IPV6_ADDRESS));
+                memcpy(ip6_address.address.address8, sin6->sin6_addr.s6_addr, 16);
+
+                L2MCD_LOG_INFO("%s: Found link-local IPv6 %s on interface %s (port %d)", 
+                                __FUNCTION__, addr_str, ifname, port_id);
+
+                portdb_add_port_entry_to_tree(&gMld.ve_portdb_tree, port_id, L2MCD_DEFAULT_VRF_IDX, port_id);
+                portdb_insert_addr_ipv6_list(&gMld.ve_portdb_tree, port_id,
+                                             ip6_address, 64, L2MCD_DEFAULT_VRF_IDX, 0);
+            }
+        }
+    }
+
+    freeifaddrs(ifaddr);
+}
+
 /* clears total cache/ vlan specific/ grp specific cache */
 int pims_clear_snoop_cache(int afi, mld_vid_t vlan_id, MADDR_ST *grp_addr_clr,uint8_t type)
 {
@@ -2150,18 +2200,15 @@ mcgrp_add_router_port(MCGRP_CLASS * mcgrp,
     if (is_static)
        mcgrp_vport->rtr_port_list->is_static  = TRUE;
 	else {
-    	mcgrp_vport->rtr_port_list->is_static  = FALSE;
-			// Add to the wheel timer.
-			mcgrp_vport->rtr_port_list->mrtr_tmr.timer_type =
-			    MCGRP_WTE_MROUTER;
-	    mcgrp_vport->rtr_port_list->mrtr_tmr.mcgrp  = mcgrp;
-			mcgrp_vport->rtr_port_list->mrtr_tmr.wte.
-			    mrtr_port.mcgrp_vport = mcgrp_vport;
-			mcgrp_vport->rtr_port_list->mrtr_tmr.wte.
-			    mrtr_port.phy_port_id = phy_port_id;
-		mcgrp_vport->rtr_port_list->mrtr_tmr.mcgrp_wte.data = 
-													&new_mcgrp_rport->mrtr_tmr;
-	    WheelTimer_AddElement(mcgrp->mcgrp_wtid,
+		mcgrp_vport->rtr_port_list->is_static = FALSE;
+		// Add to the wheel timer.
+		mcgrp_vport->rtr_port_list->mrtr_tmr.timer_type =
+			MCGRP_WTE_MROUTER;
+		mcgrp_vport->rtr_port_list->mrtr_tmr.mcgrp = mcgrp;
+		mcgrp_vport->rtr_port_list->mrtr_tmr.wte.mrtr_port.mcgrp_vport = mcgrp_vport;
+		mcgrp_vport->rtr_port_list->mrtr_tmr.wte.mrtr_port.phy_port_id = phy_port_id;
+		mcgrp_vport->rtr_port_list->mrtr_tmr.mcgrp_wte.data = &new_mcgrp_rport->mrtr_tmr;
+		WheelTimer_AddElement(mcgrp->mcgrp_wtid,
 					      &new_mcgrp_rport->
 					      mrtr_tmr.mcgrp_wte,
 					      (UINT32) time);
@@ -2310,6 +2357,11 @@ void mcgrp_update_l2_static_group(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_vport,
 			//return;	
 		}
 	} else {
+		version = ((mcgrp_pport->oper_version >= MLD_VERSION_2) 
+							? MLD_STATIC_VER2  : MLD_STATIC_VER1);
+        IPV6_ADDRESS lowest_ipv6_addr = ip_get_lowest_ipv6_address_on_port
+												(mcgrp_vport->vir_port_id, mcgrp_vport->type);
+		mcast_set_ipv6_addr(&addr, &lowest_ipv6_addr);	
 		if (mld_update_ssm_parameters(mcgrp, &group_addr, &version,
 					       mcgrp_vport->vir_port_id,
 					       phy_port_id, &v3_action,
@@ -2549,7 +2601,7 @@ void mcgrp_refresh_l2_static_group(MCGRP_CLASS * mcgrp,
     MADDR_ST            *group_address = NULL;
     MADDR_ST             addr;
     UINT8                version = 0;
-    UINT8                igmp_action = 0;
+    UINT8                action = 0;
     UINT16               num_srcs = 0;
     UINT32              *src_list = NULL;
 
@@ -2585,28 +2637,31 @@ void mcgrp_refresh_l2_static_group(MCGRP_CLASS * mcgrp,
 				mcast_print_addr(group_address), mcgrp_mbrshp->phy_port_id);
 
 		}
-        version = ((mcgrp_vport->oper_version >= IGMP_VERSION_2) ?
-                                                   IGMP_STATIC_VER2 : IGMP_STATIC_VER1);
+
 
 		if (IS_IGMP_CLASS(mcgrp)) {
+        	version = ((mcgrp_vport->oper_version >= IGMP_VERSION_2) ? IGMP_STATIC_VER2 : IGMP_STATIC_VER1);
 			mcast_set_ipv4_addr(&addr,
 					    ip_get_lowest_ip_address_on_port(vir_port_id, mcgrp_vport->type));
-			igmp_action = IS_EXCL;
+			action = IS_EXCL;
 			//Port mode IGMPv3 and IGMPv2 static group configured,
 			//below would perfom SSM MAP  IGMPv2 convert to mapped source -> IGMPv3
 			if (igmp_update_ssm_parameters
 			    (mcgrp, group_address, &version, vir_port_id,
-			     phy_port_id, &igmp_action, &num_srcs,
+			     phy_port_id, &action, &num_srcs,
 														&src_list) == FALSE)
 			{
 				MLD_LOG(MLD_LOGLEVEL9, MLD_IP_IPV4_AFI, "%s(%d) PIM SSM group:%s ssm-map failed\n",
 					FN, LN, mcast_print_addr(group_address));
 			}
 		} else {
-		    UINT8 mld_action = 0;
+			version = ((mcgrp_vport->oper_version >= MLD_VERSION_2) ? MLD_STATIC_VER2 : MLD_STATIC_VER1);
+            IPV6_ADDRESS lowest_ipv6_addr = ip_get_lowest_ipv6_address_on_port(vir_port_id, mcgrp_vport->type);
+			mcast_set_ipv6_addr(&addr, &lowest_ipv6_addr);
+		    action  = IS_EXCL;
 			if (mld_update_ssm_parameters(mcgrp, group_address, &version,
 				       vir_port_id,
-				       phy_port_id, &mld_action,
+				       phy_port_id, &action,
 					&num_srcs, &src_list) == FALSE)
     		{
     			MLD_LOG(MLD_LOGLEVEL9, MLD_IP_IPV6_AFI, "%s(%d) MLD SSM group:%s ssm-map failed\n",
@@ -2615,7 +2670,7 @@ void mcgrp_refresh_l2_static_group(MCGRP_CLASS * mcgrp,
             //MLD
         }
 		mcgrp_update_group_address_table(mcgrp, vir_port_id, phy_port_id, group_address, &addr,	// use intf's addr as client source
-						 igmp_action, version, num_srcs, (void *) src_list);	/* No sources */
+						 action, version, num_srcs, (void *) src_list);	/* No sources */
 		//Send the static group over mrouter ports
 		if (mcgrp_mbrshp && mcgrp_mbrshp->static_mmbr)
 		{
@@ -2916,7 +2971,6 @@ void mld_snoop_clear_on_version_change(uint32_t vid, int afi, uint8_t type)
 	MADDR_ST grp_addr_clr = {0};
 	int clr_grp_flag = 0;
 	uint16_t ivid = 0;
-	afi = MCAST_IPV4_AFI;
 
     grp_addr_clr.afi = afi;
 	if(type == MLD_BD)	
@@ -2999,7 +3053,7 @@ int mld_proto_query_interval_set(uint32_t afi, uint32_t vid, mld_vid_t gvid,
 			else 
 			{
                 mld_send_general_query(mcgrp, mcgrp_vport->vir_port_id, send_port,
-                                   (UINT8) mcgrp_vport->oper_version, 0,
+                                   (UINT8) mcgrp_vport->oper_version, NULL,
                                    mcgrp_vport->max_response_time * 10);
 
 			}
@@ -3795,7 +3849,7 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
         int num_grps = ntohs(mesg->num_srcs);
         if (mesg_size != sizeof(MLDV2_MESSAGE) - (num_grps - 1) * sizeof(IPV6_ADDRESS))
         {
-            L2MCD_LOG_WARN("[MLDv%d RX] MLDV2_MESSAGE size: %d, rx size: %d", mldver, sizeof(MLDV2_MESSAGE) - (num_grps - 1) * sizeof(IPV6_ADDRESS), mesg_size);
+            L2MCD_LOG_WARN("[MLDv%d RX] MLDV2_REPORT_MESSAGE size: %d, rx size: %d", mldver, sizeof(MLDV2_MESSAGE) - (num_grps - 1) * sizeof(IPV6_ADDRESS), mesg_size);
             mld->mld_stats[vir_port_id].recv_size_or_range_error++;
             return FALSE;
         }

@@ -125,14 +125,36 @@ void mcgrp_service_wheel_timer (UINT32 afi)
     }
 }
 
-int mcgrp_addr_cmp_cb_param (const void *keya, const void *keyb, void *param)
+int mcgrp_addr_cmp_cb_param(const void *keya, const void *keyb, void *param)
 {
-    MADDR_ST addr_a = *(MADDR_ST*) keya;
-    MADDR_ST addr_b = *(MADDR_ST*) keyb;
-    if (addr_a.ip.v4addr > addr_b.ip.v4addr) return 1;
-    if (addr_a.ip.v4addr < addr_b.ip.v4addr) return -1;
-    return 0;
+    MADDR_ST addr_a = *(MADDR_ST *)keya;
+    MADDR_ST addr_b = *(MADDR_ST *)keyb;
+
+    if (addr_a.afi == MLD_IP_IPV4_AFI && addr_b.afi == MLD_IP_IPV4_AFI)
+    {
+        if (addr_a.ip.v4addr > addr_b.ip.v4addr)
+            return 1;
+        if (addr_a.ip.v4addr < addr_b.ip.v4addr)
+            return -1;
+        return 0;
+    }
+
+    if (addr_a.afi == MLD_IP_IPV6_AFI && addr_b.afi == MLD_IP_IPV6_AFI)
+    {
+        int ret = memcmp(addr_a.ip.v6addr.address.address8,
+                         addr_b.ip.v6addr.address.address8,
+                         16);
+
+        if (ret > 0)
+            return 1;
+        if (ret < 0)
+            return -1;
+        return 0;
+    }
+
+    return (addr_a.afi - addr_b.afi);
 }
+
 void set_mask_bit(PORT_MASK *mask, int port)
 {
 	if (!mld_only_code)

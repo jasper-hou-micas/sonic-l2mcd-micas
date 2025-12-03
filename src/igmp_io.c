@@ -23,6 +23,7 @@
 
 #define PREFIX_LIST_NAME_LEN 32 //256
 extern MCAST_GLOBAL_CLASS    gMulticast, *pgMulticast;
+extern MCAST_GLOBAL_CLASS    gMulticast2, *pgMulticast2;
 extern L2MCD_AVL_TREE *mld_portdb_tree;
 extern L2MCD_AVL_TREE *ve_mld_portdb_tree;
 
@@ -269,7 +270,6 @@ void igmp_process_query(MCGRP_CLASS *igmp,
     {
         return;
     }
-
 
     /* If this is a GS-Query and we are in non-querier mode, we should
      * update the age of this group, unless ofcourse this is a V3 query
@@ -742,6 +742,13 @@ int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters)
                     sptr_igmp_message,
                     igmp_packet_size,
                     clnt_src_ip);
+            
+            // General Query & Group/Source Specific Query
+            if (is_mld_snooping_enabled(igmp_vport, MCAST_IPV4_AFI))
+            {
+                group_addr.ip.v4addr = ntohl(group_addr.ip.v4addr);
+                mld_tx_query_rcvd_on_edge_port(sptr_ip_parameters, &group_addr, igmp, igmp_vport);
+            }
 
             break;
 
@@ -814,7 +821,7 @@ int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters)
             {
                 MLD_LOG(MLD_LOGLEVEL7,MLD_IP_IPV4_AFI,"IGMP:%s()%d group_addr:%s send Report to rtr ports",FN,LN, mcast_print_addr(&group_addr));
                 group_addr.ip.v4addr = ntohl(group_addr.ip.v4addr);
-                mld_tx_reports_leave_rcvd_on_edge_port(sptr_ip_parameters, &group_addr, igmp, igmp_vport);
+                mld_tx_reports_and_leave_rcvd_on_edge_port(sptr_ip_parameters, &group_addr, igmp, igmp_vport);
             }
             break;
 
@@ -825,7 +832,7 @@ int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters)
 
             if (is_mld_snooping_enabled(igmp_vport, MCAST_IPV4_AFI)) {
                 L2MCD_VLAN_LOG_INFO(vid,"%s:%d:[vlan:%d] send V3 Report to Rtr ports", __FUNCTION__, __LINE__,vid);  
-                mld_tx_reports_leave_rcvd_on_edge_port(sptr_ip_parameters, &group_addr, igmp, igmp_vport); 
+                mld_tx_reports_and_leave_rcvd_on_edge_port(sptr_ip_parameters, &group_addr, igmp, igmp_vport); 
             }
 
             if (!l2mcd_is_peerlink(portdb_get_ifname_from_portindex(multicast->source_port)))
@@ -888,7 +895,7 @@ int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters)
                 if (is_mld_fast_leave_configured(igmp_vport)) {
                     MLD_LOG(MLD_LOGLEVEL7,MLD_IP_IPV4_AFI,"%s(%d) Send v2 Fast Leave for grp:%s to rtr ports", FN, LN, mcast_print_addr(&group_addr));
                     group_addr.ip.v4addr = ntohl(group_addr.ip.v4addr);
-                    mld_tx_reports_leave_rcvd_on_edge_port(sptr_ip_parameters, &group_addr, igmp, igmp_vport);
+                    mld_tx_reports_and_leave_rcvd_on_edge_port(sptr_ip_parameters, &group_addr, igmp, igmp_vport);
                 }
             }
 
@@ -1318,7 +1325,7 @@ BOOLEAN igmp_send_igmp_message (MCGRP_CLASS *igmp,
 
     if (type == IGMP_MEMBERSHIP_QUERY_TYPE && group_address == 0)
     {
-        mcast_set_ipv4_addr(&dest_addr,  iph->destination_ip_address);
+        mcast_set_ipv4_addr(&dest_addr, iph->destination_ip_address);
         ret=l2mcd_send_pkt (&rx_pkt_msg, physical_port != PORT_INDEX_INVALID ? physical_port : 0, vlan_id,  &dest_addr, igmp, mcgrp_glb,
                            0, (physical_port == PORT_INDEX_INVALID));
     } else if (type == IGMP_MEMBERSHIP_QUERY_TYPE && group_address) {

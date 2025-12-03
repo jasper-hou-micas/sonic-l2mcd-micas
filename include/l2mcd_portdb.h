@@ -28,8 +28,6 @@
 #define PORTDB_DEFAULT_PORT_MTU     1500
 #define PORTDB_DEFAULT_PORT_TYPE    1
 
-
-
  typedef struct PORTDB_IP6_ADDRESS_ENTRY_S {
     UINT32              port_index;
     IPV6_ADDRESS        ipaddress; 
@@ -46,8 +44,6 @@
     struct list         *ip6_link_local_address; //Link Local Address
     struct list         *ip6_address_list; //Global Address
  } PORTDB_IP6;
-
-
 
 typedef struct portdb_entry_s {
     L2MCD_AVL_NODE         node;

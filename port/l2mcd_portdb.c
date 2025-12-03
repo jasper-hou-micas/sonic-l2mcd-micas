@@ -512,6 +512,7 @@ PORTDB_IP6_ADDRESS_ENTRY* portdb_get_port_lowest_ipv6_addr_from_list(L2MCD_AVL_T
     portdb_entry_t *port_entry;
     struct listnode *node;
 
+    insert_linklocal_ipv6_into_portdb(port_index);
     port_entry = portdb_find_port_entry(portdb_tree, port_index);
     if (port_entry)
     {
@@ -538,12 +539,29 @@ void portdb_insert_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index
 {
     portdb_entry_t *port_entry;
     PORTDB_IP6_ADDRESS_ENTRY* ipv6_entry;
+    struct listnode *node;
+    PORTDB_IP6_ADDRESS_ENTRY *exist;
 
-    port_entry  = portdb_find_port_entry(portdb_tree, port_index);
-    if(!port_entry)
+    port_entry = portdb_find_port_entry(portdb_tree, port_index);
+    if (!port_entry)
     {
         L2MCD_LOG_INFO("%s Port entry not found for %d", __FUNCTION__, port_index);
         return;
+    }
+
+    struct list *list_to_use = IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)&ipaddress)
+                               ? port_entry->ip6->ip6_link_local_address
+                               : port_entry->ip6->ip6_address_list;
+
+    for (ALL_LIST_ELEMENTS_RO(list_to_use, node, exist))
+    {
+        if (memcmp(exist->ipaddress.address.address8,
+                   ipaddress.address.address8, 16) == 0)
+        {
+            L2MCD_LOG_INFO("%s IPv6 already exists for port %d, skip",
+                           __FUNCTION__, port_index);
+            return;
+        }
     }
     //FIXME: If ipv6 entry exists, then update the data or ignore ??
     

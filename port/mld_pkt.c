@@ -57,11 +57,11 @@ int mld_ok_to_send_over_edge_port(ifindex_t source, ifindex_t destination)
 void mld_tx_static_report_leave_on_mrtr_port(MCGRP_CLASS  *mld, MADDR_ST *grp_addr, MCGRP_L3IF *mld_vport, 
 											 uint32_t rx_phy_port, uint8_t joinflag)
 {
-	uint8_t 			afi 						= MCAST_IPV4_AFI;
+	uint8_t 			afi 						= (IS_IGMP_CLASS(mld) ? MCAST_IPV4_AFI : MCAST_IPV6_AFI);
 	ifindex_t 			source;
-	port_link_list_t 	*sptr_addr_entry 			= NULL;
 	uint32_t 			gvid 						= 0;
 	uint32_t			src_addr 					= 0;
+	IPV6_ADDRESS		src_addr6                   = IP6_ADDRESS_UNSPECIFIED_INIT;
 	int 				port_id 					= 0;
 	mld_vlan_node_t 	*vlan_node 					= NULL;
 
@@ -82,29 +82,66 @@ void mld_tx_static_report_leave_on_mrtr_port(MCGRP_CLASS  *mld, MADDR_ST *grp_ad
 	vlan_node = mld_vdb_vlan_get(gvid, mld_vport->type);
 	if (vlan_node && vlan_node->ve_ifindex) 
 	{
-		if(l2mcd_ifindex_is_svi(vlan_node->ve_ifindex)) 
+		if (afi == MCAST_IPV4_AFI)
 		{
-			port_id = l3_get_port_from_ifindex(vlan_node->ve_ifindex);
-			sptr_addr_entry = (port_link_list_t *)(portdb_get_port_lowest_ipv4_addr_from_list(ve_mld_portdb_tree, port_id));
-			MLD_LOG(MLD_LOGLEVEL7,MLD_IP_IPV4_AFI, "%s(%d) rx_phy_port:0x%x ifindex:0x%x ve_ifindex:0x%x ", 
-					FN, LN, rx_phy_port, vlan_node->ifindex, vlan_node->ve_ifindex);
+			port_link_list_t *sptr_addr_entry = NULL;
+			if (l2mcd_ifindex_is_svi(vlan_node->ve_ifindex))
+			{
+				port_id = l3_get_port_from_ifindex(vlan_node->ve_ifindex);
+				sptr_addr_entry = (port_link_list_t *)(portdb_get_port_lowest_ipv4_addr_from_list(ve_mld_portdb_tree, port_id));
+				MLD_LOG(MLD_LOGLEVEL7, MLD_IP_IPV4_AFI, "%s(%d) rx_phy_port:0x%x ifindex:0x%x ve_ifindex:0x%x ",
+						FN, LN, rx_phy_port, vlan_node->ifindex, vlan_node->ve_ifindex);
+			}
+			else
+			{
+				// Router Port IP address
+				port_id = mld_vport->vir_port_id;
+				sptr_addr_entry = (port_link_list_t *)(portdb_get_port_lowest_ipv4_addr_from_list(mld_portdb_tree, port_id));
+				MLD_LOG(MLD_LOGLEVEL7, MLD_IP_IPV4_AFI, "%s(%d) rx_phy_port:0x%x Router ifindex:0x%x ",
+						FN, LN, rx_phy_port, vlan_node->ifindex);
+			}
+			if (sptr_addr_entry)
+			{
+				uint32_t lowest_ip = sptr_addr_entry->value.ipaddress;
+
+				for (port_link_list_t *addr_entry = sptr_addr_entry->next; addr_entry; addr_entry = addr_entry->next)
+				{
+					if (addr_entry->value.ipaddress < lowest_ip)
+					{
+						lowest_ip = addr_entry->value.ipaddress;
+					}
+				}
+				src_addr = lowest_ip;
+			}
 		}
-		else {
-			//Router Port IP address
-			port_id = mld_vport->vir_port_id;
-			sptr_addr_entry = (port_link_list_t *)(portdb_get_port_lowest_ipv4_addr_from_list(mld_portdb_tree, port_id));
-			MLD_LOG(MLD_LOGLEVEL7,MLD_IP_IPV4_AFI, "%s(%d) rx_phy_port:0x%x Router ifindex:0x%x ", 
-					FN, LN, rx_phy_port, vlan_node->ifindex);
+		else
+		{
+			PORTDB_IP6_ADDRESS_ENTRY *sptr_addr6_entry = NULL;
+			if (l2mcd_ifindex_is_svi(vlan_node->ve_ifindex))
+			{
+				port_id = l3_get_port_from_ifindex(vlan_node->ve_ifindex);
+				sptr_addr6_entry = (PORTDB_IP6_ADDRESS_ENTRY *)(portdb_get_port_lowest_ipv6_addr_from_list(ve_mld_portdb_tree, port_id));
+				MLD_LOG(MLD_LOGLEVEL7, MLD_IP_IPV6_AFI, "%s(%d) rx_phy_port:0x%x ifindex:0x%x ve_ifindex:0x%x ",
+						FN, LN, rx_phy_port, vlan_node->ifindex, vlan_node->ve_ifindex);
+			}
+			else
+			{
+				// Router Port IP address
+				port_id = mld_vport->vir_port_id;
+				sptr_addr6_entry = (PORTDB_IP6_ADDRESS_ENTRY *)(portdb_get_port_lowest_ipv6_addr_from_list(mld_portdb_tree, port_id));
+				MLD_LOG(MLD_LOGLEVEL7, MLD_IP_IPV6_AFI, "%s(%d) rx_phy_port:0x%x Router ifindex:0x%x ",
+						FN, LN, rx_phy_port, vlan_node->ifindex);
+			}
+			if (sptr_addr6_entry)
+			{
+				src_addr6 = sptr_addr6_entry->ipaddress;
+			}
 		}
 	}
 
-	// TODO: Note that sptr_addr_entry is a list. Not sure what is "list of lowest ip addresses".
-	if (sptr_addr_entry) 
-	{
-		src_addr = sptr_addr_entry->value.ipaddress;
-	}
+
 	source = rx_phy_port;
-	if(is_mld_snooping_enabled(mld_vport, afi)) 
+	if(MCAST_IPV4_AFI == afi && is_mld_snooping_enabled(mld_vport, afi)) 
 	{
 		/* This function should take care of sending to all mrouter ports
 		 */
@@ -114,6 +151,21 @@ void mld_tx_static_report_leave_on_mrtr_port(MCGRP_CLASS  *mld, MADDR_ST *grp_ad
 					(UINT8) mld_vport->oper_version,
 					grp_addr->ip.v4addr,   // Group Address
 					src_addr, // Source Address of the packet 
+					0, // 0 means use default response time
+					NULL, FALSE,       // no srcs
+					FALSE); // not retx
+	}
+
+	if(MCAST_IPV6_AFI == afi && is_mld_snooping_enabled(mld_vport, afi)) 
+	{
+		/* This function should take care of sending to all mrouter ports
+		 */
+		mld_send_mld_message(mld, mld_vport->vir_port_id,
+					source, //mcgrp_rport->phy_port_id,
+					joinflag ? MLD_V1_MEMBERSHIP_REPORT_TYPE : MLD_V1_LEAVE_GROUP_TYPE,
+					(UINT8) mld_vport->oper_version,
+					grp_addr->ip.v6addr,   // Group Address
+					src_addr6, // Source Address of the packet 
 					0, // 0 means use default response time
 					NULL, FALSE,       // no srcs
 					FALSE); // not retx
@@ -329,6 +381,7 @@ int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid,
         payload_len = mld_msg->pkt_size;
         ether_type = HSL_ETHER_TYPE_IPV6;
         send_sock_handle = g_l2mcd_mld_tx_handle;
+        sa.sll_protocol = htons(ETH_P_IPV6); 
     }
     else
     {
@@ -338,6 +391,7 @@ int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t ivid,
         payload_len = igmp_msg->ip_param.total_length;
         ether_type = HSL_ETHER_TYPE_IP;
         send_sock_handle = g_l2mcd_igmp_tx_handle;
+        sa.sll_protocol = htons(ETH_P_IP); 
     }
     if (!payload_data || payload_len <= 0)
     {

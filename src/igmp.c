@@ -23,6 +23,7 @@
 extern MCGRP_GLOBAL_CLASS    gMld, *pgMld;
 extern MCGRP_GLOBAL_CLASS    gIgmp, *pgIgmp;
 extern MCAST_GLOBAL_CLASS    gMulticast, *pgMulticast;
+extern MCAST_GLOBAL_CLASS    gMulticast2, *pgMulticast2;
 extern MCGRP_CLASS           Mld0, *pMld0;
 extern MCGRP_CLASS           Igmp0, *pIgmp0;
 
@@ -493,8 +494,10 @@ void mcgrp_update_static_groups (MCGRP_CLASS         *mcgrp,
         }
         else
         {
-            version = ((mcgrp_pport->oper_version >= MLD_VERSION_2) ? MLD_VERSION_2 : MLD_VERSION_1);
-            mcast_set_ipv6_addr(&addr, ip_get_lowest_ip_address_on_port(mcgrp_vport->vir_port_id, mcgrp_vport->type));
+            version = ((mcgrp_pport->oper_version >= MLD_VERSION_2) ? MLD_STATIC_VER2  : MLD_STATIC_VER1);
+            IPV6_ADDRESS lowest_ipv6_addr = ip_get_lowest_ipv6_address_on_port
+												(mcgrp_vport->vir_port_id, mcgrp_vport->type);
+            mcast_set_ipv6_addr(&addr, &lowest_ipv6_addr);
             if (mld_update_ssm_parameters(mcgrp, &group_addr, &version, mcgrp_vport->vir_port_id,
                         phy_port_id, &v3_action,  &num_srcs, &src_list) == FALSE)
                 continue;
@@ -714,8 +717,10 @@ void mcgrp_stop_vir_port (MCGRP_CLASS  *mcgrp,
                 &mcgrp_vport->vport_tmr.mcgrp_wte);
 
     // Stop/Reset the querier process and any other timers
-    mcgrp_vport->querier = TRUE;
+    mcgrp_vport->querier = FALSE;
     mcgrp_vport->v1_rtr_present = FALSE;
+    L2MCD_VLAN_LOG_INFO(mcgrp_vport->vir_port_id, "%s:%d:[vlan:%d] querier:%d",
+                  FN,LN,mcgrp_vport->vir_port_id, mcgrp_vport->querier);
 }
 
 //v4/v6 compliant
@@ -724,6 +729,17 @@ MCGRP_PORT_ENTRY* mcgrp_add_phy_port (MCGRP_CLASS  *mcgrp,
         //UINT16        phy_port_id)
         UINT32        phy_port_id)
 {
+    MCGRP_PORT_ENTRY *iter;
+
+    for (iter = mcgrp_vport->phy_port_list; iter != NULL; iter = iter->next) {
+        if (iter->phy_port_id == phy_port_id) {
+            L2MCD_VLAN_LOG_INFO(mcgrp_vport->vir_port_id,
+                "%s:%d:[vlan:%d] phy_port:%d already exists, return existing entry",
+                __FUNCTION__, __LINE__, mcgrp_vport->vir_port_id, phy_port_id);
+            return iter; 
+        }
+    }
+
     MCGRP_PORT_ENTRY  *new_mcgrp_pport;
 
     // Alloc init appropriate data structures
@@ -1673,7 +1689,7 @@ mcgrp_age_group_mbrshp (MCGRP_CLASS   *mcgrp,
                             TRUE);
 
                     mcast_init_addr(&addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
-                    mcast_set_ipv6_addr(&addr, 0);
+                    mcast_set_ipv6_addr(&addr, &ip6_unspecified_address);
                     //MLD
                 }
             }
@@ -1785,7 +1801,7 @@ mcgrp_age_group_mbrshp (MCGRP_CLASS   *mcgrp,
                     igmp_send_igmp_message(mcgrp, vir_port_id, phy_port_id, IGMP_V2_LEAVE_GROUP_TYPE, mcgrp_vport->oper_version,
                             mcgrp_entry->group_address.ip.v4addr, mcgrp_mbrshp->client_source_addr.ip.v4addr, 0, NULL, 0, 0);
                 } else if (IS_MLD_CLASS(mcgrp)){
-                    mld_send_mld_message(mcgrp, vir_port_id, phy_port_id, MLD_V2_MEMBERSHIP_REPORT_TYPE, mcgrp_vport->oper_version,
+                    mld_send_mld_message(mcgrp, vir_port_id, phy_port_id, MLD_V1_LEAVE_GROUP_TYPE, mcgrp_vport->oper_version,
                             mcgrp_entry->group_address.ip.v6addr, mcgrp_mbrshp->client_source_addr.ip.v6addr, 0, NULL, 0, 0);
                 //MLD
                 }
@@ -1950,7 +1966,7 @@ mcgrp_age_group_mbrshp_and_lmq (MCGRP_CLASS   *mcgrp,
                                 TRUE);  // retx
 
                         mcast_init_addr(&addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
-                        mcast_set_ipv6_addr(&addr, 0);
+                        mcast_set_ipv6_addr(&addr, &ip6_unspecified_address);
                         //MLD 
                     }
                 }
@@ -2017,7 +2033,7 @@ mcgrp_age_group_mbrshp_and_lmq (MCGRP_CLASS   *mcgrp,
                     igmp_send_igmp_message(mcgrp, vir_port_id, phy_port_id, IGMP_V2_LEAVE_GROUP_TYPE, mcgrp_vport->oper_version,
                             mcgrp_entry->group_address.ip.v4addr, mcgrp_mbrshp->client_source_addr.ip.v4addr, 0, NULL, 0, 0);
                 } else if (IS_MLD_CLASS(mcgrp)) {
-                    mld_send_mld_message(mcgrp, vir_port_id, phy_port_id, MLD_V2_MEMBERSHIP_REPORT_TYPE, mcgrp_vport->oper_version,
+                    mld_send_mld_message(mcgrp, vir_port_id, phy_port_id, MLD_V1_LEAVE_GROUP_TYPE, mcgrp_vport->oper_version,
                             mcgrp_entry->group_address.ip.v6addr, mcgrp_mbrshp->client_source_addr.ip.v6addr, 0, NULL, 0, 0);
                     //MLD
                 }
@@ -2401,7 +2417,6 @@ MCGRP_MBRSHP* mcgrp_alloc_add_mbrshp_entry (MCGRP_CLASS  *mcgrp,
 
     new_mbrshp->static_mmbr    = is_static;
     new_mbrshp->aging_enabled  = ! is_static;
-
     new_mbrshp->filter_mode = FILT_INCL;
 
     static int clnt_addr_offset= M_AVLL_OFFSETOF(MCGRP_CLIENT, clnt_addr);
@@ -2710,7 +2725,8 @@ void mcgrp_refresh_static_group (MCGRP_CLASS         *mcgrp,
         }
         else
         {
-            mcast_set_ipv6_addr(&addr, ip_get_lowest_ip_address_on_port(vir_port_id, mcgrp_vport->type));
+            IPV6_ADDRESS lowest_v6_addr = ip_get_lowest_ipv6_address_on_port(vir_port_id, mcgrp_vport->type);
+            mcast_set_ipv6_addr(&addr, &lowest_v6_addr);
             UINT mld_action = IS_EXCL ;
             if(mld_update_ssm_parameters(mcgrp, group_address, &version, vir_port_id,
                         phy_port_id, &mld_action, &num_srcs, &src_list) == FALSE)
@@ -2850,8 +2866,7 @@ void mcgrp_port_state_notify (UINT32        afi,
 
 
 //v4 only
-int igmpv3_src_compare (void *keya, 
-        void *keyb)
+int igmpv3_src_compare (void *keya, void *keyb)
 {
     UINT32 src_addr_a = ((MADDR_ST*) keya)->ip.v4addr;
     UINT32 src_addr_b = ((MADDR_ST*) keyb)->ip.v4addr;
@@ -2861,8 +2876,7 @@ int igmpv3_src_compare (void *keya,
 
 
 //v4 only
-void igmpv3_src_assign (void *keya, 
-        void *keyb)
+void igmpv3_src_assign (void *keya, void *keyb)
 {
     /*
      * The address of linked list key is being passed as the first parameter and the src address
@@ -2886,8 +2900,7 @@ void igmpv3_src_assign (void *keya,
 //v4 only
 MCGRP_CLASS *g_igmp_destroy;
 
-void igmpv3_src_destroy (generic_pool_struct  *pool, 
-        void                 *item)
+void igmpv3_src_destroy(generic_pool_struct *pool, void *item)
 {
     MCGRP_CLASS  *igmp = g_igmp_destroy;
 

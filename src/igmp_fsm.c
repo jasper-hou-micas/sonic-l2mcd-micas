@@ -38,6 +38,7 @@ extern MCAST_GLOBAL_CLASS    gMulticast, *pgMulticast;
 extern int mld_grp_exists_on_local_vlan(mld_vid_t vid, mcast_grp_addr_t *ip_addr);
 extern BOOLEAN mld_is_snoop_mbrship_present(MCGRP_MBRSHP *mcgrp_mbrshp, 
         uint8_t *v1_mbr, uint8_t *v2_mbr, uint8_t *v3_mbr);
+extern IP6_IPV6_ADDRESS ip6_unspecified_address;
 
 void mcgrp_notify_vif_add (MCGRP_CLASS   *mcgrp,
         MADDR_ST      *group_address,
@@ -71,8 +72,7 @@ void mcgrp_notify_vif_add (MCGRP_CLASS   *mcgrp,
     }
     else
     {
-        L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] unsupported", FN,LN,vir_port_id);
-        mcast_set_ipv6_addr(&src_addr, PIM_ENCODE_SRC_ADDRESS_WC);
+        mcast_set_ipv6_addr(&src_addr, &ip6_unspecified_address);
     }
 
     L2MCD_VLAN_LOG_INFO(vir_port_id,"%s:%d:[vlan:%d] [ Port %s,%d, %s. Grp %s ] Interface added to group. Chg %d",
@@ -201,8 +201,7 @@ void mcgrp_notify_vif_del(MCGRP_CLASS  *mcgrp,
         mcast_set_ipv4_addr(&src_addr, PIM_ENCODE_SRC_ADDRESS_WC);
     else
     {
-        mcast_set_ipv6_addr(&src_addr, PIM_ENCODE_SRC_ADDRESS_WC);
-        L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] unsupported", FN,LN,vir_port_id);
+        mcast_set_ipv6_addr(&src_addr, &ip6_unspecified_address);
     }
 }
 
@@ -238,8 +237,7 @@ void mcgrp_notify_phy_port_del (MCGRP_CLASS  *mcgrp,
     }
     else
     {
-        mcast_set_ipv6_addr(&src_addr, PIM_ENCODE_SRC_ADDRESS_WC);
-        L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] unsupported", FN,LN,vir_port_id);
+        mcast_set_ipv6_addr(&src_addr, &ip6_unspecified_address);
     }
     L2MCD_VLAN_LOG_INFO(vir_port_id,"%s:%d:[vlan:%d][ Port %s,%s. Grp %s ] Physical port deleted from group. Chg %d\n",
             FN,LN,vir_port_id, mld_get_if_name_from_ifindex(phy_port_id), 

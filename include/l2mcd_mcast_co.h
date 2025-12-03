@@ -28,8 +28,7 @@
 #define GET_MAX_PORT()				256
 #define MAX_MC_INTFS L2MCD_MAX_INTERFACES
 
-#define MCAST_GET_INSTANCE_FROM_VRFINDEX(afi, vrf_index) (((vrf_index) > IPVRF_MAX_VRF_IDX) ? NULL : ((afi) == IP_IPV4_AFI ? gMulticast.instances[vrf_index] : NULL))
-
+#define MCAST_GET_INSTANCE_FROM_VRFINDEX(afi, vrf_index) (((vrf_index) > IPVRF_MAX_VRF_IDX) ? NULL : ((afi) == IP_IPV4_AFI ? gMulticast.instances[vrf_index] : gMulticast2.instances[vrf_index]))
 
 #define MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, vrf_index) \
 			(((vrf_index) > IPVRF_MAX_VRF_IDX) ? NULL \
@@ -529,7 +528,7 @@ typedef struct MCGRP_PORT_ENTRY
 	UINT16            spare             : 6;
 	UINT32            verwarn_intvl_start;      // Can we add a syslog...msg for this????
 	UINT32            verwarn_count;
-	BOOLEAN			  snooping_mrouter_detected;
+	BOOLEAN           snooping_mrouter_detected;
 } MCGRP_PORT_ENTRY ;
 
 /* This data structure represents IGMP/MLD's state on each IP interface */

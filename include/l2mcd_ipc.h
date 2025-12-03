@@ -27,7 +27,7 @@
 #define L2MCD_IPC_SOCK_NAME "/var/run/l2mcd_ipc.sock"
 
 #define L2MCD_IFNAME_SIZE       20
-#define L2MCD_IP_ADDR_STR_SIZE  16
+#define L2MCD_IP_ADDR_STR_SIZE  46
 #define L2MCD_IPC_MAX_PORTS         1544 //ap max 1024, port brk 1x4 max 520
 #define L2MCD_OP_ENABLE             1
 #define L2MCD_OP_DISABLE            0

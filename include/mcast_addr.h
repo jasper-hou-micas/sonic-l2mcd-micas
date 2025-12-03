@@ -267,6 +267,5 @@ int mcast_cmp_addr (MADDR_ST *addr1, MADDR_ST *addr2);
 BOOLEAN mcast_same_addr (MADDR_ST *addr1, MADDR_ST *addr2);
 
 BOOLEAN mcast_addr_contain(MADDR_ST *subset_address , MADDR_ST *superset_address);
-void mcast_addr_init (UINT32 afi);
 
 #endif /* __MCAST_ADDR_H__ */

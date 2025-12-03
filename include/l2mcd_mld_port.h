@@ -25,6 +25,7 @@
 #define UNSET_FLAG(V,F)      (V) = (V) & ~(F)
 #define COMPARE(A,B)  strncmp(A, B, strlen(A))
 
+/* Max bit/byte length of IPv6 address. */
 #define IPV6_MAX_BYTELEN     16
 #define IPV6_MAX_BITLEN      128
 #define IPV6_ADDR_CMP(D,S)   memcmp ((D), (S), IPV6_MAX_BYTELEN)
@@ -111,6 +112,7 @@ uint32_t ve_mld_portdb_get_port_lowest_ipv4_addr_from_list(uint32_t port_num);
 uint32_t mld_portdb_get_port_lowest_ipv4_addr_from_list(uint32_t port_num);
 IPV6_ADDRESS mld_portdb_get_port_lowest_ipv6_addr_from_list(uint32_t port_num);
 IPV6_ADDRESS ve_mld_portdb_get_port_lowest_ipv6_addr_from_list(uint32_t port_num);
+void insert_linklocal_ipv6_into_portdb(int port_id);
 int pims_clear_snoop_cache(int afi, mld_vid_t vlan_id, MADDR_ST *grp_addr_clr,uint8_t type);
 void pims_clear_statistics(int afi, mld_vid_t vlan_id, uint8_t type);
 
