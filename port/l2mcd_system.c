@@ -1545,15 +1545,6 @@ struct mmsghdr mmsg6[L2MCD_MM_SOCKET_BATCH_SIZE];
 static uint8_t buf6[L2MCD_MM_SOCKET_BATCH_SIZE][L2MCD_RX_BUFFER_SIZE];
 static struct sockaddr_ll rx_sa6[L2MCD_MM_SOCKET_BATCH_SIZE];
 ucmsgbuf cmsgbuf6[L2MCD_MM_SOCKET_BATCH_SIZE];
-
-struct vlan_ethhdr {
-    unsigned char   h_dest[ETH_ALEN];           // dmac len 6
-    unsigned char   h_source[ETH_ALEN];         // smac len 6
-    __be16          h_vlan_proto;               // TPID 8100
-    __be16          h_vlan_TCI;                 // TCI such as: Priority, CFI, VLAN ID
-    __be16          h_vlan_encapsulated_proto;  // real proto such as: IPv6 0x86DD
-};
-
 void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
 {
     struct msghdr *msg_ptr;
@@ -1642,8 +1633,6 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         L2MCD_LOG_INFO("hbh nexthdr %d", nexthdr);
 
         int ifindex = rx_sa6[i].sll_ifindex;
-        L2MCD_LOG_NOTICE("ifindex:%d", ifindex);
-
         if (rx_sa6[i].sll_pkttype == PACKET_OUTGOING)
         {
             L2MCD_LOG_NOTICE("Ignore packet sent by kernel");
@@ -1664,7 +1653,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
                 if (auxdata->tp_status & TP_STATUS_VLAN_VALID)
                 {
                     vlan_id = auxdata->tp_vlan_tci & 0xFFF;
-                    L2MCD_LOG_NOTICE("vid: %d", vlan_id);
+                    L2MCD_LOG_DEBUG("vid: %d", vlan_id);
                 }
             }
         }
@@ -1682,7 +1671,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         if (ifindex > 0)
         {
             if_indextoname(ifindex, ifname);
-            L2MCD_LOG_NOTICE("ifname:%s", ifname);
+            L2MCD_LOG_DEBUG("ifname:%s", ifname);
         }
         else
         {
@@ -1722,6 +1711,8 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
             continue;
         }
 
+        memcpy(ip6_rx_msg.ip_param.smac, eth->h_source, 6);
+        memcpy(ip6_rx_msg.ip_param.dmac, eth->h_dest, 6);
         ip6_rx_msg.ip_param.rx_port_number = vlan_node->ifindex;
         ip6_rx_msg.ip_param.rx_physical_port_number = l2mcd_if_tree->ifid;
         ip6_rx_msg.ip_param.vrf_index = L2MCD_DEFAULT_VRF_IDX;
@@ -1738,9 +1729,6 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
 
         ip6_rx_msg.pkt_data = buf6[i] + sizeof(struct ether_header);
         ip6_rx_msg.pkt_size = len - sizeof(struct ether_header);
-
-        // ip6_rx_msg.pkt_data = (uint8_t *)ip6h;
-        // ip6_rx_msg.pkt_size = (UINT16)((buf6[i] + len) - (uint8_t *)ip6_rx_msg.pkt_data);
 
         L2MCD_LOG_NOTICE("[MLD RX] if:%s ifindex:%d len=%zd pkt_len:%d", ifname, ifindex, len, ip6_rx_msg.pkt_size);
         g_rx_stats_mld_pkts++;

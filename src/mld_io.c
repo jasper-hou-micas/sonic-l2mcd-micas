@@ -157,10 +157,10 @@ void l2mcd_mld_process_query(IP6_RX_PKT_MSG* mld_pkt_msg)
 
     if (mld_vport->oper_version < mldver)
     {
-        L2MCD_VLAN_LOG_ERR(mld_pkt_msg->ip_param.rx_port_number, "MLD:%s()%d query version mismatch %d, %d", FN, LN, mld_vport->oper_version, mldver);
+        L2MCD_VLAN_LOG_ERR(vir_port_id, "MLD:%s()%d query version mismatch %d, %d", FN, LN, mld_vport->oper_version, mldver);
         return;
     }
-    mld->mld_stats[mld_pkt_msg->ip_param.rx_port_number].recv_packets++;
+    mld->mld_stats[vir_port_id].recv_packets++;
 
     // Update stats
     if (IP6_IS_ADDRESS_NOT_NULL(group_addr.ip.v6addr.address))
@@ -663,75 +663,75 @@ void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_pkt_msg)
     }
 }
 
-
-BOOLEAN mld_send_mld_message (MCGRP_CLASS *mld,
-        UINT16          tx_port_number,
-        UINT32          physical_port,     // if valid send to this port only, else send to tx_port_number
-        UINT8           type,
-        UINT8           version,
-        IPV6_ADDRESS    group_address,     // 0 => general query
-        IPV6_ADDRESS    source_address,
-        UINT16          response_time,     // 0 means use default
-        MCGRP_SOURCE*   src_list,
-        BOOLEAN         all_srcs,
-        BOOLEAN         is_retx
-        )
+BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
+                             UINT16 tx_port_number,
+                             UINT32 physical_port, // if valid send to this port only, else send to tx_port_number
+                             UINT8 type,
+                             UINT8 version,
+                             IPV6_ADDRESS group_address, // 0 => general query
+                             IPV6_ADDRESS source_address,
+                             UINT16 response_time, // 0 means use default
+                             MCGRP_SOURCE *src_list,
+                             BOOLEAN all_srcs,
+                             BOOLEAN is_retx)
 {
     IP6_RX_PKT_MSG rx_pkt_msg;
     IPV6_HEADER *ip6h = NULL;
     IPV6_HBH_ROUTER_ALERT_COMPLETE *hbh_opts = NULL;
     union mld_in6_cmsg *cmsg;
-    
+
     // Routing/Interface lookups
     MCGRP_L3IF *mld_vport = gMld.port_list[tx_port_number];
     MCGRP_GLOBAL_CLASS *mcgrp_glb = (IS_IGMP_CLASS(mld) ? &gIgmp : &gMld);
     uint32_t ifindex = 0;
     uint16_t vlan_id = 0;
     int ret = 0;
-    
+
     // Pointers for Message construction
-    MLD_MESSAGE             *sptr_mld_message = NULL;
-    MLDV2_MESSAGE           *sptr_mldv2_message = NULL;
-    MLDV2_REPORT_MESSAGE    *sptr_mldv2_group_message = NULL;
-    
-    MLD_PACKET          *sptr_mld_packet = NULL;
-    MLDV2_PACKET        *sptr_mldv2_packet = NULL;
-    MLDV2_GROUP_PACKET  *sptr_mldv2_group_packet = NULL;
-    
+    MLD_MESSAGE *sptr_mld_message = NULL;
+    MLDV2_MESSAGE *sptr_mldv2_message = NULL;
+    MLDV2_REPORT_MESSAGE *sptr_mldv2_group_message = NULL;
+
+    MLD_PACKET *sptr_mld_packet = NULL;
+    MLDV2_PACKET *sptr_mldv2_packet = NULL;
+    MLDV2_GROUP_PACKET *sptr_mldv2_group_packet = NULL;
+
     UINT32 packet_total_size = 0;
     UINT32 mld_message_size = 0;
     int num_srcs = 0;
-    
+
     MADDR_ST group_addr;
     MADDR_ST source_addr;
     mcast_init_addr(&source_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
     mcast_init_addr(&group_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
     mcast_set_ipv6_addr(&group_addr, &group_address);
     mcast_set_ipv6_addr(&source_addr, &source_address);
-    
-    L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] type:%d ver:%d G:%s(0x%x),S:%s(0x%x) port:0x%x tx_port:0x%x type:%d",
-                         __FUNCTION__, __LINE__, tx_port_number, type, version, mcast_print_addr(&group_addr), group_address,
-                         mcast_print_addr(&source_addr), source_address, physical_port, tx_port_number, type);
-    
+
+    L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] type:%d ver:%d G:%s,S:%s port:0x%x tx_port:0x%x type:%d",
+                         __FUNCTION__, __LINE__, tx_port_number, type, version, mcast_print_addr(&group_addr),
+                         mcast_print_addr(&source_addr), physical_port, tx_port_number, type);
+    // Prepare TX Message Wrapper
+    memset(&rx_pkt_msg, 0, sizeof(rx_pkt_msg));
+
     if (version == MLD_NONE)
     {
-        L2MCD_VLAN_LOG_ERR(tx_port_number,"MLD:%s()%d MLD. ERR: [ Port %s,%s, Grp %s ] BUG !!! Request to send a Version None pkt\n",FN,LN,
-                 mld_get_if_name_from_ifindex(physical_port), mld_get_if_name_from_port(tx_port_number), mcast_print_addr(&group_addr));
+        L2MCD_VLAN_LOG_ERR(tx_port_number, "MLD:%s()%d MLD. ERR: [ Port %s,%s, Grp %s ] BUG !!! Request to send a Version None pkt\n", FN, LN,
+                           mld_get_if_name_from_ifindex(physical_port), mld_get_if_name_from_port(tx_port_number), mcast_print_addr(&group_addr));
         version = MLD_VER_1;
     }
-    
+
     // ---------------------------------------------------------
     // 1. Memory Allocation
     // ---------------------------------------------------------
-    if(version == MLD_VER_1)
+    if (version == MLD_VER_1)
     {
         packet_total_size = sizeof(MLD_PACKET);
-        sptr_mld_packet = (MLD_PACKET*)calloc(1, packet_total_size);
-    
+        sptr_mld_packet = (MLD_PACKET *)calloc(1, packet_total_size);
+
         if (sptr_mld_packet == NULL)
         {
-    
-            L2MCD_VLAN_LOG_ERR(tx_port_number,"MLD:%s()%d MLD.VRF%d.ERR: Failed to allocate an IP pkt. Transmit failed\n",FN,LN, mld->vrf_index);
+
+            L2MCD_VLAN_LOG_ERR(tx_port_number, "MLD:%s()%d MLD.VRF%d.ERR: Failed to allocate an IP pkt. Transmit failed\n", FN, LN, mld->vrf_index);
             return FALSE;
         }
         ip6h = &sptr_mld_packet->ip_header;
@@ -739,40 +739,47 @@ BOOLEAN mld_send_mld_message (MCGRP_CLASS *mld,
         sptr_mld_message = &sptr_mld_packet->mld_message;
         mld_message_size = sizeof(MLD_MESSAGE);
     }
-    else if(version == MLD_VER_2)
+    else if (version == MLD_VER_2)
     {
-        MCGRP_SOURCE *p_src = src_list;
-        for(; p_src; p_src = p_src->next)
+        if (src_list)
         {
-            if (is_retx || p_src->retx_cnt == 0)
+            MCGRP_SOURCE *p_src = src_list;
+            for (; p_src; p_src = p_src->next)
             {
-                num_srcs++;
-                // Limit packet size if necessary (MTU checks usually happen here)
-                if (num_srcs >= 80)
-                    break;
+                if (is_retx || p_src->retx_cnt == 0)
+                {
+                    num_srcs++;
+                    // Limit packet size if necessary (MTU checks usually happen here)
+                    if (num_srcs >= 80)
+                        break;
+                }
             }
         }
-    
+        else
+        {
+            num_srcs = 0;
+        }
+
         // Packet size = Base Structure + (N-1) IPv6 addresses (since struct has array[1])
-        UINT32 variable_part = (num_srcs > 1) ? ((num_srcs - 1) * sizeof(IPV6_ADDRESS)) : 0;
+        int variable_part = (num_srcs - 1) * sizeof(IPV6_ADDRESS);
         packet_total_size = sizeof(MLDV2_PACKET) + variable_part;
-        
+
         sptr_mldv2_packet = (MLDV2_PACKET *)calloc(1, packet_total_size);
-    
+
         if (sptr_mldv2_packet == NULL)
         {
-            L2MCD_VLAN_LOG_ERR(tx_port_number,"MLD:%s()%d MLD.VRF%d.ERR: Failed to allocate an IP pkt. Transmit failed\n",FN,LN, mld->vrf_index);
+            L2MCD_VLAN_LOG_ERR(tx_port_number, "MLD:%s()%d MLD.VRF%d.ERR: Failed to allocate an IP pkt. Transmit failed\n", FN, LN, mld->vrf_index);
             return FALSE;
         }
-    
+
         ip6h = &sptr_mldv2_packet->ip_header;
         hbh_opts = &sptr_mldv2_packet->hbh_options;
         sptr_mldv2_message = &sptr_mldv2_packet->mld_message; // Base pointer
-        
+
         mld_message_size = sizeof(MLDV2_MESSAGE) + variable_part;
-        
+
         // Reset num_srcs for encoding loop
-        num_srcs = 0; 
+        num_srcs = 0;
     }
     // ---------------------------------------------------------
     // 2. MLD Payload Construction
@@ -780,211 +787,221 @@ BOOLEAN mld_send_mld_message (MCGRP_CLASS *mld,
     // For leave packets the response_time should be 0
     if ((response_time == 0) && (type == MLD_MEMBERSHIP_QUERY_TYPE))
     {
-        response_time = mld->max_response_time * 1000;
+        response_time = mld->max_response_time * 100 * 1000;
     }
-    
+
     switch (version)
     {
-        case MLD_VER_1:
-            {
-                sptr_mld_message->type = type;
-                sptr_mld_message->code = 0;
-                // MLDv1 Max Response Delay is in milliseconds (16 bits). 
-                // Input 'response_time' is usually 1ms. Convert: * 1000.
-                sptr_mld_message->maximum_response_delay = htons((UINT16)response_time * 1000);
-                sptr_mld_message->reserved = 0;
-                
-                // Copy Group Address
-                memcpy(&sptr_mld_message->group_address, &group_address, sizeof(IPV6_ADDRESS));
-                break;
-            }
-        case MLD_VER_2:
-         {
-             sptr_mldv2_message->type = type;
-             sptr_mldv2_message->code = 0;
-             // MLDv2 Max Response Code (float encoding similar to IGMPv3)
-             sptr_mldv2_message->maximum_response_code = htons(MCGRP_VAL_2_CODE16(response_time)); // Ensure helper supports v2
-             sptr_mldv2_message->reserved = 0;
-             memcpy(&sptr_mldv2_message->group_address, &group_address, sizeof(IPV6_ADDRESS));
+    case MLD_VER_1:
+    {
+        sptr_mld_message->type = type;
+        sptr_mld_message->code = 0;
+        // MLDv1 Max Response Delay is in milliseconds (16 bits).
+        // Input 'response_time' is usually 1ms. Convert: * 1000.
+        sptr_mld_message->maximum_response_delay = htons((UINT16)response_time);
+        sptr_mld_message->reserved = 0;
 
-             // Encode Source List
-             if (src_list) {
-                 num_srcs = mldv2_encode_src_list(sptr_mldv2_message, src_list, all_srcs, is_retx);
-             } else {
-                 num_srcs = 0;
-             }
+        // Copy Group Address
+        memcpy(&sptr_mld_message->group_address, &group_address, sizeof(IPV6_ADDRESS));
+        break;
+    }
+    case MLD_VER_2:
+    {
+        sptr_mldv2_message->type = type;
+        sptr_mldv2_message->code = 0;
+        // MLDv2 Max Response Code (float encoding similar to IGMPv3)
+        sptr_mldv2_message->maximum_response_code = htons(MCGRP_VAL_2_CODE16(response_time)); // Ensure helper supports v2
+        sptr_mldv2_message->reserved = 0;
+        memcpy(&sptr_mldv2_message->group_address, &group_address, sizeof(IPV6_ADDRESS));
 
-             // Group-Source Query Logic Check
-             if (!IN6_IS_ADDR_UNSPECIFIED(&group_address) && src_list && num_srcs == 0)
-             {
-                 free(sptr_mldv2_packet);
-                 sptr_mldv2_packet = NULL;
-                 L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] [ Port %s,%s. Grp %s ] Skipped Grp-Src-Qry as num_srcs is 0. List %d",
-                                      FN, LN, tx_port_number,
-                                      mld_get_if_name_from_ifindex(physical_port), mld_get_if_name_from_port(tx_port_number),
-                                      mcast_print_addr(&group_addr),
-                                      (src_list != NULL));
-                 return TRUE;
-             }
+        // Encode Source List
+        if (src_list)
+        {
+            num_srcs = mldv2_encode_src_list(sptr_mldv2_message, src_list, all_srcs, is_retx);
+        }
+        else
+        {
+            num_srcs = 0;
+        }
 
-             // Fill MLDv2 specific fields
-             // Note: Bitfield handling macros or direct assignment depending on endianness
-             // Simplified assignment here assuming struct handles bitfields:
-             sptr_mldv2_message->reserved_flags = 0;
-             sptr_mldv2_message->suppress_router_process = (response_time > mld->LMQ_interval);
-             sptr_mldv2_message->querier_robustness_var = mld->cfg_robustness_var;
-             
-             sptr_mldv2_message->query_interval_code = MCGRP_VAL_2_CODE(mld->cfg_query_interval_time);
-             sptr_mldv2_message->num_srcs = htons((UINT16)num_srcs);
+        // Group-Source Query Logic Check
+        if (!IN6_IS_ADDR_UNSPECIFIED(&group_address) && src_list && num_srcs == 0)
+        {
+            free(sptr_mldv2_packet);
+            sptr_mldv2_packet = NULL;
+            L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] [ Port %s,%s. Grp %s ] Skipped Grp-Src-Qry as num_srcs is 0. List %d",
+                                 FN, LN, tx_port_number,
+                                 mld_get_if_name_from_ifindex(physical_port), mld_get_if_name_from_port(tx_port_number),
+                                 mcast_print_addr(&group_addr),
+                                 (src_list != NULL));
+            return TRUE;
+        }
 
-             L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] MLDv2 num_srcs:%d mld_packet_size:%d alloc_buff_size:%d mld_type:%d",
-                                  __FUNCTION__, __LINE__, tx_port_number, num_srcs, packet_total_size, mld_message_size, type);
-             break;
-         }
-     } /* switch (version) */
-    
-     // ---------------------------------------------------------
-     // 3. IPv6 Header & HBH Construction
-     // ---------------------------------------------------------
-    
-     // Setup HBH Options (Router Alert is mandatory for MLD)
-     hbh_opts->hbh_header.next_header = IP6_ICMPV6; // Next is ICMPv6
-     hbh_opts->hbh_header.hdr_ext_len = 0;  // (0 + 1) * 8 = 8 bytes
-     
-     hbh_opts->rtr_alert.type = IP6_OPT_RTALERT;   // Router Alert Option Type
-     hbh_opts->rtr_alert.length  = 2;      // Length
-     hbh_opts->rtr_alert.value = IP6_OPT_PAD1;     // MLD
-     
-     hbh_opts->pad_type = 1;     // PadN
-     hbh_opts->pad_len  = 0;     // 0 Data bytes (total 2 bytes overhead fills alignment)
-    
-     // Setup IPv6 Header
-     // Note: IPV6_HEADER struct usage depends on bitfield definition order
-     ip6h->version = 6;
-     ip6h->traffic_class = 0; // Or set Precedence equivalent
-     ip6h->flow_label = 0;
-     
-     ip6h->payload_length = htons(sizeof(IPV6_HBH_ROUTER_ALERT_COMPLETE) + mld_message_size);
-     ip6h->next_header = IP6_HOP_BY_HOP_EH;   // Next is Hop-by-Hop Options
-     ip6h->hop_limit = 1;     // MLD MUST have Hop Limit 1
-    
-     memcpy(&ip6h->source_ip_address, &source_address, sizeof(IPV6_ADDRESS));
-    
-     // Determine Destination Address
-     if (IN6_IS_ADDR_UNSPECIFIED(&group_address)) // General Query
-     {
-          // All Nodes (FF02::1)
-          inet_pton(AF_INET6, "FF02::1", &ip6h->destination_ip_address);
-     }
-     else
-     {
-         if (type == MLD_V1_LEAVE_GROUP_TYPE) {
-             // All Routers (FF02::2)
-             inet_pton(AF_INET6, "FF02::2", &ip6h->destination_ip_address);
-         } else {
-             // Group Specific Query or Report -> Send to Group Address
-             memcpy(&ip6h->destination_ip_address, &group_address, sizeof(IPV6_ADDRESS));
-         }
-     }
-    
-     // ---------------------------------------------------------
-     // 4. Checksum Calculation (ICMPv6 includes Pseudo-Header)
-     // ---------------------------------------------------------
-     
-     UINT8 *msg_ptr = (version == MLD_VER_2) ? (UINT8*)sptr_mldv2_message : (UINT8*)sptr_mld_message;
-     
-     if (version == MLD_VER_2) {
-         sptr_mldv2_message->checksum = 0;
-         // calculate_icmpv6_checksum must handle IPv6 Pseudo Header + Payload
-         sptr_mldv2_message->checksum = calculate_ip6_checksum(
-             &ip6h->source_ip_address, 
-             &ip6h->destination_ip_address, 
-             msg_ptr,
-             mld_message_size, 
-             IP6_ICMPV6);
-     } else {
-         sptr_mld_message->checksum = 0;
-         sptr_mld_message->checksum = calculate_ip6_checksum(
-             &ip6h->source_ip_address, 
-             &ip6h->destination_ip_address, 
-             msg_ptr,
-             mld_message_size, 
-             IP6_ICMPV6);
-     }
-    
-     // ---------------------------------------------------------
-     // 5. Send Packet
-     // ---------------------------------------------------------
-     
-     // Get VLAN Info
-     cmsg = calloc(1, sizeof(union mld_in6_cmsg));
-     {
-         L2MCD_VLAN_LOG_ERR(tx_port_number,"MLD:%s()%d MLD.VRF%d.ERR: Failed to allocate cmsg.\n",FN,LN, mld->vrf_index);
-         return FALSE;
-     }
-    
-     ifindex = portdb_get_port_ifindex(mld_portdb_tree, tx_port_number);
-     if(l2mcd_ifindex_is_physical(ifindex)) {
-         cmsg->vaddr.vlanid = mld_portdb_get_ivid_from_gvid(ifindex, MLD_ROUTE_PORT);
-     } else {
-         cmsg->vaddr.vlanid = mld_get_ivid_vport(tx_port_number, MCAST_IPV6_AFI);
-     }
-     cmsg->vaddr.port = physical_port;
-     vlan_id = cmsg->vaddr.vlanid;
-    
-     // TODO micas
-     // // Set System MAC for Leave/Report if needed (mimicking IGMP logic)
-     // if ((type == MLD_LEAVE_GROUP_TYPE) || (type == MLD_V1_MEMBERSHIP_REPORT_TYPE)) {
-     //      memcpy(cmsg->vaddr.src_mac, mcgrp_glb->mac, ETHER_ADDR_LEN);
-     // }
-    
-     // Prepare TX Message Wrapper
-     memset(&rx_pkt_msg, 0, sizeof(rx_pkt_msg));
-     
-     // Copy addresses for the TX internal structure (using custom structs/unions per your system)
-     memcpy(&rx_pkt_msg.ip_param.source_address, &source_address, sizeof(IPV6_ADDRESS));
-     rx_pkt_msg.ip_param.rx_port_number = tx_port_number;
-     rx_pkt_msg.ip_param.vrf_index = 1; // Or pull from mld->vrf_index
-     rx_pkt_msg.ip_param.rx_physical_port_number = physical_port;
-     rx_pkt_msg.pkt_data = (version == MLD_VER_2) ? (void*)sptr_mldv2_packet : (void*)sptr_mld_packet;
-     rx_pkt_msg.pkt_size = packet_total_size;
-    #if 0
-     L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] Tx dstip:0x%x srcip:0x%x ip6hlen:%d tot:%d phy_p:0x%x type:%d ver:%d group_adress:%d vlan:%d",
-             __FUNCTION__, __LINE__, tx_port_number, ntohl(ip6h->destination_ip_address),
-             ntohl(ip6h->source_ip_address), ip6h->version,
-             ntohs(ip6h->payload_length), rx_pkt_msg.ip_param.rx_physical_port_number, type, version, group_address, vlan_id);
-    #endif
-     MADDR_ST dest_addr_st;
-     mcast_init_addr(&dest_addr_st, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
-     mcast_set_ipv6_addr(&dest_addr_st, &ip6h->destination_ip_address);
-    
-     // TODO micas
-     // if (type == IGMP_MEMBERSHIP_QUERY_TYPE && group_address == 0)
-     // {
-     //     ret=l2mcd_send_pkt (&rx_pkt_msg, physical_port != PORT_INDEX_INVALID ? physical_port : 0, vlan_id,  &dest_addr, mld, mcgrp_glb,
-     //                        0, (physical_port == PORT_INDEX_INVALID));
-     // } else if (type == IGMP_MEMBERSHIP_QUERY_TYPE && group_address) {
-     //     ret=l2mcd_send_pkt (&rx_pkt_msg, (physical_port != PORT_INDEX_INVALID) ? physical_port :0, vlan_id, &dest_addr, mld, mcgrp_glb,
-     //                         0, (physical_port == PORT_INDEX_INVALID));
-     // } else if ((type == IGMP_V2_LEAVE_GROUP_TYPE) || (type == IGMP_V2_MEMBERSHIP_REPORT_TYPE) || (type == IGMP_V1_MEMBERSHIP_REPORT_TYPE)) {
-     //     mld_tx_reports_leave_rcvd_on_edge_port(&rx_pkt_msg, &dest_addr, mld, mld_vport);
-     // } else {
-     //     ret=l2mcd_send_pkt(&rx_pkt_msg, (physical_port != PORT_INDEX_INVALID) ? physical_port : 0, vlan_id, &dest_addr, mld, mcgrp_glb,
-     //                         0 , (physical_port == PORT_INDEX_INVALID));
-     // }
-    
-     mld->mld_stats[tx_port_number].xmt_packets++;
-    
-     if (ret ==-1)  mld->mld_stats[tx_port_number].xmt_error++;
-    
-     L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] MLD.type:%d: [ Port %s(%d),  %s(%d) Grp 0x%x ] Sent version %d Query. size %d. Src 0x%x vlan:%d", FN, LN,
-                          tx_port_number, type, portdb_get_ifname_from_portindex(physical_port), physical_port, portdb_get_ifname_from_portindex(tx_port_number), tx_port_number,
-                          group_address, version, mld_message_size, source_address, vlan_id);
-    
-     // Cleanup
-     if (version == MLD_VER_2) free(sptr_mldv2_packet);
-     else free(sptr_mld_packet);
-     free(cmsg);
+        // Fill MLDv2 specific fields
+        // Note: Bitfield handling macros or direct assignment depending on endianness
+        // Simplified assignment here assuming struct handles bitfields:
+        sptr_mldv2_message->reserved_flags = 0;
+        sptr_mldv2_message->suppress_router_process = (response_time > mld->LMQ_interval);
+        sptr_mldv2_message->querier_robustness_var = mld->cfg_robustness_var;
+
+        sptr_mldv2_message->query_interval_code = MCGRP_VAL_2_CODE(mld->cfg_query_interval_time);
+        sptr_mldv2_message->num_srcs = htons((UINT16)num_srcs);
+
+        L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] MLDv2 num_srcs:%d mld_packet_size:%d alloc_buff_size:%d mld_type:%d",
+                             __FUNCTION__, __LINE__, tx_port_number, num_srcs, packet_total_size, mld_message_size, type);
+        break;
+    }
+    } /* switch (version) */
+
+    // ---------------------------------------------------------
+    // 3. IPv6 Header & HBH Construction
+    // ---------------------------------------------------------
+
+    // Setup HBH Options (Router Alert is mandatory for MLD)
+    hbh_opts->hbh_header.next_header = IP6_ICMPV6; // Next is ICMPv6
+    hbh_opts->hbh_header.hdr_ext_len = 0;          // (0 + 1) * 8 = 8 bytes
+
+    hbh_opts->rtr_alert.type = IP6_OPT_RTALERT;      // Router Alert Option Type
+    hbh_opts->rtr_alert.length = 2;                  // Length
+    hbh_opts->rtr_alert.value = IP6_OPT_RTALERT_MLD; // MLD
+
+    hbh_opts->pad_type = 1; // PadN
+    hbh_opts->pad_len = 0;  // 0 Data bytes (total 2 bytes overhead fills alignment)
+
+    // Setup IPv6 Header
+    // Note: IPV6_HEADER struct usage depends on bitfield definition order
+    UINT32 vtf = (6 << 28) | (0xc0 << 20) | 0;
+    vtf = htonl(vtf);
+    memcpy(ip6h, &vtf, sizeof(UINT32));
+
+    ip6h->payload_length = htons(sizeof(IPV6_HBH_ROUTER_ALERT_COMPLETE) + mld_message_size);
+    ip6h->next_header = IP6_HOP_BY_HOP_EH; // Next is Hop-by-Hop Options
+    ip6h->hop_limit = 1;                   // MLD MUST have Hop Limit 1
+
+    memcpy(&ip6h->source_ip_address, &source_address, sizeof(IPV6_ADDRESS));
+
+    // Group-Specific Query || MLD_V1_MEMBERSHIP_REPORT_TYPE
+    memcpy(&ip6h->destination_ip_address, &group_address, sizeof(IPV6_ADDRESS));
+    if (type == MLD_MEMBERSHIP_QUERY_TYPE)
+    {
+        if (IN6_IS_ADDR_UNSPECIFIED(&group_address))
+        {
+            // General Query
+            inet_pton(AF_INET6, "FF02::1", &ip6h->destination_ip_address);
+        }
+    }
+    else if (type == MLD_V2_MEMBERSHIP_REPORT_TYPE)
+    {
+        inet_pton(AF_INET6, "FF02::16", &ip6h->destination_ip_address);
+    }
+    else if (type == MLD_V1_LEAVE_GROUP_TYPE)
+    {
+        inet_pton(AF_INET6, "FF02::2", &ip6h->destination_ip_address);
+    }
+    // ---------------------------------------------------------
+    // 4. Checksum Calculation (ICMPv6 includes Pseudo-Header)
+    // ---------------------------------------------------------
+
+    UINT8 *msg_ptr = (version == MLD_VER_2) ? (UINT8 *)sptr_mldv2_message : (UINT8 *)sptr_mld_message;
+    if (version == MLD_VER_2)
+    {
+        sptr_mldv2_message->checksum = 0;
+        // calculate_icmpv6_checksum must handle IPv6 Pseudo Header + Payload
+        sptr_mldv2_message->checksum = htons(calculate_ip6_checksum(
+            &ip6h->source_ip_address,
+            &ip6h->destination_ip_address,
+            msg_ptr,
+            mld_message_size,
+            IP6_ICMPV6));
+    }
+    else
+    {
+        sptr_mld_message->checksum = 0;
+        sptr_mld_message->checksum = htons(calculate_ip6_checksum(
+            &ip6h->source_ip_address,
+            &ip6h->destination_ip_address,
+            msg_ptr,
+            mld_message_size,
+            IP6_ICMPV6));
+    }
+
+    // ---------------------------------------------------------
+    // 5. Send Packet
+    // ---------------------------------------------------------
+
+    // Get VLAN Info
+    cmsg = calloc(1, sizeof(union mld_in6_cmsg));
+    if (!cmsg)
+    {
+        L2MCD_VLAN_LOG_ERR(tx_port_number, "MLD:%s()%d MLD.VRF%d.ERR: Failed to allocate cmsg.\n", FN, LN, mld->vrf_index);
+        return FALSE;
+    }
+
+    ifindex = portdb_get_port_ifindex(mld_portdb_tree, tx_port_number);
+    if (l2mcd_ifindex_is_physical(ifindex))
+    {
+        cmsg->vaddr.vlanid = mld_portdb_get_ivid_from_gvid(ifindex, MLD_ROUTE_PORT);
+    }
+    else
+    {
+        cmsg->vaddr.vlanid = mld_get_ivid_vport(tx_port_number, MCAST_IPV6_AFI);
+    }
+    cmsg->vaddr.port = physical_port;
+    vlan_id = cmsg->vaddr.vlanid;
+
+    if ((type == MLD_MEMBERSHIP_QUERY_TYPE))
+    {
+        memcpy(cmsg->vaddr.src_mac, mcgrp_glb->mac, ETHER_ADDR_LEN);
+    }
+
+    // Copy addresses for the TX internal structure (using custom structs/unions per your system)
+    memcpy(&rx_pkt_msg.ip_param.source_address, &source_address, sizeof(IPV6_ADDRESS));
+    memcpy(&rx_pkt_msg.ip_param.destination_address, &ip6h->destination_ip_address, sizeof(IPV6_ADDRESS));
+
+    // rx_pkt_msg.ip_param.smac = ;
+    // rx_pkt_msg.ip_param.dmac = ;
+    // rx_pkt_msg.ip_param.source_address = ;
+    // rx_pkt_msg.ip_param.destination_address = ;
+
+    rx_pkt_msg.ip_param.rx_port_number = tx_port_number;
+    rx_pkt_msg.ip_param.rx_physical_port_number = physical_port;
+    rx_pkt_msg.ip_param.vrf_index = L2MCD_DEFAULT_VRF_IDX;
+    rx_pkt_msg.ip_param.vlan_id = vlan_id;
+    rx_pkt_msg.pkt_data = (version == MLD_VER_2) ? (void *)sptr_mldv2_packet : (void *)sptr_mld_packet;
+    rx_pkt_msg.pkt_size = packet_total_size;
+
+    MADDR_ST dest_addr_st;
+    mcast_init_addr(&dest_addr_st, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+    mcast_set_ipv6_addr(&dest_addr_st, &ip6h->destination_ip_address);
+
+    if ((type == MLD_V1_LEAVE_GROUP_TYPE) || (type == MLD_V1_MEMBERSHIP_REPORT_TYPE))
+    {
+        mld_tx_reports_leave_rcvd_on_edge_port(&rx_pkt_msg, &dest_addr_st, mld, mld_vport);
+    }
+    else
+    {
+        L2MCD_VLAN_LOG_DEBUG(tx_port_number, "[Before Send] pkt: %p, phy_port: %d, vlan: %d, dest ip: %s, mld(%p) mcgrp_glb(%p) fwd: %d bocast: %d",
+                             &rx_pkt_msg, physical_port, vlan_id, mcast_print_addr(&dest_addr_st), mld, mcgrp_glb, (physical_port != PORT_INDEX_INVALID), (physical_port == PORT_INDEX_INVALID));
+        ret = l2mcd_send_pkt(&rx_pkt_msg, (physical_port != PORT_INDEX_INVALID) ? physical_port : 0, vlan_id, &dest_addr_st, mld, mcgrp_glb,
+                             (physical_port != PORT_INDEX_INVALID), (physical_port == PORT_INDEX_INVALID));
+    }
+
+    mld->mld_stats[tx_port_number].xmt_packets++;
+
+    if (ret == -1)
+        mld->mld_stats[tx_port_number].xmt_error++;
+
+    L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] MLD.type:%d: [ Port %s(%d),  %s(%d) Grp %s ] Sent version %d. size %d. Src %s vlan:%d", FN, LN,
+                         tx_port_number, type, portdb_get_ifname_from_portindex(physical_port), physical_port, portdb_get_ifname_from_portindex(tx_port_number), tx_port_number,
+                         mcast_print_addr(&group_addr), version, mld_message_size, mcast_print_addr(&source_addr), vlan_id);
+    L2MCD_VLAN_LOG_DEBUG(tx_port_number, "dest ip: %s", mcast_print_addr(&dest_addr_st));
+
+    // Cleanup
+    if (version == MLD_VER_2)
+        free(sptr_mldv2_packet);
+    else
+        free(sptr_mld_packet);
+    free(cmsg);
 
     return TRUE;
 }
@@ -1467,7 +1484,7 @@ int receive_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
     MCGRP_CLASS *mld = MLD_GET_INSTANCE_FROM_VRFINDEX(vrf_index);
     UINT8 mldver = MLD_VERSION_NONE;
     UINT8 nexthdr = ip6h->next_header;
-    UINT8 hbh_len;
+    UINT16 hbh_len;
 
     char *ifname = portdb_get_ifname_from_portindex(rx_phy_port);
     int vid = mld_l3_get_port_from_ifindex(rx_vir_port, MLD_VLAN);
@@ -1505,12 +1522,12 @@ int receive_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
         L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] ERR Rx packet has invalid checksum. Dropping packet", FN, LN, vid);
         mld->mld_stats[rx_vir_port].recv_checksum_error++;
     }
-
     // len + dest ip + proto + version check
     if (!mcast_validate_mld_packet(mld_pkt_msg))
     {
         L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] ERR Rx packet is invalid. Dropping packet", FN, LN, vid);
     }
+    mld_pkt_msg->ip_param.hopbyhop_length = hbh_len;
 
     switch (icmp6h->type)
     {

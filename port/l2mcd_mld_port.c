@@ -3674,7 +3674,7 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
         L2MCD_LOG_WARN("Ignore ICMPv6 type=%d", icmp6h->type);
         return FALSE;
     }
-    L2MCD_LOG_INFO("[MLDv%d RX] MLD_MESSAGE rx size: %d", mldver, mesg_size);
+    L2MCD_LOG_INFO("[MLDv%d RX] MLD_MESSAGE rx size: %d, icmp type: %d", mldver, mesg_size, icmp6h->type);
 
     if (mldver == MLD_VERSION_1)
     {

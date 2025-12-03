@@ -772,6 +772,8 @@ extern MCGRP_GLOBAL_CLASS    gIgmp, *pgIgmp;
 
 typedef struct IP_PARAMETERS
 {
+    UINT8                           smac[ETH_ALEN];
+    UINT8                           dmac[ETH_ALEN];
 	ULONG 							source_address;
 	ULONG 							destination_address;
 	USHORT							offset;
@@ -802,14 +804,24 @@ typedef struct
 	IP_PARAMETERS	ip_param;
 } IP_RX_PKT_MSG;
 
+struct vlan_ethhdr {
+    unsigned char   h_dest[ETH_ALEN];           // dmac len 6
+    unsigned char   h_source[ETH_ALEN];         // smac len 6
+    __be16          h_vlan_proto;               // TPID 8100
+    __be16          h_vlan_TCI;                 // TCI such as: Priority, CFI, VLAN ID
+    __be16          h_vlan_encapsulated_proto;  // real proto such as: IPv6 0x86DD
+};
 
 typedef struct IP6_PARAMETERS
 {
+    UINT8                       smac[ETH_ALEN];
+    UINT8                       dmac[ETH_ALEN];
     UINT8                       hop_limit;
     UINT8                       version;
     UINT8                       next_header;
     UINT32                      traffic_class;
     UINT16                      payload_length;
+    UINT16                      hopbyhop_length;
     IP6_IPV6_ADDRESS            source_address;
     IP6_IPV6_ADDRESS            destination_address;
 
@@ -1387,8 +1399,7 @@ int igmpv3_encode_src_list (IGMPV3_MESSAGE *igmpv3_msg, MCGRP_SOURCE *p_src, BOO
 int mldv2_encode_src_list (MLDV2_MESSAGE *mldv2_msg, MCGRP_SOURCE *p_src, BOOLEAN all_srcs, BOOLEAN is_retx);
 int l2mcd_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t vlan_id ,  MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_GLOBAL_CLASS  *mcgrp_glb, 
     bool_t is_forwarded, bool_t is_bcast);
-int l2mcd_tx_send_pkt(void *msg, ifindex_t phy_port_id, uint16_t vlan_id ,  MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_GLOBAL_CLASS  *mcgrp_glb, 
-    bool_t is_forwarded, bool_t is_bcast);
+int l2mcd_fwd_pkt(void *msg, ifindex_t phy_port_id, uint16_t vlan_id, MCGRP_CLASS *mld, MCGRP_GLOBAL_CLASS *mcgrp_glb, bool_t is_forwarded);
 void mld_tx_reports_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_L3IF *mld_vport);
 void mld_tx_query_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_L3IF *mld_vport);
 void mld_tx_reports_and_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_L3IF *mld_vport);
