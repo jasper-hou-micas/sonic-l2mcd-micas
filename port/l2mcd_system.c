@@ -1287,6 +1287,7 @@ void l2mcd_recv_igmp_msg(evutil_socket_t fd, short what, void *arg)
 
     for (i=0;i<num_pkts;i++)
     {
+        struct ether_header *eth = (struct ether_header *) buf[i];
         if (l2mcd_pkt_rx_batch_proc)
         {
             iph  = (struct iphdr *) (buf[i] + sizeof(struct ether_header));
