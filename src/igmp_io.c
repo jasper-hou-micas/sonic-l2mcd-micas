@@ -1323,27 +1323,45 @@ BOOLEAN igmp_send_igmp_message (MCGRP_CLASS *igmp,
             ntohs(iph->total_length), ntohs(iph->header_checksum), 
             rx_pkt_msg.ip_param.rx_phy_port_number, type, version, group_address,vlan_id);
 
-    if (type == IGMP_MEMBERSHIP_QUERY_TYPE && group_address == 0)
+    mcast_set_ipv4_addr(&dest_addr, iph->destination_ip_address);
+    if ((type == IGMP_V2_LEAVE_GROUP_TYPE) || (type == IGMP_V2_MEMBERSHIP_REPORT_TYPE) || (type == IGMP_V1_MEMBERSHIP_REPORT_TYPE))
     {
-        mcast_set_ipv4_addr(&dest_addr, iph->destination_ip_address);
-        ret=l2mcd_send_pkt (&rx_pkt_msg, physical_port != PORT_INDEX_INVALID ? physical_port : 0, vlan_id,  &dest_addr, igmp, mcgrp_glb,
-                           0, (physical_port == PORT_INDEX_INVALID));
-    } else if (type == IGMP_MEMBERSHIP_QUERY_TYPE && group_address) {
-        mcast_set_ipv4_addr(&dest_addr, iph->destination_ip_address);
-        ret=l2mcd_send_pkt (&rx_pkt_msg, (physical_port != PORT_INDEX_INVALID) ? physical_port :0, vlan_id, &dest_addr, igmp, mcgrp_glb,
-                            0, (physical_port == PORT_INDEX_INVALID));
-    } else if ((type == IGMP_V2_LEAVE_GROUP_TYPE) || (type == IGMP_V2_MEMBERSHIP_REPORT_TYPE) || (type == IGMP_V1_MEMBERSHIP_REPORT_TYPE)) {
-        mcast_set_ipv4_addr(&dest_addr, iph->destination_ip_address);
         mld_tx_reports_leave_rcvd_on_edge_port(&rx_pkt_msg, &dest_addr, igmp, mld_vport);
-    } else {
-        mcast_set_ipv4_addr(&dest_addr, iph->destination_ip_address);
-        ret=l2mcd_send_pkt(&rx_pkt_msg, (physical_port != PORT_INDEX_INVALID) ? physical_port : 0, vlan_id, &dest_addr, igmp, mcgrp_glb,
-                            0 , (physical_port == PORT_INDEX_INVALID)); 
     }
-
-    igmp->igmp_stats[tx_port_number].xmt_packets++;
-
-    if (ret ==-1)  igmp->igmp_stats[tx_port_number].xmt_error++;
+    else
+    {
+        if (physical_port != PORT_INDEX_INVALID)
+        {
+            MCGRP_PORT_ENTRY *mcgrp_pport = mld_vport->phy_port_list;
+            while (mcgrp_pport)
+            {
+                if (mcgrp_pport->phy_port_id != physical_port)
+                {
+                    mcgrp_pport = mcgrp_pport->next;
+                    continue;
+                }
+                ret = l2mcd_send_pkt(&rx_pkt_msg, physical_port, vlan_id, &dest_addr, igmp, mcgrp_glb,
+                                     mcgrp_pport->tagged, FALSE);
+                break;
+            }
+            igmp->igmp_stats[tx_port_number].xmt_packets++;
+            if (ret == -1)
+                igmp->igmp_stats[tx_port_number].xmt_error++;
+        }
+        else
+        {
+            MCGRP_PORT_ENTRY *mcgrp_pport = mld_vport->phy_port_list;
+            while (mcgrp_pport)
+            {
+                ret = l2mcd_send_pkt(&rx_pkt_msg, mcgrp_pport->phy_port_id, vlan_id, &dest_addr, igmp, mcgrp_glb,
+                                     mcgrp_pport->tagged, FALSE);
+                igmp->igmp_stats[tx_port_number].xmt_packets++;
+                if (ret == -1)
+                    igmp->igmp_stats[tx_port_number].xmt_error++;
+                mcgrp_pport = mcgrp_pport->next;
+            }
+        }
+    }
 
     L2MCD_VLAN_LOG_DEBUG(tx_port_number,"%s:%d:[vlan:%d] IGMP.type:%d: [ Port %s(%d),  %s(%d) Grp 0x%x ] Sent version %d Query. size %d. Src 0x%x vlan:%d",FN,LN,
             tx_port_number,type, portdb_get_ifname_from_portindex(physical_port), physical_port, portdb_get_ifname_from_portindex(tx_port_number), tx_port_number,

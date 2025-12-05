@@ -227,32 +227,32 @@ typedef struct
 
 typedef struct L2MCD_CONTEXT {
     /* Libevent base to monitor all socket Fd's*/
-    struct event_base   *evbase;
+    struct event_base       *evbase;
     /*Fd's used by socket*/
-    int                 ipc_fd;         //communication with l2mcdmgr, etc.
-    int                 igmp_rx_fd;     //Recieve socket for snooped packets
-    int                 igmp_tx_fd;     //Tx Socket 
-    int                 mld_tx_fd;
-    uint32_t            l2mcd_msg_fd;
-    uint32_t            nl_fd;
-    L2MCD_LIBEV_STATS   libev_stats;
-    L2MCD_RX_SOCK_STATS rx_stats;
-    FILE                *cmd_fp;
-    FILE                *pkt_fp;
-    uint8_t             vlan_log_mask;
-    uint8_t             fwk_dbg_mode;
-    uint8_t             dbg_to_sys_log;
-     uint8_t            dbg_vlan_log_all;
-    char                l2mcd_global_mac[ETHER_ADDR_LEN];
-    uint8_t             pktlog[L2MCD_VLAN_MAX+1];
-    uint32_t            ifindex_to_kifindex[L2MCD_PORTDB_PHYIF_MAX_IDX];
-    uint32_t            curr_dbg_level;
-    char                rx_buf[L2MCD_RX_BUFFER_SIZE];
-    L2MCD_AVL_TREE         kif_to_if_tree;
-    L2MCD_AVL_TREE         if_to_kif_tree;
-    int                 rx_is_l2_sock;
-    int                 portdb_pending_count;
-    uint8_t             port_init_done;
+    int                     ipc_fd;         //communication with l2mcdmgr, etc.
+    int                     igmp_rx_fd;     //Recieve socket for snooped packets
+    int                     igmp_tx_fd;     //Tx Socket 
+    int                     mld_tx_fd;
+    uint32_t                l2mcd_msg_fd;
+    uint32_t                nl_fd;
+    L2MCD_LIBEV_STATS       libev_stats;
+    L2MCD_RX_SOCK_STATS     rx_stats;
+    FILE                    *cmd_fp;
+    FILE                    *pkt_fp;
+    uint8_t                 vlan_log_mask;
+    uint8_t                 fwk_dbg_mode;
+    uint8_t                 dbg_to_sys_log;
+    uint8_t                 dbg_vlan_log_all;
+    char                    l2mcd_global_mac[ETHER_ADDR_LEN];
+    uint8_t                 pktlog[L2MCD_VLAN_MAX+1];
+    uint32_t                ifindex_to_kifindex[L2MCD_PORTDB_PHYIF_MAX_IDX];
+    uint32_t                curr_dbg_level;
+    char                    rx_buf[L2MCD_RX_BUFFER_SIZE];
+    L2MCD_AVL_TREE          kif_to_if_tree;
+    L2MCD_AVL_TREE          if_to_kif_tree;
+    int                     rx_is_l2_sock;
+    int                     portdb_pending_count;
+    uint8_t                 port_init_done;
 } L2MCD_CONTEXT;
 
 #define L2MCD_CTL_CMD_RESET          0x1

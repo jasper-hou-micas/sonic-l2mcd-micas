@@ -611,9 +611,8 @@ mld_if_snoop_set(uint32_t afi, uint16_t vid, int user_cfg, uint8_t type)
 }
 
 /* Wrapper function to handle add/delete port from VLAN event */
-int
-mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
-									uint32_t ip_family, uint8_t type, int lif_type, int lif_state)
+int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
+                            uint32_t ip_family, uint8_t type, int lif_type, int lif_state, int tagged)
 {
     int rc = MLD_SUCCESS;
     UINT16  vlan_port;
@@ -644,16 +643,15 @@ mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
         for (afi = L2MCD_IPV4_AFI; afi <= MCAST_AFI_MAX; afi++)
 		{
 			if (mld_vdb_vlan_is_present_in_protocol(vlan_node, afi)) {
-				mcgrp =
-				    MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi,
-								     MLD_DEFAULT_VRF_ID);
+				mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, MLD_DEFAULT_VRF_ID);
 				mcgrp_vport =
 				    IS_IGMP_CLASS(mcgrp) ?
 				    gIgmp.port_list[vlan_port]
 				    : gMld.port_list[vlan_port];
 
 				if (mcgrp_vport) {
-					mcgrp_pport = mcgrp_add_phy_port (mcgrp, mcgrp_vport, port);
+                    mcgrp_pport = mcgrp_add_phy_port(mcgrp, mcgrp_vport, port);
+                    mcgrp_pport->tagged = tagged;
 
                     L2MCD_VLAN_LOG_INFO (vlan_node->gvid, "%s:%d:[vlan:%d] Port:%d PPORT:%p LIF:%d LIF_State:%d",
                             FN, LN,vlan_id, port, mcgrp_pport, lif_type, lif_state);

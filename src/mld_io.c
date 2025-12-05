@@ -988,14 +988,39 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
     {
         L2MCD_VLAN_LOG_DEBUG(tx_port_number, "[Before Send] pkt: %p, phy_port: %d, vlan: %d, dest ip: %s, mld(%p) mcgrp_glb(%p) fwd: %d bocast: %d",
                              &rx_pkt_msg, physical_port, vlan_id, mcast_print_addr(&dest_addr_st), mld, mcgrp_glb, (physical_port != PORT_INDEX_INVALID), (physical_port == PORT_INDEX_INVALID));
-        ret = l2mcd_send_pkt(&rx_pkt_msg, (physical_port != PORT_INDEX_INVALID) ? physical_port : 0, vlan_id, &dest_addr_st, mld, mcgrp_glb,
-                             (physical_port != PORT_INDEX_INVALID), (physical_port == PORT_INDEX_INVALID));
+        if (physical_port != PORT_INDEX_INVALID)
+        {
+            MCGRP_PORT_ENTRY *mcgrp_pport = mld_vport->phy_port_list;
+            while (mcgrp_pport)
+            {
+                if (mcgrp_pport->phy_port_id != physical_port)
+                {
+                    mcgrp_pport = mcgrp_pport->next;
+                    continue;
+                }
+                ret = l2mcd_send_pkt(&rx_pkt_msg, physical_port, vlan_id, &dest_addr_st, mld, mcgrp_glb,
+                                     mcgrp_pport->tagged, FALSE);
+                break;
+            }
+            mld->mld_stats[tx_port_number].xmt_packets++;
+
+            if (ret == -1)
+                mld->mld_stats[tx_port_number].xmt_error++;
+        }
+        else
+        {
+            MCGRP_PORT_ENTRY *mcgrp_pport = mld_vport->phy_port_list;
+            while (mcgrp_pport)
+            {
+                ret = l2mcd_send_pkt(&rx_pkt_msg, mcgrp_pport->phy_port_id, vlan_id, &dest_addr_st, mld, mcgrp_glb,
+                                     mcgrp_pport->tagged, FALSE);
+                mld->mld_stats[tx_port_number].xmt_packets++;
+                if (ret == -1)
+                    mld->mld_stats[tx_port_number].xmt_error++;
+                mcgrp_pport = mcgrp_pport->next;
+            }
+        }
     }
-
-    mld->mld_stats[tx_port_number].xmt_packets++;
-
-    if (ret == -1)
-        mld->mld_stats[tx_port_number].xmt_error++;
 
     L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] MLD.type:%d: [ Port %s(%d),  %s(%d) Grp %s ] Sent version %d. size %d. Src %s vlan:%d", FN, LN,
                          tx_port_number, type, portdb_get_ifname_from_portindex(physical_port), physical_port, portdb_get_ifname_from_portindex(tx_port_number), tx_port_number,

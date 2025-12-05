@@ -529,6 +529,7 @@ typedef struct MCGRP_PORT_ENTRY
 	UINT32            verwarn_intvl_start;      // Can we add a syslog...msg for this????
 	UINT32            verwarn_count;
 	BOOLEAN           snooping_mrouter_detected;
+	BOOLEAN           tagged;
 } MCGRP_PORT_ENTRY ;
 
 /* This data structure represents IGMP/MLD's state on each IP interface */

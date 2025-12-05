@@ -53,6 +53,7 @@ typedef struct PORT_ATTR_ {
     char       pnames[L2MCD_IFNAME_SIZE];
     int        oper_state;
     int        stp_state; 
+    int        tagged; 
 } PORT_ATTR;
 
 typedef struct L2MCD_CONFIG_MSG {

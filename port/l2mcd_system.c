@@ -505,7 +505,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 if ((!val && data->op_code) || (val && !data->op_code))
                 {
                     lif_state = is_interface_up(data->ports[i].pnames);
-                    mld_map_port_vlan_state(vlan_id, ifidx, data->op_code, L2MCD_IPV4_AFI, MLD_VLAN , TRUE, lif_state);
+                    mld_map_port_vlan_state(vlan_id, ifidx, data->op_code, L2MCD_IPV4_AFI, MLD_VLAN , TRUE, lif_state, data->ports[i].tagged);
                     L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:VLAN_MEMBER port:%s ifindx:%d, op:%d", FN,LN, vlan_id, data->ports[i].pnames, ifidx,data->op_code);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, data->op_code? 1:0, -1, afi);
                     if (data->op_code) 
@@ -631,7 +631,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                     ifidx = portdb_get_portindex_from_ifname(data->ports[i].pnames);
                     lif_state = is_interface_up(data->ports[i].pnames);
                     L2MCD_VLAN_LOG_INFO(vlan_id,"%s:%d:[vlan:%d] vlan-member:%s ifindx:%d", __FUNCTION__, __LINE__, vlan_id, data->ports[i].pnames, ifidx);
-                    mld_map_port_vlan_state(vlan_id, ifidx, TRUE, afi, MLD_VLAN , TRUE, lif_state);
+                    mld_map_port_vlan_state(vlan_id, ifidx, TRUE, afi, MLD_VLAN , TRUE, lif_state, data->ports[i].tagged);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, 1, -1, afi);
                 }
 

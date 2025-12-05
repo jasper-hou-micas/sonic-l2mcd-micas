@@ -172,18 +172,16 @@ void mld_tx_static_report_leave_on_mrtr_port(MCGRP_CLASS  *mld, MADDR_ST *grp_ad
 	}
 }
 
-void mld_tx_reports_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS  *mld, MCGRP_L3IF *mld_vport)
+void mld_tx_reports_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS *mld, MCGRP_L3IF *mld_vport)
 {
-	MCGRP_ROUTER_ENTRY* mcgrp_rport = NULL;
-	MADDR_ST dest_addr;
-	uint8_t afi;
-	MCGRP_GLOBAL_CLASS *mcgrp_glb = (IS_IGMP_CLASS(mld) ? &gIgmp : &gMld);
-	ifindex_t source,destination;
-	uint32_t rx_phy_port;
-	MCGRP_PORT_ENTRY* mcgrp_pport;
+    MADDR_ST dest_addr;
+    uint8_t afi;
+    MCGRP_GLOBAL_CLASS *mcgrp_glb = (IS_IGMP_CLASS(mld) ? &gIgmp : &gMld);
+    ifindex_t source, destination;
+    uint32_t rx_phy_port;
+    MCGRP_PORT_ENTRY *mcgrp_pport;
 
-
-	if (mld_vport == NULL) 
+    if (mld_vport == NULL) 
 	{
 		L2MCD_LOG_INFO("%s(%d) mld_vport is NULL. ", FN, LN);	
 		return;
@@ -205,45 +203,25 @@ void mld_tx_reports_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP
 	source = rx_phy_port;
 
 	if (is_mld_snooping_enabled(mld_vport, afi)) {
-		mcgrp_rport = mld_vport->rtr_port_list;
-		
-		while (mcgrp_rport) {
-			L2MCD_VLAN_LOG_DEBUG(mld_vport->vir_port_id, "%s:%d:[vlan:%d] port_ifindex:0x%x", 
-				__FUNCTION__, __LINE__, mld_vport->vir_port_id, mcgrp_rport->phy_port_id);
-
-			/* This is for stopping looping the joins, received on vlag , sending them to again on the
- 			** the same vlag */ 
-			//destination = mld_get_port_ifindex(mcgrp_rport->phy_port_id);
-			destination = mcgrp_rport->phy_port_id;
-			L2MCD_LOG_INFO("%s(%d) src_port:0x%x (%s) dst_port:0x%x", FN, LN, 
-				source, mld_get_if_name_from_ifindex(rx_phy_port), destination);
-			if (mld_ok_to_send_over_edge_port(source, destination)) {
-				L2MCD_VLAN_LOG_DEBUG(mld_vport->vir_port_id,"%s:%d:[vlan:%d] %s:mcgrp_rport %s vlan_id %s %s",
-							FN, LN, mld_vport->vir_port_id, afi == MLD_IP_IPV4_AFI ? "IGMP":"MLD", 
-							mld_get_if_name_from_ifindex(mcgrp_rport->phy_port_id), 
-							mld_get_if_name_from_port(mld_vport->vir_port_id), mcast_print_addr(grp_addr));
-				l2mcd_send_pkt(req, mcgrp_rport->phy_port_id, mld_vport->vir_port_id, &dest_addr, mld, mcgrp_glb, TRUE, FALSE);
-
-			}
-			mcgrp_rport = mcgrp_rport->next;
-		}
-		/* Now scan through the edge ports and whichever matches tunnel, forward it.
-		   We will exclude mrouter ports since we already forwarded over mrouter ports. */	
-		mcgrp_pport = mld_vport->phy_port_list;
-		while (mcgrp_pport)
-		{ 	
-			destination = mcgrp_pport->phy_port_id;
-			if(l2mcd_ifindex_is_tunnel(destination)
-				  && mld_ok_to_send_over_edge_port(source, destination)
-				  && !mcgrp_find_rtr_port_entry(mld, mld_vport, mcgrp_pport->phy_port_id))	
-			{
-				L2MCD_VLAN_LOG_DEBUG(mld_vport->vir_port_id, "%s:%d:[vlan:%d] mcgrp_pport %s vlan_id %s %s",
-					  __FUNCTION__, LN,mld_vport->vir_port_id, mld_get_if_name_from_ifindex(mcgrp_pport->phy_port_id), 
-					  mld_get_if_name_from_port(mld_vport->vir_port_id), mcast_print_addr(grp_addr));
-				l2mcd_send_pkt(req, mcgrp_pport->phy_port_id, mld_vport->vir_port_id, &dest_addr, mld, mcgrp_glb, FALSE, FALSE);
-			}
-			mcgrp_pport = mcgrp_pport->next;
-		}
+        mcgrp_pport = mld_vport->phy_port_list;
+        while (mcgrp_pport)
+        {
+            destination = mcgrp_pport->phy_port_id;
+            if (!mld_ok_to_send_over_edge_port(source, destination))
+            {
+                mcgrp_pport = mcgrp_pport->next;
+                continue;
+            }
+            L2MCD_LOG_DEBUG("%s(%d) src_port:0x%x (%s) dst_port:0x%x", FN, LN, source, mld_get_if_name_from_ifindex(source), destination);
+            if (l2mcd_ifindex_is_tunnel(destination) || mcgrp_find_rtr_port_entry(mld, mld_vport, destination))
+            {
+                L2MCD_VLAN_LOG_DEBUG(mld_vport->vir_port_id, "%s:%d:[vlan:%d] mcgrp_pport %s vlan_id %s %s",
+                                     __FUNCTION__, LN, mld_vport->vir_port_id, mld_get_if_name_from_ifindex(destination),
+                                     mld_get_if_name_from_port(mld_vport->vir_port_id), mcast_print_addr(grp_addr));
+				l2mcd_send_pkt(req, mcgrp_pport->phy_port_id, mld_vport->vir_port_id, &dest_addr, mld, mcgrp_glb, mcgrp_pport->tagged, FALSE);
+            }
+            mcgrp_pport = mcgrp_pport->next;
+        }
 	}
 }
 
@@ -292,7 +270,7 @@ void mld_tx_query_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS *
         {
             L2MCD_LOG_DEBUG("MLD:%s()%d General Query Packet sent over edge port %s",
                             FN, LN, mld_get_if_name_from_ifindex(destination));
-            l2mcd_fwd_pkt(req, destination, mld_vport->vir_port_id, mld, mcgrp_glb, TRUE);
+            l2mcd_fwd_pkt(req, destination, mld_vport->vir_port_id, mld, mcgrp_glb, mcgrp_pport->tagged);
         }
         else
         {
@@ -302,7 +280,7 @@ void mld_tx_query_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, MCGRP_CLASS *
             {
                 L2MCD_LOG_DEBUG("%s: GSQ Query Packet sent over edge port %s", FN,
                                 mld_get_if_name_from_ifindex(destination));
-                l2mcd_fwd_pkt(req, destination, mld_vport->vir_port_id, mld, mcgrp_glb, TRUE);
+                l2mcd_fwd_pkt(req, destination, mld_vport->vir_port_id, mld, mcgrp_glb, mcgrp_pport->tagged);
             }
         }
         mcgrp_pport = mcgrp_pport->next;
@@ -347,7 +325,7 @@ void mld_tx_reports_and_leave_rcvd_on_edge_port(void *req, MADDR_ST *grp_addr, M
             L2MCD_VLAN_LOG_DEBUG(mld_vport->vir_port_id, "%s:%d:[vlan:%d] mcgrp_pport %s vlan_id %s %s",
                                  __FUNCTION__, LN, mld_vport->vir_port_id, mld_get_if_name_from_ifindex(destination),
                                  mld_get_if_name_from_port(mld_vport->vir_port_id), mcast_print_addr(grp_addr));
-            l2mcd_fwd_pkt(req, destination, mld_vport->vir_port_id, mld, mcgrp_glb, TRUE);
+            l2mcd_fwd_pkt(req, destination, mld_vport->vir_port_id, mld, mcgrp_glb, mcgrp_pport->tagged);
         }
         mcgrp_pport = mcgrp_pport->next;
     }
