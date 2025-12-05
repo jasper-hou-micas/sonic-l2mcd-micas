@@ -653,8 +653,8 @@ int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
                     mcgrp_pport = mcgrp_add_phy_port(mcgrp, mcgrp_vport, port);
                     mcgrp_pport->tagged = tagged;
 
-                    L2MCD_VLAN_LOG_INFO (vlan_node->gvid, "%s:%d:[vlan:%d] Port:%d PPORT:%p LIF:%d LIF_State:%d",
-                            FN, LN,vlan_id, port, mcgrp_pport, lif_type, lif_state);
+                    L2MCD_VLAN_LOG_INFO(vlan_node->gvid, "%s:%d:[vlan:%d] Port:%d PPORT:%p LIF:%d LIF_State:%d tagged: %d",
+                                        FN, LN, vlan_id, port, mcgrp_pport, lif_type, lif_state, tagged);
 
                     if (lif_type && mcgrp_pport)
                         mcgrp_pport->is_up = lif_state;

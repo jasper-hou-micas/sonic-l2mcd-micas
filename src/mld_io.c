@@ -986,8 +986,6 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
     }
     else
     {
-        L2MCD_VLAN_LOG_DEBUG(tx_port_number, "[Before Send] pkt: %p, phy_port: %d, vlan: %d, dest ip: %s, mld(%p) mcgrp_glb(%p) fwd: %d bocast: %d",
-                             &rx_pkt_msg, physical_port, vlan_id, mcast_print_addr(&dest_addr_st), mld, mcgrp_glb, (physical_port != PORT_INDEX_INVALID), (physical_port == PORT_INDEX_INVALID));
         if (physical_port != PORT_INDEX_INVALID)
         {
             MCGRP_PORT_ENTRY *mcgrp_pport = mld_vport->phy_port_list;
@@ -998,6 +996,8 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
                     mcgrp_pport = mcgrp_pport->next;
                     continue;
                 }
+                L2MCD_VLAN_LOG_DEBUG(tx_port_number, "[Before Send] pkt: %p, phy_port: %d, vlan: %d, dest ip: %s, fwd: %d",
+                                     &rx_pkt_msg, physical_port, vlan_id, mcast_print_addr(&dest_addr_st), mcgrp_pport->tagged);
                 ret = l2mcd_send_pkt(&rx_pkt_msg, physical_port, vlan_id, &dest_addr_st, mld, mcgrp_glb,
                                      mcgrp_pport->tagged, FALSE);
                 break;
@@ -1012,6 +1012,8 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
             MCGRP_PORT_ENTRY *mcgrp_pport = mld_vport->phy_port_list;
             while (mcgrp_pport)
             {
+                L2MCD_VLAN_LOG_DEBUG(tx_port_number, "[Before Send] pkt: %p, phy_port: %d, vlan: %d, dest ip: %s, fwd: %d",
+                                     &rx_pkt_msg, physical_port, vlan_id, mcast_print_addr(&dest_addr_st), mcgrp_pport->tagged);
                 ret = l2mcd_send_pkt(&rx_pkt_msg, mcgrp_pport->phy_port_id, vlan_id, &dest_addr_st, mld, mcgrp_glb,
                                      mcgrp_pport->tagged, FALSE);
                 mld->mld_stats[tx_port_number].xmt_packets++;

@@ -842,8 +842,8 @@ MCGRP_MBRSHP*mcgrp_update_group_address_table (MCGRP_CLASS  *mcgrp,
     L2MCD_VLAN_LOG_DEBUG(vir_port_id,"%s:%d:[vlan:%d] %s port:%s(%d) GA:%s is_static:%d SSM:%d  ver:%d Action:%s num_srcs:%d ",
             FN,LN, vir_port_id, portdb_get_ifname_from_portindex(vir_port_id), portdb_get_ifname_from_portindex(phy_port_id),phy_port_id,
             mcast_print_addr(group_address),is_static, is_ssm_grp, version,mcgrp_action_label[action],num_srcs);
-    for (i=0;i<num_srcs;i++) 
-         L2MCD_VLAN_LOG_DEBUG(vir_port_id,  "%s:%d:[vlan:%d] GA:%s Src:0x%x",  FN,LN, vir_port_id, ipaddr_print_str(group_address), *(srcarray+i));
+    for (i=0;i<num_srcs;i++)
+        L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] GA:%s Src:0x%x", FN, LN, vir_port_id, mcast_print_addr(group_address), *(srcarray + i));
 
     is_leave = (num_srcs == 0 && (action == TO_INCL || action == IS_INCL));
 
