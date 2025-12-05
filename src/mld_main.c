@@ -109,7 +109,7 @@ void mld_vport_state_notify (UINT16   vir_port_id,
                 if (!IP6_IS_ADDRESS_UNSPECIFIED(mld_vport->querier_router.ip.v6addr.address) || is_mld_l3_configured(mld_vport))
                     mld_send_general_query(mld, mld_vport->vir_port_id,
                                            mld_pport->phy_port_id, (UINT8)mld_vport->oper_version,
-                                           NULL, (mld_vport->max_response_time * 1000));
+                                           NULL, (mld_vport->max_response_time * 10));
             }
             else if ((afi == MCAST_IPV4_AFI) && mld_vport->querier)
             {
@@ -117,7 +117,7 @@ void mld_vport_state_notify (UINT16   vir_port_id,
                 if (!mld_vport->querier_router.ip.v4addr || is_mld_l3_configured(mld_vport))
                     igmp_send_general_query(mld, mld_vport->vir_port_id,
                                             mld_pport->phy_port_id, (UINT8)mld_vport->oper_version,
-                                            0, (mld_vport->max_response_time * 1000));
+                                            0, (mld_vport->max_response_time * 10));
             }
         }
         /* notify l2mcmgr send pre-config static entry */
