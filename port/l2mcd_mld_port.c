@@ -612,7 +612,7 @@ mld_if_snoop_set(uint32_t afi, uint16_t vid, int user_cfg, uint8_t type)
 
 /* Wrapper function to handle add/delete port from VLAN event */
 int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
-                            uint32_t ip_family, uint8_t type, int lif_type, int lif_state, int tagged)
+                            uint8_t type, int lif_type, int lif_state, int tagged)
 {
     int rc = MLD_SUCCESS;
     UINT16  vlan_port;
@@ -650,16 +650,22 @@ int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
 				    : gMld.port_list[vlan_port];
 
 				if (mcgrp_vport) {
+                    mcgrp_pport = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, port);
+                    if (mcgrp_pport)
+                        continue;
+                    
                     mcgrp_pport = mcgrp_add_phy_port(mcgrp, mcgrp_vport, port);
-                    mcgrp_pport->tagged = tagged;
 
                     L2MCD_VLAN_LOG_INFO(vlan_node->gvid, "%s:%d:[vlan:%d] Port:%d PPORT:%p LIF:%d LIF_State:%d tagged: %d",
                                         FN, LN, vlan_id, port, mcgrp_pport, lif_type, lif_state, tagged);
 
                     if (lif_type && mcgrp_pport)
+                    {
                         mcgrp_pport->is_up = lif_state;
+                        mcgrp_pport->tagged = tagged;
+                    }
 
-					/* Port State Notify if LIF is UP */
+                    /* Port State Notify if LIF is UP */
 					if ((mcgrp_pport) && (mcgrp_pport->is_up)) {
 						mld_protocol_port_state_notify (vlan_node, afi, mcgrp, port, TRUE);
 						mld_static_mr_grp_replay_confg(vlan_node, afi, port);
@@ -675,11 +681,8 @@ int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
                 mld_vdb_vlan_is_present_in_protocol(vlan_node, MCAST_IPV6_AFI),port);
         for (afi = 1; afi <= MCAST_AFI_MAX; afi++) {
 			if (mld_vdb_vlan_is_present_in_protocol(vlan_node, afi)) {
-				mld_static_grp_deconfig_port(vlan_node, ifindex,
-							     port, afi);
-				mcgrp =
-				    MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi,
-								     MLD_DEFAULT_VRF_ID);
+				mld_static_grp_deconfig_port(vlan_node, ifindex, port, afi);
+				mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, MLD_DEFAULT_VRF_ID);
                 
                 if (vlan_node && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED))
                     mcgrp_vport_state_notify(mcgrp, vlan_port, port, FALSE);
@@ -689,12 +692,10 @@ int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
 				    gIgmp.port_list[vlan_port]
 				    : gMld.port_list[vlan_port];
 				if (mcgrp_vport)
-					mcgrp_delete_veport(mcgrp, mcgrp_vport,
-							    port);
+					mcgrp_delete_veport(mcgrp, mcgrp_vport, port);
 			}
 		}
-		rc = mld_vdb_del_port_frm_vlan(mld_vlan_get_db(), vlan_id,
-					       port, type);
+		rc = mld_vdb_del_port_frm_vlan(mld_vlan_get_db(), vlan_id, port, type);
 	}
 
     return rc;
@@ -1257,7 +1258,6 @@ void mcgrp_vport_start_querier_process(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_v
 		mld_send_general_query(mcgrp, mcgrp_vport->vir_port_id, send_port, (UINT8) mcgrp_vport->oper_version, 
 				&mcgrp_vport->querier_router.ip.v6addr,	/* Use lowest srcIp */
 				(mcgrp_vport->max_response_time * 10));
-        //MLD
 	}
 	if (mcgrp_vport->start_up_query_count > 0)
 		mcgrp_vport->start_up_query_count--;
@@ -1658,8 +1658,7 @@ void mcast_set_ip_addr(MADDR_ST * grp_addr, mcast_grp_addr_t * gaddr)
 	if (gaddr->afi == MCAST_IPV4_AFI)
 		mcast_set_ipv4_addr(grp_addr, gaddr->ip.ipv4_addr);
 	else
-		mcast_set_ipv6_addr(grp_addr,
-				    (IPV6_ADDRESS *) & gaddr->ip.ipv6_addr);
+		mcast_set_ipv6_addr(grp_addr, (IPV6_ADDRESS *)&gaddr->ip.ipv6_addr);
 }
 
 // This funcion is invoked when there is a configuration change with
@@ -2419,26 +2418,22 @@ void mld_static_grp_replay_confg(mld_vlan_node_t * vlan_node, int afi,
 	s_list = mld_vdb_vlan_get_static_grp_list(vlan_node, FALSE, afi, FALSE);
     if_name =  mld_get_if_name_from_ifindex(phy_port);
 	LIST_LOOP(s_list, static_grp, list_node) {
-		L2MCD_LOG_INFO("%s %d %x %s %s", __FUNCTION__, phy_port,
-			       //mld_get_port_ifindex(phy_port),
-			       if_name,
-			       static_grp->ifname,
-			    //   portdb_get_ifname_from_portindex(phy_port));
-			       mld_get_if_name_from_ifindex(phy_port));
-		//  portdb_get_ifname_from_portindex(phy_port),
+        L2MCD_LOG_INFO("%s %d %x %s %s", __FUNCTION__, phy_port,
+                       if_name,
+                       static_grp->ifname,
+                       mld_get_if_name_from_ifindex(phy_port));
 		if (if_name != NULL && strncmp(static_grp->ifname, if_name, INTERFACE_NAMSIZ) == 0)
 		{
 			L2MCD_LOG_INFO("in side %s %s", static_grp->ifname,  
 				    //   portdb_get_ifname_from_portindex (phy_port));
 				       if_name);
 			mcast_set_ip_addr(&grp_addr, &static_grp->grp_addr);
-			mcgrp_notify_l2_staticGroup_change(afi,
-							   MLD_DEFAULT_VRF_ID,
-							   &grp_addr,
-							   mld_l3_get_port_from_ifindex
-							   (vlan_node->ifindex,vlan_node->type),
-							   phy_port, TRUE);
-		}
+            mcgrp_notify_l2_staticGroup_change(afi,
+                                               MLD_DEFAULT_VRF_ID,
+                                               &grp_addr,
+                                               mld_l3_get_port_from_ifindex(vlan_node->ifindex, vlan_node->type),
+                                               phy_port, TRUE);
+        }
 	}
 
 }
@@ -2970,7 +2965,6 @@ void mld_snoop_clear_on_version_change(uint32_t vid, int afi, uint8_t type)
 	MADDR_ST grp_addr_clr = {0};
 	int clr_grp_flag = 0;
 	uint16_t ivid = 0;
-	//afi = MCAST_IPV4_AFI;
 
     grp_addr_clr.afi = afi;
 	if(type == MLD_BD)	

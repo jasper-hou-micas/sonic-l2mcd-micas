@@ -31,7 +31,7 @@ namespace swss {
     class L2mcSync {
         public:
             L2mcSync(DBConnector *db, DBConnector *cfgDb, DBConnector *stateDb);
-	    ~L2mcSync();
+            ~L2mcSync();
             void addL2mcVlanEntry(uint16_t vlan_id);
             void delL2mcVlanEntry(uint16_t vlan_id);
             void addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg);

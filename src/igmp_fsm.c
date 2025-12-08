@@ -275,7 +275,8 @@ void mcgrp_notify_phy_port_del (MCGRP_CLASS  *mcgrp,
 
         }
     }
-    if (mcgrp_pport->oper_version == IGMP_VERSION_3 /*mld to do*/) 
+    if ((IS_IGMP_CLASS(mcgrp) && mcgrp_pport->oper_version == IGMP_VERSION_3) ||
+        (IS_MLD_CLASS(mcgrp) && mcgrp_pport->oper_version == MLD_VERSION_2))
     {
         if (mcgrp_entry)
         {

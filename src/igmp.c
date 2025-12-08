@@ -724,23 +724,17 @@ void mcgrp_stop_vir_port (MCGRP_CLASS  *mcgrp,
 }
 
 //v4/v6 compliant
-MCGRP_PORT_ENTRY* mcgrp_add_phy_port (MCGRP_CLASS  *mcgrp,
-        MCGRP_L3IF   *mcgrp_vport,
-        //UINT16        phy_port_id)
-        UINT32        phy_port_id)
+MCGRP_PORT_ENTRY *mcgrp_add_phy_port(MCGRP_CLASS *mcgrp, MCGRP_L3IF *mcgrp_vport, UINT32 phy_port_id)
 {
-    MCGRP_PORT_ENTRY *iter;
-
-    for (iter = mcgrp_vport->phy_port_list; iter != NULL; iter = iter->next) {
-        if (iter->phy_port_id == phy_port_id) {
-            L2MCD_VLAN_LOG_INFO(mcgrp_vport->vir_port_id,
-                "%s:%d:[vlan:%d] phy_port:%d already exists, return existing entry",
-                __FUNCTION__, __LINE__, mcgrp_vport->vir_port_id, phy_port_id);
-            return iter; 
-        }
+    MCGRP_PORT_ENTRY *new_mcgrp_pport;
+    MCGRP_PORT_ENTRY *iter = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
+    if (iter)
+    {
+        L2MCD_VLAN_LOG_INFO(mcgrp_vport->vir_port_id,
+                            "%s:%d:[vlan:%d] phy_port:%d already exists, return existing entry",
+                            __FUNCTION__, __LINE__, mcgrp_vport->vir_port_id, phy_port_id);
+        return iter;
     }
-
-    MCGRP_PORT_ENTRY  *new_mcgrp_pport;
 
     // Alloc init appropriate data structures
     new_mcgrp_pport = dy_malloc_zero(sizeof(MCGRP_PORT_ENTRY));
@@ -772,7 +766,6 @@ MCGRP_PORT_ENTRY* mcgrp_add_phy_port (MCGRP_CLASS  *mcgrp,
 
     return new_mcgrp_pport;
 }
-
 
 //v4/v6 compliant
 MCGRP_PORT_ENTRY* mcgrp_find_phy_port_entry (MCGRP_CLASS  *mcgrp,

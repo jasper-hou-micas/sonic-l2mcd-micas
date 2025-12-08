@@ -61,7 +61,7 @@ int mld_static_group_source_set(uint32_t vid, char *ifname, int iftype,
 int mld_if_snoop_unset(uint32_t afi, uint32_t vid, int user_cfg, uint8_t type);
 int mld_if_snoop_set(uint32_t afi, uint16_t vid, int user_cfg, uint8_t type);
 int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
-                            uint32_t ip_family, uint8_t type, int lif_type, int lif_state, int tagged);
+							uint8_t type, int lif_type, int lif_state, int tagged);
 int mld_snoop_querier_unset(uint32_t afi, uint16_t vid, uint8_t type);
 int mld_fastleave_set(uint32_t afi, uint32_t vid, uint8_t type);
 int mld_fastleave_unset(uint32_t afi, uint32_t vid, uint8_t type);
