@@ -254,7 +254,7 @@ BOOLEAN mcast_is_valid_grpaddr(MADDR_ST *addr)
 	}
 	else
 	{
-		return (IP6_IS_MC_ADDRESS_FWDABLE(addr->ip.v6addr.address));
+		return (mld_check_valid_range(&(addr->ip.v6addr)));
 	}
     return (FALSE);
 }
