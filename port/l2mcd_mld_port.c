@@ -2642,8 +2642,7 @@ void mcgrp_refresh_l2_static_group(MCGRP_CLASS * mcgrp,
 			//below would perfom SSM MAP  IGMPv2 convert to mapped source -> IGMPv3
 			if (igmp_update_ssm_parameters
 			    (mcgrp, group_address, &version, vir_port_id,
-			     phy_port_id, &action, &num_srcs,
-														&src_list) == FALSE)
+			     phy_port_id, &action, &num_srcs, &src_list) == FALSE)
 			{
 				MLD_LOG(MLD_LOGLEVEL9, MLD_IP_IPV4_AFI, "%s(%d) PIM SSM group:%s ssm-map failed\n",
 					FN, LN, mcast_print_addr(group_address));

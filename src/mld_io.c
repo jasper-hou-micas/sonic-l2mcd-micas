@@ -38,7 +38,7 @@ BOOLEAN mld_update_ssm_parameters(MCGRP_CLASS         *mcgrp,
         UINT16               *num_srcs,
         UINT32               **src_list)
 {
-    MCGRP_L3IF          *mcgrp_vport;
+    MCGRP_L3IF *mcgrp_vport;
     mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vir_port_id] : gMld.port_list[vir_port_id];
     if (mcgrp_vport == NULL || (! mcgrp_vport->is_up) )
     {
@@ -48,7 +48,6 @@ BOOLEAN mld_update_ssm_parameters(MCGRP_CLASS         *mcgrp,
             L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] vport->is_up :%d", FN,LN,vir_port_id,mcgrp_vport->is_up);
         }
         return FALSE;
-
     }
     
     *src_list = NULL;

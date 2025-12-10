@@ -30,26 +30,28 @@ void l2mcd_port_state_notify_handler(l2mcd_if_tree_t *l2mcd_if_tree,int state_up
 	struct listnode *node = NULL;
 	int afi = L2MCD_IPV4_AFI;
     int port = l2mcd_if_tree->ifid;
-	MCGRP_CLASS         *mcgrp = NULL; 
+	MCGRP_CLASS *mcgrp = NULL;
 
-	L2MCD_LOG_DEBUG("%s(%d)port %d %s state %d", FN, LN, port,mld_get_if_name_from_port(port), state_up);
-    mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, vrf_index);
-    LIST_LOOP(snooping_enabled_vlans[afi - 1], vlan_node, node) 
+    L2MCD_LOG_DEBUG("%s(%d)port %d %s state %d", FN, LN, port, mld_get_if_name_from_port(port), state_up);
+    for (afi = L2MCD_IPV4_AFI; afi <= MCAST_AFI_MAX; afi++)
     {
-        if (is_mld_vlan_snooping_enabled(vlan_node, afi)) 
-        { 
-
-            if (mld_is_port_member_of_vlan(vlan_node, port)) 
+        mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, vrf_index);
+        LIST_LOOP(snooping_enabled_vlans[afi - 1], vlan_node, node)
+        {
+            if (is_mld_vlan_snooping_enabled(vlan_node, afi))
             {
-                L2MCD_VLAN_LOG_INFO(vlan_node->ivid, "%s:%d:[vlan:%d] port: %s[%d] state_up:%d ivid %d snp_enbl %d mbr_vlan %d",
-                        FN,LN, vlan_node->ivid, l2mcd_if_tree->iname, port, state_up, vlan_node->ivid,
-                        is_mld_vlan_snooping_enabled(vlan_node, afi),
-                        mld_is_port_member_of_vlan (vlan_node, port));
-                mld_protocol_port_state_notify(vlan_node, afi, mcgrp, port, state_up);
+                if (mld_is_port_member_of_vlan(vlan_node, port))
+                {
+                    L2MCD_VLAN_LOG_INFO(vlan_node->ivid, "%s:%d:[vlan:%d] port: %s[%d] state_up:%d ivid %d snp_enbl %d mbr_vlan %d",
+                                        FN, LN, vlan_node->ivid, l2mcd_if_tree->iname, port, state_up, vlan_node->ivid,
+                                        is_mld_vlan_snooping_enabled(vlan_node, afi),
+                                        mld_is_port_member_of_vlan(vlan_node, port));
+                    mld_protocol_port_state_notify(vlan_node, afi, mcgrp, port, state_up);
+                }
             }
         }
     }
-	return;
+    return;
 }
 
 /*
