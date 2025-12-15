@@ -73,7 +73,7 @@
 
 #define L2MCD_DEFAULT_KEY_SEPARATOR ":"
 #define L2MCD_STATE_KEY_SEPARATOR "|"
-#define L2MCD_100MS_TIMEOUT 100000 
+#define L2MCD_100MS_TIMEOUT 100000
 #define L2MCD_VLAN_MAX 4095
 #define L2MCD_RX_BUFFER_SIZE  2048
 extern int applog_level_map[APP_LOG_LEVEL_MAX + 2];
@@ -98,9 +98,9 @@ extern int applog_level_map[APP_LOG_LEVEL_MAX + 2];
 #define L2MCD_IS_BIT_SET(val, pos) ((val) & (1<<(pos)))
 #define L2MCD_BIT_SET(val, pos)  ((val) |= (1<<(pos)))
 #define L2MCD_BIT_CLEAR(val, pos)  ((val) &= ~(1<<(pos)))
-#define L2MCD_VLAN_BM_SET(bm,x) L2MCD_BIT_SET(bm[L2MCD_VLAN_BM_IDX(x)],L2MCD_VLAN_BM_POS(x)) 
-#define L2MCD_VLAN_BM_CLR(bm,x) L2MCD_BIT_CLEAR(bm[L2MCD_VLAN_BM_IDX(x)],L2MCD_VLAN_BM_POS(x)) 
-#define L2MCD_VLAN_IS_BM_SET(bm,x) L2MCD_IS_BIT_SET(bm[L2MCD_VLAN_BM_IDX(x)],L2MCD_VLAN_BM_POS(x)) 
+#define L2MCD_VLAN_BM_SET(bm,x) L2MCD_BIT_SET(bm[L2MCD_VLAN_BM_IDX(x)],L2MCD_VLAN_BM_POS(x))
+#define L2MCD_VLAN_BM_CLR(bm,x) L2MCD_BIT_CLEAR(bm[L2MCD_VLAN_BM_IDX(x)],L2MCD_VLAN_BM_POS(x))
+#define L2MCD_VLAN_IS_BM_SET(bm,x) L2MCD_IS_BIT_SET(bm[L2MCD_VLAN_BM_IDX(x)],L2MCD_VLAN_BM_POS(x))
 
 
 //AVL Tree Defnitions
@@ -126,7 +126,7 @@ static inline void * M_AVLL_NEXT(L2MCD_AVL_TREE avl_tree, L2MCD_AVL_NODE node)
 #define M_AVLL_DELETE  avl_delete
 #define M_AVLL_INSERT  avl_probe
 #define M_AVLL_DESTROY avl_destroy
-#define M_AVLL_INIT_NODE(NODE) 
+#define M_AVLL_INIT_NODE(NODE)
 #define M_AVLL_SET_REBALANCE(TREE, FLAG)
 
 
@@ -153,10 +153,10 @@ static inline bool_t l2mcd_ifindex_is_svi(ifindex_t ifidx)
 static inline int l2mcd_ifindex_get_svi_vid(ifindex_t ifidx)
 {
   if (L2MCD_IFIDX_TYPE(ifidx) == L2MCD_IF_TYPE_SVI) {
-		return (ifidx & 0x3ffff);	/* vlanid was lsb 12 bit but extended to 18 bits */	
+		return (ifidx & 0x3ffff);	/* vlanid was lsb 12 bit but extended to 18 bits */
   } else {
     return (-1);
-  }	
+  }
 }
 static inline int l2mcd_ifindex_is_physical(ifindex_t ifidx)
 {
@@ -212,7 +212,7 @@ typedef struct
     uint64_t netlink;
 } L2MCD_LIBEV_STATS;
 
-typedef struct 
+typedef struct
 {
     uint32_t tot_pkts;
     uint32_t igmp_pkts;
@@ -231,7 +231,7 @@ typedef struct L2MCD_CONTEXT {
     /*Fd's used by socket*/
     int                     ipc_fd;         //communication with l2mcdmgr, etc.
     int                     igmp_rx_fd;     //Recieve socket for snooped packets
-    int                     igmp_tx_fd;     //Tx Socket 
+    int                     igmp_tx_fd;     //Tx Socket
     int                     mld_tx_fd;
     uint32_t                l2mcd_msg_fd;
     uint32_t                nl_fd;
@@ -276,14 +276,14 @@ typedef struct L2MCD_CTL_MSG {
 typedef struct L2MCD_APP_TABLE_ENTRY {
     uint8_t     op_code;
     uint8_t     port_oper;
-    uint8_t     is_static;  
-    uint8_t     is_remote; 
-    int         vlan_id; 
-    uint32_t    count; 
+    uint8_t     is_static;
+    uint8_t     is_remote;
+    int         vlan_id;
+    uint32_t    count;
     BOOLEAN     is_igmp;
     char        saddr[L2MCD_IP_ADDR_STR_SIZE];
     char        gaddr[L2MCD_IP_ADDR_STR_SIZE];
-    PORT_ATTR   ports[L2MCD_IPC_MAX_PORTS]; 
+    PORT_ATTR   ports[L2MCD_IPC_MAX_PORTS];
 } L2MCD_APP_TABLE_ENTRY;
 
 
@@ -306,8 +306,8 @@ extern L2MCD_CONTEXT l2mcd_context;
 #define g_l2mcd_pkt_log                   l2mcd_context.pktlog
 #define g_if_to_kif                       l2mcd_context.ifindex_to_kifindex
 #define g_curr_dbg_level                  l2mcd_context.curr_dbg_level
-#define g_l2mcd_vlan_dbg_to_sys_log       l2mcd_context.dbg_to_sys_log     
-#define g_l2mcd_dbg_vlan_log_all          l2mcd_context.dbg_vlan_log_all     
+#define g_l2mcd_vlan_dbg_to_sys_log       l2mcd_context.dbg_to_sys_log
+#define g_l2mcd_dbg_vlan_log_all          l2mcd_context.dbg_vlan_log_all
 #define g_l2mcd_rx_buf                    l2mcd_context.rx_buf
 #define g_l2mcd_if_to_kif_tree            l2mcd_context.if_to_kif_tree
 #define g_l2mcd_kif_to_if_tree            l2mcd_context.kif_to_if_tree
@@ -320,7 +320,7 @@ extern L2MCD_CONTEXT l2mcd_context;
 #define g_rx_stats_tot_pkts               l2mcd_context.rx_stats.tot_pkts
 #define g_rx_stats_no_aux                 l2mcd_context.rx_stats.no_aux
 #define g_rx_stats_no_tag                 l2mcd_context.rx_stats.no_tag
-#define g_rx_stats_inv_tags               l2mcd_context.rx_stats.inv_tags 
+#define g_rx_stats_inv_tags               l2mcd_context.rx_stats.inv_tags
 #define g_portdb_pending_count            l2mcd_context.portdb_pending_count
 #define g_port_init_done                  l2mcd_context.port_init_done
 

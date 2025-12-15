@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include <string.h>
 #include <errno.h>
 #include <system_error>
@@ -29,7 +30,10 @@
 #include "debugframework.h"
 #include "notificationproducer.h"
 
-#define STATE_L2MC_MROUTER_TABLE_NAME   "L2MC_STATE_MROUTER_TABLE"
+#define L2MC_APPL_NOTIFICATIONS             "L2MC_NOTIFICATIONS"
+#define L2MC_APPL_MROUTE_NOTIFICATIONS      "L2MC_MROUTER_NOTIFICATIONS"
+#define L2MC_APPL_CONFIG_NOTIFICATIONS      "L2MC_CONFIG_PARA_DONE"
+#define L2MC_APPL_WARMREBOOT_NOTIFICATIONS  "L2MC_WARMREBOOT_NOTIFICATIONS"
 
 using namespace std;
 using namespace swss;
@@ -38,17 +42,25 @@ void l2mcd_debugCLI(std::string s, KeyOpFieldsValuesTuple t);
 string g_L2McdCompstring = "l2mcd_debug";
 
 L2mcSync::L2mcSync(DBConnector *db, DBConnector *cfgDb, DBConnector *stateDb) :
-    m_l2mcdAppVlanTable(db, APP_L2MC_VLAN_TABLE_NAME),
-    m_l2mcdEntryTable(db,  APP_L2MC_MEMBER_TABLE_NAME),
-    m_l2mcdMrouterTable(db, APP_L2MC_MROUTER_TABLE_NAME),
+    m_appVlanProducerTable(db, APP_L2MC_VLAN_TABLE_NAME),
+    m_appEntryProducerTable(db,  APP_L2MC_MEMBER_TABLE_NAME),
+    m_appMrouterProducerTable(db, APP_L2MC_MROUTER_TABLE_NAME),
+    m_appSuppressProducerTable(db, APP_L2MC_SUPPRESS_TABLE_NAME),
     m_statel2mcdLocalMemberTable(stateDb, STATE_L2MC_MEMBER_TABLE_NAME),
-    m_statel2mcdLocalMrouterTable(stateDb, STATE_L2MC_MROUTER_TABLE_NAME)
+    m_statel2mcdLocalMrouterTable(stateDb, STATE_L2MC_MROUTER_TABLE_NAME),
+    m_featureTable(cfgDb, CFG_FEATURE_TABLE_NAME),
+    m_appMrouteTable(db, APP_L2MC_MROUTER_TABLE_NAME),
+    m_appEntryTable(db, APP_L2MC_MEMBER_TABLE_NAME),
+    m_appVlanTable(db, APP_L2MC_VLAN_TABLE_NAME),
+    m_appSuppressTable(db, APP_L2MC_SUPPRESS_TABLE_NAME)
 {
     SWSS_LOG_NOTICE("L2MCD: sync object");
-    l2mc_entry_notifications = new swss::NotificationProducer(db, "L2MC_NOTIFICATIONS");
-    l2mc_mrouter_notifications = new swss::NotificationProducer(db, "L2MC_MROUTER_NOTIFICATIONS");
-    l2mc_cfg_done_notifications = new swss::NotificationProducer(db, "L2MC_CONFIG_PARA_DONE");
-    m_mclagTable = std::unique_ptr<Table>(new Table(cfgDb, CFG_MCLAG_TABLE_NAME ));
+    l2mc_entry_notifications = new swss::NotificationProducer(db, L2MC_APPL_NOTIFICATIONS);
+    l2mc_mrouter_notifications = new swss::NotificationProducer(db, L2MC_APPL_MROUTE_NOTIFICATIONS);
+    l2mc_cfg_done_notifications = new swss::NotificationProducer(db, L2MC_APPL_CONFIG_NOTIFICATIONS);
+    l2mc_warm_reboot_notifications = new swss::NotificationProducer(db, L2MC_APPL_WARMREBOOT_NOTIFICATIONS);
+
+    m_mclagTable = std::unique_ptr<Table>(new Table(cfgDb, CFG_MCLAG_TABLE_NAME));
 }
 
 L2mcSync::~L2mcSync()
@@ -130,6 +142,10 @@ extern "C" {
     {
         l2mcsync.notify_config_done(option, paraname);
     }
+    void l2mcsync_clear_l2mc_entry()
+    {
+        l2mcsync.clearL2mcVlanEntry();
+    }
 }
 
 int L2mcSync::getL2mcMgrDebugPrio(void)
@@ -145,6 +161,70 @@ void L2mcSync::notify_config_done(std::string option, std::string paraname)
     l2mc_cfg_done_notifications->send(option, paraname, value);
 }
 
+void L2mcSync::clearL2mcVlanEntry(void)
+{
+    SWSS_LOG_NOTICE("clear All L2mc Entry");
+    bool l2mcd_state = false;
+
+    std::vector<string> feature_keys;
+    m_featureTable.getKeys(feature_keys);
+    for (auto i: feature_keys)
+    {
+        if (i != "l2mcd")
+            continue;
+        std::vector<swss::FieldValueTuple> feature_fvs;
+        m_featureTable.get(i, feature_fvs);
+        for (auto f: feature_fvs)
+        {
+            if (fvField(f) == "state")
+            {
+                l2mcd_state = fvValue(f) == "enabled";
+                SWSS_LOG_NOTICE("l2mcd state: %s, %d", fvValue(f).c_str(), l2mcd_state);
+                break;
+            }
+        }
+    }
+    // feature enabled and maybe warm-restart
+    if (l2mcd_state)
+    {
+        SWSS_LOG_NOTICE("l2mcd state is still Enabled, there is no need to clear the l2mc entry");
+        return;
+    }
+    // feature disable and clear l2mcd entry
+    std::vector<string> l2mcd_keys;
+    m_statel2mcdLocalMemberTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_statel2mcdLocalMemberTable.del(i);
+    }
+    m_statel2mcdLocalMrouterTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_statel2mcdLocalMrouterTable.del(i);
+    }
+
+    m_appSuppressTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_appSuppressProducerTable.del(i);
+    }
+    m_appEntryTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_appEntryProducerTable.del(i);
+    }
+    m_appMrouteTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_appMrouterProducerTable.del(i);
+    }
+    m_appVlanTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_appVlanProducerTable.del(i);
+    }
+}
+
 void L2mcSync::addL2mcVlanEntry(uint16_t vlan_id)
 {
     std::vector<FieldValueTuple> fvVector;
@@ -153,7 +233,7 @@ void L2mcSync::addL2mcVlanEntry(uint16_t vlan_id)
     vlan = VLAN_PREFIX + to_string(vlan_id);
     FieldValueTuple s("id", to_string(vlan_id));
     fvVector.push_back(s);
-    m_l2mcdAppVlanTable.set(vlan, fvVector);
+    m_appVlanProducerTable.set(vlan, fvVector);
     SWSS_LOG_NOTICE("APP_L2MC_VLAN_TABLE Add %s to L2MC ", vlan.c_str());
 }
 
@@ -162,10 +242,11 @@ void L2mcSync::delL2mcVlanEntry(uint16_t vlan_id)
     string vlan;
 
     vlan = VLAN_PREFIX + to_string(vlan_id);
-    m_l2mcdAppVlanTable.del(vlan);
+    m_appVlanProducerTable.del(vlan);
 
     SWSS_LOG_NOTICE("APP_L2MC_VLAN_TABLE Delete %s from L2MC ", vlan.c_str());
 }
+
 void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
 {
     string key;
@@ -195,7 +276,7 @@ void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     if (!msg->op_code)
     {
         SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d is_remote:%d ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static,msg->is_remote);
-        m_l2mcdEntryTable.del(key);
+        m_appEntryProducerTable.del(key);
         if (!m_statel2mcdLocalMemberTable.get(stateKey, fvVector1))
         {
             SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d Not Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static);
@@ -216,7 +297,7 @@ void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     else
     {
         SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d,is_remote:%d  ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static, msg->is_remote);
-        m_l2mcdEntryTable.set(key,fvVector);
+        m_appEntryProducerTable.set(key,fvVector);
         if (m_statel2mcdLocalMemberTable.get(stateKey, fvVector1))
         {
             SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static);
@@ -240,7 +321,7 @@ void L2mcSync::delL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     key = VLAN_PREFIX + to_string(msg->vlan_id) +  L2MCD_DEFAULT_KEY_SEPARATOR + "*"+L2MCD_DEFAULT_KEY_SEPARATOR;
     key +=msg->gaddr;
     SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group delete vid:%d G:%s ", msg->vlan_id, msg->gaddr);
-    m_l2mcdEntryTable.del(key);
+    m_appEntryProducerTable.del(key);
 
 }
 
@@ -276,7 +357,7 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     {
         SWSS_LOG_NOTICE("APP_L2MC_MROUTER_TABLE:Key:%s stateKey:%s Vlan%d:%s mrouter add",key.c_str(), stateKey.c_str(),
                 msg->vlan_id, msg->ports[0].pnames);
-        m_l2mcdMrouterTable.set(key,fvVector);
+        m_appMrouterProducerTable.set(key,fvVector);
         if (m_statel2mcdLocalMrouterTable.get(stateKey, fvVector1))
         {
             SWSS_LOG_NOTICE("STATE_L2MC_MROUTER_TABLE Mroute port Add key:%s vid:%d port %s static:%d Exists ", stateKey.c_str(), 
@@ -294,7 +375,7 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     }
     else
     {
-        m_l2mcdMrouterTable.del(key);
+        m_appMrouterProducerTable.del(key);
         SWSS_LOG_NOTICE("APP_L2MC_MROUTER_TABLE:Key:%s stateKey:%s Vlan%d:%s mrouter entry deleted", key.c_str(),
                 stateKey.c_str(), msg->vlan_id, msg->ports[0].pnames);
 

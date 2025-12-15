@@ -31,6 +31,7 @@ extern void l2mcsync_process_mrouterentry(L2MCD_APP_TABLE_ENTRY *msg);
 extern void l2mcsync_init_debug_framework(void);
 extern void l2mcsync_debug_print(const char *fmt, ...);
 extern int l2mcd_is_peerlink(char *portname);
+extern void l2mcsync_clear_l2mc_entry(void);
 #ifdef __cplusplus
 }/* extern "C" */
 #endif

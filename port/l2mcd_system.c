@@ -2068,6 +2068,14 @@ int mcast_mld_init()
 	return (0);
 }
 
+void l2mcd_sigterm_cb(evutil_socket_t sig, short what, void *arg)
+{
+    struct event_base *base = (struct event_base *)arg;
+    L2MCD_INIT_LOG("Received SIGTERM (%d). Starting graceful shutdown...", sig);
+    l2mcsync_clear_l2mc_entry();
+    event_base_loopexit(base, NULL);
+}
+
 /*
  * l2mcd_system_init
  *
@@ -2075,12 +2083,13 @@ int mcast_mld_init()
  */
 int l2mcd_system_init(int flag)
 {
-    struct event_config *cfg  = NULL;
-    struct timeval l2mcd_ipc_msec_50 = { 0, 1*1000 };
+    struct event *l2mcd_ev_sigterm = NULL;
+    struct event_config *cfg = NULL;
+    struct timeval l2mcd_ipc_msec_50 = {0, 1 * 1000};
     struct timeval l2mcd_100ms_tv = {0, L2MCD_100MS_TIMEOUT};
-    struct event   *l2mcd_evtimer_100ms = 0;
-    int rc=0;
-    char *l2mcd_msg_sock= L2MCD_MSG_SOCK_NAME;
+    struct event *l2mcd_evtimer_100ms = 0;
+    int rc = 0;
+    char *l2mcd_msg_sock = L2MCD_MSG_SOCK_NAME;
 
     memset(&l2mcd_context, 0, sizeof(L2MCD_CONTEXT));
     g_l2mcd_vlan_dbg_to_sys_log = FALSE;
@@ -2090,22 +2099,22 @@ int l2mcd_system_init(int flag)
     g_curr_dbg_level = APP_LOG_LEVEL_DEBUG;
     g_l2mcd_rx_is_l2_sock = TRUE;
     /* Debug Log Files */
-   
-    APP_LOG_SET_LEVEL(g_curr_dbg_level);
-    L2MCD_INIT_LOG("Starting L2MCD Daemon with Loglevel::%d flag:0x%x logall_to_syslog:%d",g_curr_dbg_level, flag,g_l2mcd_vlan_dbg_to_sys_log);
 
-    if (flag & 0x1) 
+    APP_LOG_SET_LEVEL(g_curr_dbg_level);
+    L2MCD_INIT_LOG("Starting L2MCD Daemon with Loglevel::%d flag:0x%x logall_to_syslog:%d", g_curr_dbg_level, flag, g_l2mcd_vlan_dbg_to_sys_log);
+
+    if (flag & 0x1)
     {
-        g_l2mcd_vlan_dbg_to_sys_log= TRUE;
-        g_l2mcd_dbg_vlan_log_all=TRUE;
-        memset(&g_l2mcd_pkt_log[0],1, L2MCD_VLAN_MAX);
-        g_l2mcd_vlan_log_mask =L2MCD_LOG_MASK_INFO|L2MCD_LOG_MASK_DEBUG;
+        g_l2mcd_vlan_dbg_to_sys_log = TRUE;
+        g_l2mcd_dbg_vlan_log_all = TRUE;
+        memset(&g_l2mcd_pkt_log[0], 1, L2MCD_VLAN_MAX);
+        g_l2mcd_vlan_log_mask = L2MCD_LOG_MASK_INFO | L2MCD_LOG_MASK_DEBUG;
         L2MCD_INIT_LOG("Enabing vlan debug all on init");
     }
-   
+
     /* IGMP Vlan Database Init */
     rc = mld_vdb_init();
-    if (rc <0)
+    if (rc < 0)
     {
         L2MCD_LOG_ERR(" L2MCD VLAN DB Init failed (error %d)", rc);
         return -1;
@@ -2130,7 +2139,7 @@ int l2mcd_system_init(int flag)
     }
     L2MCD_LOG_INFO("LIBEVENT VER : 0x%x", event_get_version_number());
     L2MCD_INIT_LOG("LIBEVENT VER : 0x%x", event_get_version_number());
-    event_config_set_max_dispatch_interval(cfg, &l2mcd_ipc_msec_50/*max_interval*/, -1/*max_callbacks*/, 1/*min-prio*/);
+    event_config_set_max_dispatch_interval(cfg, &l2mcd_ipc_msec_50 /*max_interval*/, -1 /*max_callbacks*/, 1 /*min-prio*/);
 
     /* Create event base to attach a event */
     g_l2mcd_evbase = event_base_new_with_config(cfg);
@@ -2161,8 +2170,8 @@ int l2mcd_system_init(int flag)
     }
     L2MCD_INIT_LOG_INFO("MLD TX Sock Initialized");
     /*Create a Timer Libevent*/
-    l2mcd_evtimer_100ms= l2mcd_libevent_create(g_l2mcd_evbase, -1,
-            EV_PERSIST, l2mcd_100ms_timer, (char *)"L2MCD 100MS Timer", &l2mcd_100ms_tv, -1);
+    l2mcd_evtimer_100ms = l2mcd_libevent_create(g_l2mcd_evbase, -1,
+                                                EV_PERSIST, l2mcd_100ms_timer, (char *)"L2MCD 100MS Timer", &l2mcd_100ms_tv, -1);
     if (!l2mcd_evtimer_100ms)
     {
         L2MCD_LOG_ERR("l2mcd_evtimer_100ms create Failed");
@@ -2170,23 +2179,44 @@ int l2mcd_system_init(int flag)
         return -1;
     }
 
-    if (l2mcd_unix_sock_create(&g_l2mcd_igmp_msg_handle, l2mcd_msg_sock, 0)<0) // 未调用
+    if (l2mcd_unix_sock_create(&g_l2mcd_igmp_msg_handle, l2mcd_msg_sock, 0) < 0) // 未调用
     {
         L2MCD_INIT_LOG("igmp_msg_handle sock create failed");
         return -1;
     }
-    L2MCD_INIT_LOG("igmp_msg_handle:%d sock:%s created ",g_l2mcd_igmp_msg_handle, l2mcd_msg_sock);
+    L2MCD_INIT_LOG("igmp_msg_handle:%d sock:%s created ", g_l2mcd_igmp_msg_handle, l2mcd_msg_sock);
 
     /*IPC Messaging Socket with L2MC Config Manager*/
     rc = l2mcd_ipc_init();
-    if (rc <0)
+    if (rc < 0)
     {
         L2MCD_LOG_ERR("l2mc ipc init failed :%d", rc);
         L2MCD_INIT_LOG("l2mc ipc init failed :%d", rc);
         return -1;
     }
+
+    /* Add SIGTERM event */
+    l2mcd_ev_sigterm = evsignal_new(g_l2mcd_evbase, SIGTERM, l2mcd_sigterm_cb, g_l2mcd_evbase);
+    if (!l2mcd_ev_sigterm || event_add(l2mcd_ev_sigterm, NULL) < 0)
+    {
+        L2MCD_LOG_ERR("l2mc could not create/add SIGTERM event!");
+        L2MCD_INIT_LOG("l2mc could not create/add SIGTERM event!");
+        return -1;
+    }
+
     l2mcd_nl_init();
     L2MCD_INIT_LOG("system init done");
     event_base_dispatch(g_l2mcd_evbase);
+
+    if (l2mcd_ev_sigterm)
+    {
+        event_free(l2mcd_ev_sigterm);
+    }
+
+    /* free event_base */
+    if (g_l2mcd_evbase)
+    {
+        event_base_free(g_l2mcd_evbase);
+    }
     return 0;
 }
