@@ -145,6 +145,7 @@ enum MLD_PDUTYPE
 /*Notify param and action to l2mcmgr*/
 #define NOTIFY_PARAM_SNP 				"SNP"
 #define NOTIFY_PARAM_LINK_STATUS		"LINK_STATUS"
+#define NOTIFY_PARAM_WARM_STATUS		"WARM_REBOOT"
 #define NOTIFY_PARAM_ACTION_ENABLE		"enable"
 #define NOTIFY_PARAM_ACTION_DISABLE		"disable"
 

@@ -24,6 +24,7 @@ extern "C" {
 
 extern void l2mcsync_add_vlan_entry(uint16_t vlan_id);
 extern void l2mcsync_notify_config_done(char *option, char *paraname);
+extern void l2mcsync_notify_warm_reboot_done(char *option, char *paraname);
 extern void l2mcsync_del_vlan_entry(uint16_t vlan_id);
 extern void l2mcsync_add_l2mc_entry(L2MCD_APP_TABLE_ENTRY *msg);
 extern void l2mcsync_del_l2mc_entry(L2MCD_APP_TABLE_ENTRY *msg);

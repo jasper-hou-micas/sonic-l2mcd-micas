@@ -41,6 +41,7 @@ namespace swss {
             int getL2mcMgrDebugPrio(void);
             bool isPortPeerLink(std::string portname);
             void notify_config_done(std::string option, std::string paraname);
+            void notify_warm_reboot_done(std::string option, std::string paraname);
             void clearL2mcVlanEntry(void);
 
         protected:

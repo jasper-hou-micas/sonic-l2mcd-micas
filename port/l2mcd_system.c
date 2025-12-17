@@ -124,7 +124,7 @@ int l2mcd_system_group_entry_notify(MADDR_ST *group_address, MADDR_ST *src_addre
     l2mcd_if_tree = l2mcd_if_to_kif(phy_port_id);
     if (l2mcd_if_tree)
     {
-        memcpy(msg.ports[0].pnames, l2mcd_if_tree->iname, sizeof(msg.ports[0].pnames));
+        memcpy(msg.port.pnames, l2mcd_if_tree->iname, sizeof(msg.port.pnames));
         msg.port_oper = l2mcd_if_tree->oper;
     }
 
@@ -155,7 +155,7 @@ int l2mcd_system_group_entry_notify(MADDR_ST *group_address, MADDR_ST *src_addre
     msg.op_code = insert;
     msg.count=1;
     L2MCD_VLAN_LOG_INFO(vir_port, "%s:%d:[vlan:%d] GA:%s S:%s %s Rmt:%d/%d/%d op:%d is_static:%d", 
-       FN,LN,vir_port, msg.gaddr, msg.saddr,  msg.ports[0].pnames, msg.is_remote,rmt1,rmt2, msg.op_code, is_static);
+       FN,LN,vir_port, msg.gaddr, msg.saddr,  msg.port.pnames, msg.is_remote,rmt1,rmt2, msg.op_code, is_static);
     l2mcsync_add_l2mc_entry(&msg); 
     return 0;
 }
@@ -170,7 +170,7 @@ int l2mcd_system_mrouter_notify(int vir_port, int phy_port_id, int is_static, in
 
     if (l2mcd_if_tree)
     {
-        memcpy(msg.ports[0].pnames, l2mcd_if_tree->iname, sizeof(msg.ports[0].pnames));
+        memcpy(msg.port.pnames, l2mcd_if_tree->iname, sizeof(msg.port.pnames));
         msg.port_oper = l2mcd_if_tree->oper;
     }
 
@@ -178,7 +178,7 @@ int l2mcd_system_mrouter_notify(int vir_port, int phy_port_id, int is_static, in
     msg.count=1;
     msg.is_static=is_static;
     msg.is_igmp = is_igmp;
-    L2MCD_VLAN_LOG_INFO(vir_port, "%s:%d:[vlan:%d] Mrouter %s op:%s", FN,LN,vir_port, msg.ports[0].pnames, msg.op_code?"ADD":"DEL");
+    L2MCD_VLAN_LOG_INFO(vir_port, "%s:%d:[vlan:%d] Mrouter %s op:%s", FN,LN,vir_port, msg.port.pnames, msg.op_code?"ADD":"DEL");
     l2mcsync_process_mrouterentry(&msg); 
     return 0;
 }
@@ -193,7 +193,7 @@ void l2mcd_igmp_process_sync_report (
 {
 
     MCGRP_L3IF     *mcgrp_vport = NULL;
-    MCGRP_PORT_ENTRY  *mcgrp_pport = NULL;  
+    MCGRP_PORT_ENTRY  *mcgrp_pport = NULL;
     MADDR_ST      src_addr;
     MADDR_ST      grp_addr;
     UINT32 src_list;
@@ -526,7 +526,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
         }
         case L2MCD_SNOOP_CONFIG_MSG:
         {
-            data = (L2MCD_CONFIG_MSG *) msg->data;
+            data = (L2MCD_CONFIG_MSG *)msg->data;
             if (!data)
             {
                 L2MCD_LOG_NOTICE("No Data for recievd IPC message type:%u ", msg->msg_type);
@@ -535,17 +535,18 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             afi = data->afi;
             vlan_id = data->vlan_id;
             vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
-            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:SNOOP ipc_rx type:%s, ver:%d,  querier:%s, fleave:%s , qtime:%d, lmq_time:%d, qmx_resp_time:%d, dyn_count:%d afi:%d", 
-               FN, LN,vlan_id, data->op_code?"Add":"Del", data->version, data->querier?"Y":"N", data->fast_leave?"Y":"N", 
-               data->query_interval, data->last_member_query_interval, data->query_max_response_time,data->count, afi);
+            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:SNOOP ipc_rx type:%s, ver:%d,  querier:%s, fleave:%s , qtime:%d, lmq_time:%d, qmx_resp_time:%d, dyn_count:%d afi:%d",
+                                FN, LN, vlan_id, data->op_code ? "Add" : "Del", data->version, data->querier ? "Y" : "N", data->fast_leave ? "Y" : "N",
+                                data->query_interval, data->last_member_query_interval, data->query_max_response_time, data->count, afi);
+            L2MCD_VLAN_LOG_INFO(vlan_id, "[vlan:%d] l2mcd-cfg: warm_reboot:%d port_count:%d", vlan_id, data->warm_reboot, data->count);
 
             if (!vlan_node || (vlan_node && !mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED)))
             {
-                snprintf(ifname, L2MCD_IFNAME_SIZE,"Vlan%d",vlan_id);
+                snprintf(ifname, L2MCD_IFNAME_SIZE, "Vlan%d", vlan_id);
                 l2mcd_add_kif_to_if(ifname, vlan_id, -1, NULL, -1, -1, -1, 1, afi);
                 rc = mld_if_snoop_set(afi, vlan_id, TRUE, MLD_VLAN);
 
-                if(rc != MLD_SUCCESS)
+                if (rc != MLD_SUCCESS)
                 {
                     L2MCD_VLAN_LOG_INFO(vlan_id, "failed to enable igmps on vlan %d ifcnt:%d rc:%d", vlan_id, data->count, rc);
                     return;
@@ -553,21 +554,20 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 L2MCD_VLAN_LOG_INFO(vlan_id, "igmps is enabled for vlan %d ifcnt:%d rc:%d", vlan_id, data->count, rc);
                 l2mcsync_add_vlan_entry(vlan_id);
                 vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
-                portdb_entry_t *port_entry=portdb_find_port_entry(&gMld.ve_portdb_tree, vlan_id);
-                if (vlan_node && port_entry && port_entry->opaque_data) 
+                portdb_entry_t *port_entry = portdb_find_port_entry(&gMld.ve_portdb_tree, vlan_id);
+                if (vlan_node && port_entry && port_entry->opaque_data)
                 {
                     /* IP adress is already configured for the vlan */
                     vlan_node->ve_ifindex = vlan_node->ifindex;
-                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] VE enabled vlan", FN,LN, vlan_id);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] VE enabled vlan", FN, LN, vlan_id);
                 }
-
             }
 
-            if (vlan_node && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED)) 
+            if (vlan_node && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED))
             {
                 if (!data->op_code)
                 {
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"igmps/mld disable for vlan:%d", vlan_id);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "igmps/mld disable for vlan:%d", vlan_id);
                     mld_if_snoop_unset(afi, vlan_id, TRUE, MLD_VLAN);
                     l2mcsync_del_vlan_entry(vlan_id);
                     sprintf(param, "%s|%d", NOTIFY_PARAM_ACTION_DISABLE, vlan_id);
@@ -581,60 +581,63 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                     L2MCD_LOG_NOTICE("Unable to retrive cfg_param for vlan  %d", vlan_id);
                     return;
                 }
-                L2MCD_VLAN_LOG_INFO(vlan_id,"curr_cfg vlan:%d qi:%d,  qmr:%d lmqi:%d  ver:%d flags:0x%x",
-                                vlan_id, cfg->cfg_query_interval_time, cfg->max_response_time, cfg->LMQ_interval, 
-                                cfg->cfg_version, vlan_node->flags[afi-1]);
-                if (data->fast_leave && !mld_is_flag_set(vlan_node, afi,MLD_FAST_LEAVE_CONFIGURED))
+                L2MCD_VLAN_LOG_INFO(vlan_id, "curr_cfg vlan:%d qi:%d,  qmr:%d lmqi:%d  ver:%d flags:0x%x",
+                                    vlan_id, cfg->cfg_query_interval_time, cfg->max_response_time, cfg->LMQ_interval,
+                                    cfg->cfg_version, vlan_node->flags[afi - 1]);
+                if (data->fast_leave && !mld_is_flag_set(vlan_node, afi, MLD_FAST_LEAVE_CONFIGURED))
                 {
                     rc = mld_fastleave_set(afi, vlan_id, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"enabling fastleave for vlan :%d rc:%d", vlan_id, rc);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "enabling fastleave for vlan :%d rc:%d", vlan_id, rc);
                 }
-                if (!data->fast_leave && mld_is_flag_set(vlan_node, afi,MLD_FAST_LEAVE_CONFIGURED))
+                if (!data->fast_leave && mld_is_flag_set(vlan_node, afi, MLD_FAST_LEAVE_CONFIGURED))
                 {
                     rc = mld_fastleave_unset(afi, vlan_id, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"disabling fastleave for vlan :%d rc:%d", vlan_id, rc);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "disabling fastleave for vlan :%d rc:%d", vlan_id, rc);
                 }
 
-                if (data->querier && !mld_is_flag_set(vlan_node, afi,MLD_SNOOPING_QUERIER_ENABLED))
+                if (data->querier && !mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_QUERIER_ENABLED))
                 {
-                     rc = mld_snoop_querier_set(afi, vlan_id, vlan_type);
-                     L2MCD_VLAN_LOG_INFO(vlan_id,"enabling querier for vlan :%d rc:%d", vlan_id, rc);
+                    rc = mld_snoop_querier_set(afi, vlan_id, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "enabling querier for vlan :%d rc:%d", vlan_id, rc);
                 }
-                if (!data->querier && mld_is_flag_set(vlan_node, afi,MLD_SNOOPING_QUERIER_ENABLED))
+                if (!data->querier && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_QUERIER_ENABLED))
                 {
-                     rc = mld_snoop_querier_unset(afi, vlan_id, vlan_type);
-                     L2MCD_VLAN_LOG_INFO(vlan_id," disabling querier for vlan :%d rc:%d", vlan_id, rc);
+                    rc = mld_snoop_querier_unset(afi, vlan_id, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, " disabling querier for vlan :%d rc:%d", vlan_id, rc);
                 }
                 if (cfg->cfg_query_interval_time != data->query_interval)
                 {
                     val = cfg->cfg_query_interval_time;
-                    rc =  mld_query_interval_set(afi, vlan_id, data->query_interval, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"rc:%d changed QI for vlan %d from %d to %d", 
-                               rc, vlan_id, val, data->query_interval);
+                    rc = mld_query_interval_set(afi, vlan_id, data->query_interval, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "rc:%d changed QI for vlan %d from %d to %d",
+                                        rc, vlan_id, val, data->query_interval);
                 }
                 if (cfg->max_response_time != data->query_max_response_time)
                 {
                     val = cfg->max_response_time;
                     rc = mld_query_max_response_time_set(afi, vlan_id, data->query_max_response_time, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"rc:%d changed qmr of vlan %d from %d to %d", rc, vlan_id, val, data->query_max_response_time);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "rc:%d changed qmr of vlan %d from %d to %d", rc, vlan_id, val, data->query_max_response_time);
                 }
                 if (cfg->LMQ_interval != data->last_member_query_interval)
                 {
                     val = cfg->LMQ_interval;
-                    rc = mld_lmqi_set(afi, vlan_id,data->last_member_query_interval, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"rc:%d changed LMQI of vlan %d from %d to %d", rc, vlan_id, cfg->LMQ_interval, data->last_member_query_interval);
+                    rc = mld_lmqi_set(afi, vlan_id, data->last_member_query_interval, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "rc:%d changed LMQI of vlan %d from %d to %d", rc, vlan_id, cfg->LMQ_interval, data->last_member_query_interval);
                 }
                 if (cfg->cfg_version != data->version)
                 {
-                   rc = mld_if_set_version_api(MLD_DEFAULT_VRF_ID, vlan_id, data->version, afi, vlan_type);
-                   L2MCD_VLAN_LOG_INFO(vlan_id,"rc:%d changed version of vlan=%d from %d to %d", rc, vlan_id, cfg->cfg_version, data->version);
+                    rc = mld_if_set_version_api(MLD_DEFAULT_VRF_ID, vlan_id, data->version, afi, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "rc:%d changed version of vlan=%d from %d to %d", rc, vlan_id, cfg->cfg_version, data->version);
                 }
-                for(i=0;i<data->count;i++)
+                for (i = 0; i < data->count; i++)
                 {
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] [%d] vlan-member:%s oper:%d tagged:%d", __FUNCTION__, __LINE__,
+                                        vlan_id, i, data->ports[i].pnames, data->ports[i].oper_state, data->ports[i].tagged);
+
                     ifidx = portdb_get_portindex_from_ifname(data->ports[i].pnames);
                     lif_state = is_interface_up(data->ports[i].pnames);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"%s:%d:[vlan:%d] vlan-member:%s ifindx:%d", __FUNCTION__, __LINE__, vlan_id, data->ports[i].pnames, ifidx);
-                    mld_map_port_vlan_state(vlan_id, ifidx, TRUE, MLD_VLAN , TRUE, lif_state, data->ports[i].tagged);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "[vlan:%d] vlan-member:%s ifindx:%d", vlan_id, data->ports[i].pnames, ifidx);
+                    mld_map_port_vlan_state(vlan_id, ifidx, TRUE, MLD_VLAN, TRUE, lif_state, data->ports[i].tagged);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, 1, -1, afi);
                 }
 
@@ -1002,11 +1005,24 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             break;
         }
 
-
         default:
             break;
     }
-  
+    // warm-reboot reload
+    if (data && vlan_node && data->warm_reboot)
+    {
+        // static mroute
+
+        // static entry
+
+        // mroute
+
+        // entry
+
+        // notify if all vlan reload
+        // sprintf(param, "%s|%d", NOTIFY_PARAM_WARM_STATUS, vlan_id);
+        // l2mcsync_notify_warm_reboot_done(NOTIFY_PARAM_SNP, param);
+    }
 }
  
 void l2mcd_100ms_timer(evutil_socket_t fd, short what, void *arg)

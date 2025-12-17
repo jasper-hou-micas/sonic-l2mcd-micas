@@ -283,7 +283,7 @@ typedef struct L2MCD_APP_TABLE_ENTRY {
     BOOLEAN     is_igmp;
     char        saddr[L2MCD_IP_ADDR_STR_SIZE];
     char        gaddr[L2MCD_IP_ADDR_STR_SIZE];
-    PORT_ATTR   ports[L2MCD_IPC_MAX_PORTS];
+    PORT_ATTR   port;
 } L2MCD_APP_TABLE_ENTRY;
 
 

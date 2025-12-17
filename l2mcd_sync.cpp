@@ -49,9 +49,9 @@ L2mcSync::L2mcSync(DBConnector *db, DBConnector *cfgDb, DBConnector *stateDb) :
     m_statel2mcdLocalMemberTable(stateDb, STATE_L2MC_MEMBER_TABLE_NAME),
     m_statel2mcdLocalMrouterTable(stateDb, STATE_L2MC_MROUTER_TABLE_NAME),
     m_featureTable(cfgDb, CFG_FEATURE_TABLE_NAME),
-    m_appMrouteTable(db, APP_L2MC_MROUTER_TABLE_NAME),
-    m_appEntryTable(db, APP_L2MC_MEMBER_TABLE_NAME),
     m_appVlanTable(db, APP_L2MC_VLAN_TABLE_NAME),
+    m_appEntryTable(db, APP_L2MC_MEMBER_TABLE_NAME),
+    m_appMrouteTable(db, APP_L2MC_MROUTER_TABLE_NAME),
     m_appSuppressTable(db, APP_L2MC_SUPPRESS_TABLE_NAME)
 {
     SWSS_LOG_NOTICE("L2MCD: sync object");
@@ -76,6 +76,10 @@ L2mcSync::~L2mcSync()
     if (l2mc_cfg_done_notifications)
     {
         delete l2mc_cfg_done_notifications;
+    }
+    if (l2mc_warm_reboot_notifications)
+    {
+        delete l2mc_warm_reboot_notifications;
     }
 }
 
@@ -142,6 +146,10 @@ extern "C" {
     {
         l2mcsync.notify_config_done(option, paraname);
     }
+    void l2mcsync_notify_warm_reboot_done(char *option, char *paraname)
+    {
+        l2mcsync.notify_warm_reboot_done(option, paraname);
+    }
     void l2mcsync_clear_l2mc_entry()
     {
         l2mcsync.clearL2mcVlanEntry();
@@ -159,6 +167,14 @@ void L2mcSync::notify_config_done(std::string option, std::string paraname)
     FieldValueTuple s("state", "done");
     value.push_back(s);
     l2mc_cfg_done_notifications->send(option, paraname, value);
+}
+
+void L2mcSync::notify_warm_reboot_done(std::string option, std::string paraname)
+{
+    std::vector<swss::FieldValueTuple> value;
+    FieldValueTuple s("state", "done");
+    value.push_back(s);
+    l2mc_warm_reboot_notifications->send(option, paraname, value);
 }
 
 void L2mcSync::clearL2mcVlanEntry(void)
@@ -261,13 +277,13 @@ void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     key.append(L2MCD_DEFAULT_KEY_SEPARATOR);
     key.append(msg->gaddr);
     key.append(L2MCD_DEFAULT_KEY_SEPARATOR);
-    key.append(msg->ports[0].pnames);
+    key.append(msg->port.pnames);
     stateKey = VLAN_PREFIX + to_string(msg->vlan_id)+L2MCD_STATE_KEY_SEPARATOR;
     stateKey.append(msg->saddr);
     stateKey.append(L2MCD_STATE_KEY_SEPARATOR);
     stateKey.append(msg->gaddr);
     stateKey.append(L2MCD_STATE_KEY_SEPARATOR);
-    stateKey.append(msg->ports[0].pnames);
+    stateKey.append(msg->port.pnames);
 
     if(msg->is_static) type.assign("static");
     if(msg->is_remote) type.assign("remote");
@@ -275,11 +291,11 @@ void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     fvVector.push_back(s);
     if (!msg->op_code)
     {
-        SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d is_remote:%d ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static,msg->is_remote);
+        SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d is_remote:%d ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->port.pnames, msg->is_static,msg->is_remote);
         m_appEntryProducerTable.del(key);
         if (!m_statel2mcdLocalMemberTable.get(stateKey, fvVector1))
         {
-            SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d Not Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static);
+            SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d Not Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->port.pnames, msg->is_static);
             return;
         }
         m_statel2mcdLocalMemberTable.del(stateKey);
@@ -296,11 +312,11 @@ void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     }
     else
     {
-        SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d,is_remote:%d  ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static, msg->is_remote);
+        SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d,is_remote:%d  ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->port.pnames, msg->is_static, msg->is_remote);
         m_appEntryProducerTable.set(key,fvVector);
         if (m_statel2mcdLocalMemberTable.get(stateKey, fvVector1))
         {
-            SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static);
+            SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->port.pnames, msg->is_static);
             return;
         }
         m_statel2mcdLocalMemberTable.set(stateKey, fvVector);
@@ -335,9 +351,9 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     std::vector<swss::FieldValueTuple> entry;
 
     key = VLAN_PREFIX + to_string(msg->vlan_id) + L2MCD_DEFAULT_KEY_SEPARATOR;
-    key.append(msg->ports[0].pnames);
+    key.append(msg->port.pnames);
     stateKey = VLAN_PREFIX + to_string(msg->vlan_id) + L2MCD_STATE_KEY_SEPARATOR;
-    stateKey.append(msg->ports[0].pnames);
+    stateKey.append(msg->port.pnames);
     if (msg->is_igmp)
     {
         key = key + ":V4";
@@ -356,12 +372,12 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     if (msg->op_code)
     {
         SWSS_LOG_NOTICE("APP_L2MC_MROUTER_TABLE:Key:%s stateKey:%s Vlan%d:%s mrouter add",key.c_str(), stateKey.c_str(),
-                msg->vlan_id, msg->ports[0].pnames);
+                msg->vlan_id, msg->port.pnames);
         m_appMrouterProducerTable.set(key,fvVector);
         if (m_statel2mcdLocalMrouterTable.get(stateKey, fvVector1))
         {
             SWSS_LOG_NOTICE("STATE_L2MC_MROUTER_TABLE Mroute port Add key:%s vid:%d port %s static:%d Exists ", stateKey.c_str(), 
-                    msg->vlan_id, msg->ports[0].pnames, msg->is_static);
+                    msg->vlan_id, msg->port.pnames, msg->is_static);
             return;
         }
         m_statel2mcdLocalMrouterTable.set(stateKey, fvVector);
@@ -377,12 +393,12 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     {
         m_appMrouterProducerTable.del(key);
         SWSS_LOG_NOTICE("APP_L2MC_MROUTER_TABLE:Key:%s stateKey:%s Vlan%d:%s mrouter entry deleted", key.c_str(),
-                stateKey.c_str(), msg->vlan_id, msg->ports[0].pnames);
+                stateKey.c_str(), msg->vlan_id, msg->port.pnames);
 
         if (!m_statel2mcdLocalMrouterTable.get(stateKey, fvVector1))
         {
             SWSS_LOG_NOTICE("STATE_L2MC_MROUTER_TABLE Mroute port DEL key:%s vid:%d port %s static:%d Not Exists ", stateKey.c_str(), 
-                    msg->vlan_id, msg->ports[0].pnames, msg->is_static);
+                    msg->vlan_id, msg->port.pnames, msg->is_static);
             return;
         }
         m_statel2mcdLocalMrouterTable.del(stateKey);
