@@ -68,7 +68,7 @@ MCGRP_CLASS  *mcgrp_vrf_alloc (UINT32 afi, VRF_INDEX  vrf_index)
     MCGRP_CLASS         *sptr_next, *sptr_prev;
     MCGRP_GLOBAL_CLASS  *mcgrp_glb = NULL;
 
-    L2MCD_INIT_LOG_INFO("%s mcgrp alloc for afi:%d vrf:%d",__FUNCTION__, afi,vrf_index);
+    L2MCD_INIT_LOG_INFO("%s mcgrp alloc for afi:%d vrf:%d", FN, afi, vrf_index);
     if (vrf_index == IPVRF_DEFAULT_VRF_IDX)
     {
         mcgrp = (IP_IPV4_AFI == afi) ? pIgmp0 : pMld0;
@@ -76,8 +76,8 @@ MCGRP_CLASS  *mcgrp_vrf_alloc (UINT32 afi, VRF_INDEX  vrf_index)
     else if (vrf_index < IPVRF_INVALID_VRF_IDX)
     {
         mcgrp = os_malloc_zero(sizeof(MCGRP_CLASS));
-        L2MCD_LOG_DEBUG("%s %d %p vrf:%d",__FUNCTION__, __LINE__,mcgrp,vrf_index);
-        L2MCD_INIT_LOG("%s %d %p vrf:%d",__FUNCTION__, __LINE__,mcgrp,vrf_index);
+        L2MCD_LOG_DEBUG("%s %d %p vrf:%d", FN, LN, mcgrp, vrf_index);
+        L2MCD_INIT_LOG("%s %d %p vrf:%d", FN, LN, mcgrp, vrf_index);
     }
     else
     {

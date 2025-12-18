@@ -651,9 +651,9 @@ typedef struct MCGRP_CLASS
 
 typedef struct MCGRP_GLOBAL_CLASS
 {
-	MCGRP_CLASS    	        *instances[IPVRF_MAX_VRF_IDX+1];
+	MCGRP_CLASS             *instances[IPVRF_MAX_VRF_IDX + 1];
 	MCGRP_CLASS             *instances_list; /*List of actual configured instances*/
-	MCGRP_L3IF             **port_list;
+	MCGRP_L3IF              **port_list;
    
 	SORTED_LINKLIST_KEYINFO *mcgrp_src_keyinfo;
 	// klin, change to growable pool

@@ -50,6 +50,13 @@ unsigned int portdb_get_portindex_from_ifname(char *ifname)
     return NO_SUCH_PORT; //invalid port_index;
 }
 
+int ip6_addr_cmp(void *val1, void *val2) {
+    PORTDB_IP6_ADDRESS_ENTRY *p1 = (PORTDB_IP6_ADDRESS_ENTRY *)val1;
+    PORTDB_IP6_ADDRESS_ENTRY *p2 = (PORTDB_IP6_ADDRESS_ENTRY *)val2;
+
+    return memcmp(&p1->ipaddress, &p2->ipaddress, sizeof(IP6_IPV6_ADDRESS));
+}
+
 int portdb_add_ifname(char *ifname, int name_len, unsigned int port_index)
 {
     int ret;
