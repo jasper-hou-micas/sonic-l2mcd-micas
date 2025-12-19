@@ -51,7 +51,7 @@ MCAST_CLASS           Multicast2, *pMulticast2 = &Multicast2;
 
 /* use "tcpdump -i Ethernetxx -p igmp -dd" generate filter code
  * https://www.kernel.org/doc/Documentation/networking/filter.txt
- */
+ */ 
 struct sock_filter g_igmp_filter[] = {
     //1. Load Word @0
     BPF_STMT(BPF_LD |BPF_ABS|BPF_H, 0x0000000c),
@@ -479,7 +479,8 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
         case L2MCD_CONFIG_PARAMS_MSG:
         {
             data = (L2MCD_CONFIG_MSG *)msg->data;
-            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
+            // log level = data->count 
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG))
             {
                 L2MCD_LOG_NOTICE("recieved L2MCD_CONFIG_PARAMS_MSG message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
                 break;
@@ -494,9 +495,9 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             memcpy((char *) gIgmp.mac, (const char *) g_l2mcd_global_mac, ETHER_ADDR_LEN);
             memcpy((char *) gMld.mac, (const char *) g_l2mcd_global_mac, ETHER_ADDR_LEN);
             APP_LOG_SET_LEVEL(g_curr_dbg_level);
-	        L2MCD_INIT_LOG("Global MAC set for IPV4  0x%x:0x%x:0x%x:0x%x:0x%x:0x%x: dbglevel:%d",
-                   gIgmp.mac[0],gIgmp.mac[1],gIgmp.mac[2],gIgmp.mac[3],gIgmp.mac[4],gIgmp.mac[5],
-                   g_curr_dbg_level);
+            L2MCD_INIT_LOG("Global MAC set for IPV4  0x%x:0x%x:0x%x:0x%x:0x%x:0x%x: dbglevel:%d",
+                           gIgmp.mac[0], gIgmp.mac[1], gIgmp.mac[2], gIgmp.mac[3], gIgmp.mac[4], gIgmp.mac[5],
+                           g_curr_dbg_level);
             /* Debug FM call back register is done delayed, to ensure fm is up by the time. */ 
             l2mcsync_init_debug_framework();
             break;
