@@ -584,7 +584,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 l2mcsync_add_vlan_entry(vlan_id);
                 vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
                 portdb_entry_t *port_entry = portdb_find_port_entry(&gMld.ve_portdb_tree, vlan_id);
-                if (vlan_node && port_entry && port_entry->opaque_data)
+                if (vlan_node && port_entry && port_entry->ipv4_addr_data)
                 {
                     /* IP adress is already configured for the vlan */
                     vlan_node->ve_ifindex = vlan_node->ifindex;
@@ -819,8 +819,8 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 rc = mld_static_group_source_set(data->vlan_id, data->ports[0].pnames, iftype, &grpaddr, 1, FALSE, vlan_type);
             }
             L2MCD_VLAN_LOG_INFO(data->vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:%s op:%d cnt:%d port[0]:%s GA:%s SA:%s[0x%x]",
-                 FN,LN,data->vlan_id, (msg->msg_type==L2MCD_SNOOP_STATIC_CONFIG_MSG)?"STATIC":"REMOTE",
-                 data->op_code,data->count,data->ports[0].pnames,data->gaddr,data->saddr,srcaddr.ip.ipv4_addr);
+                                FN, LN, data->vlan_id, (msg->msg_type == L2MCD_SNOOP_STATIC_CONFIG_MSG) ? "STATIC" : "REMOTE",
+                                data->op_code, data->count, data->ports[0].pnames, data->gaddr, data->saddr, srcaddr.ip.ipv4_addr);
             break;
         }
         case L2MCD_INTERFACE_TABLE_UPDATE:
@@ -836,32 +836,52 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 L2MCD_LOG_NOTICE(" No Data for recievd IPC message L2MCD_INTERFACE_TABLE_UPDATE type:%u ", msg->msg_type);
                 break;
             }
-            //afi = data->afi;
-            inet_aton(data->gaddr, &ipaddr);
+            afi     = data->afi;
             vlan_id = data->vlan_id;
-            val = data->prefix_length;
+            val     = data->prefix_length;
             if (data->op_code)
             {
-                rc = portdb_add_port_entry_to_tree(&gMld.ve_portdb_tree, vlan_id, L2MCD_DEFAULT_VRF_IDX,vlan_id);
-                portdb_insert_addr_ipv4_list(&gMld.ve_portdb_tree, vlan_id, htonl(ipaddr.s_addr),val, L2MCD_DEFAULT_VRF_IDX, 0);
+                rc = portdb_add_port_entry_to_tree(&gMld.ve_portdb_tree, vlan_id, L2MCD_DEFAULT_VRF_IDX, vlan_id);
+                if (afi == MCAST_IPV4_AFI)
+                {
+                    inet_aton(data->gaddr, &ipaddr);
+                    portdb_insert_addr_ipv4_list(&gMld.ve_portdb_tree, vlan_id, htonl(ipaddr.s_addr), val, L2MCD_DEFAULT_VRF_IDX, 0);
+                }
+                else
+                {
+                    grpaddr.afi = MCAST_IPV6_AFI;
+                    inet_pton(AF_INET6, data->gaddr, &grpaddr.ip.ipv6_addr);
+                    portdb_insert_addr_ipv6_list(&gMld.ve_portdb_tree, vlan_id, (IPV6_ADDRESS)grpaddr.ip.ipv6_addr, val, L2MCD_DEFAULT_VRF_IDX, 0);
+                }
             }
             else
             {
-                rc = portdb_remove_addr_ipv4_list(&gMld.ve_portdb_tree, vlan_id, htonl(ipaddr.s_addr));
-                portdb_remove_port_entry_from_tree(&gMld.ve_portdb_tree, vlan_id);
+                if (afi == MCAST_IPV4_AFI)
+                {
+                    inet_aton(data->gaddr, &ipaddr);
+                    rc = portdb_remove_addr_ipv4_list(&gMld.ve_portdb_tree, vlan_id, htonl(ipaddr.s_addr));
+                    // portdb_remove_port_entry_from_tree(&gMld.ve_portdb_tree, vlan_id);
+                }
+                else
+                {
+                    grpaddr.afi = MCAST_IPV6_AFI;
+                    inet_pton(AF_INET6, data->gaddr, &grpaddr.ip.ipv6_addr);
+                    rc = portdb_remove_addr_ipv6_list(&gMld.ve_portdb_tree, vlan_id, (IPV6_ADDRESS)grpaddr.ip.ipv6_addr);
+                    // portdb_remove_port_entry_from_tree(&gMld.ve_portdb_tree, vlan_id);
+                }
             }
-            vlan_node =  mld_vdb_vlan_get(vlan_id, MLD_VLAN);
-            if (!vlan_node)
-            {
-               vlan_node = mld_vlan_create_fwd_ref(vlan_id, MLD_ROUTE_PORT);
-               if (!vlan_node) 
-               {
-                   L2MCD_LOG_NOTICE("vlan:%d Interface Table Update IP:%s VDB create error",vlan_id, data->gaddr,val,data->op_code);
-                   return;
-               }
-            }
-            vlan_node->ve_ifindex = (!data->op_code & !rc)? vlan_id: vlan_node->ifindex;
-            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] Interface Table Update IP:%s  %d %d ",FN,LN,data->vlan_id, data->gaddr,val,data->op_code);
+            // vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
+            // if (!vlan_node)
+            // {
+            //     vlan_node = mld_vlan_create_fwd_ref(vlan_id, MLD_ROUTE_PORT);
+            //     if (!vlan_node)
+            //     {
+            //         L2MCD_LOG_NOTICE("vlan:%d Interface Table Update IP:%s VDB create error", vlan_id, data->gaddr, val, data->op_code);
+            //         return;
+            //     }
+            // }
+            vlan_node->ve_ifindex = (!data->op_code & !rc) ? vlan_id : vlan_node->ifindex;
+            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] Interface Table Update IP:%s  %d %d ", FN, LN, data->vlan_id, data->gaddr, val, data->op_code);
             break;
         }
 
@@ -1700,7 +1720,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         }
         else if (ether_type != ETH_P_IPV6)
         {
-            L2MCD_LOG_ERR("ether_type is mpt sopport  %d", ether_type);
+            L2MCD_LOG_INFO("ether_type is mpt sopport  %d", ether_type);
             continue;
         }
         else 

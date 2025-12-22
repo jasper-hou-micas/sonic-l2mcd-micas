@@ -336,8 +336,7 @@ MCGRP_L3IF *mcgrp_alloc_init_l3if_entry (MCGRP_CLASS   *mcgrp,
             // If this is virtual port, alloc a port-mask for the member ports of this VE
             if (is_virtual_port(vir_port_id))
             {
-                mcgrp_vport->ve_port_mask = 
-                    dy_malloc_zero(mld_get_port_bitmap_size()); 
+                mcgrp_vport->ve_port_mask = dy_malloc_zero(mld_get_port_bitmap_size()); 
             }
         }
 
@@ -2150,21 +2149,21 @@ MCGRP_ENTRY* mcgrp_find_group_address_entry (MCGRP_CLASS  *mcgrp,
  * virtual interface is still up and runing 
  */
 //v4/v6 compliant 
-void mcgrp_mcast_change_vport_membership (MCGRP_CLASS  *mcgrp, 
+void mcgrp_mcast_change_vport_membership(MCGRP_CLASS  *mcgrp, 
         MADDR_ST     *source_address,
         MADDR_ST     *group_address,
         UINT16        router_port, 
         UINT32        phy_port,
         UINT32        mcgrp_op)
 {
-    uint32_t            afi = (IS_IGMP_CLASS(mcgrp) ? MCAST_IPV4_AFI:MCAST_IPV6_AFI);
-    MCGRP_L3IF          *mcgrp_vport    = NULL;
-    mcast_grp_addr_t    grp_addr, src_addr;
-    MCGRP_PORT_ENTRY    *mcgrp_pport    = NULL;
-    MCGRP_ENTRY         *mcgrp_entry    = NULL;
-    MCGRP_MBRSHP        *mcgrp_mbrshp   = NULL;
-    BOOLEAN             is_pim_snp_mbr  = FALSE;
-    MADDR_ST            addr_any;
+    uint32_t          afi            = (IS_IGMP_CLASS(mcgrp) ? MCAST_IPV4_AFI : MCAST_IPV6_AFI);
+    MCGRP_L3IF       *mcgrp_vport    = NULL;
+    MCGRP_PORT_ENTRY *mcgrp_pport    = NULL;
+    MCGRP_ENTRY      *mcgrp_entry    = NULL;
+    MCGRP_MBRSHP     *mcgrp_mbrshp   = NULL;
+    BOOLEAN           is_pim_snp_mbr = FALSE;
+    mcast_grp_addr_t  grp_addr, src_addr;
+    MADDR_ST          addr_any;
 
     if (afi == MCAST_IPV4_AFI)
         mcgrp_vport = gIgmp.port_list[router_port];
@@ -2190,11 +2189,15 @@ void mcgrp_mcast_change_vport_membership (MCGRP_CLASS  *mcgrp,
 
     is_pim_snp_mbr = pims_is_pim_snoop_mbrship(mcgrp_mbrshp);
     if(mcgrp_op == MCGRP_ADD_GROUP) {
-        if (mcgrp_pport && mcgrp_pport->oper_version == IGMP_VERSION_3) {
+        if (mcgrp_pport &&
+            ((afi == MCAST_IPV4_AFI && mcgrp_pport->oper_version == IGMP_VERSION_3) || (afi == MCAST_IPV6_AFI && mcgrp_pport->oper_version == MLD_VERSION_2)))
+        {
             MLD_LOG(MLD_LOGLEVEL6, MCGRP_AFI(mcgrp), "%s(%d) Sending to l2mcsync (%s, %s) mode:%d ", FN, LN,
                     mcast_print_addr(source_address), mcast_print_addr(group_address), mcgrp_mbrshp->filter_mode);
-            igmpv3_send_l2mcd_sync_group_upd(group_address, router_port, 1, phy_port, 0, 0, source_address, 0, 0);
-        } else {
+            mld_send_l2mcd_sync_src_group_upd(group_address, router_port, 1, phy_port, 0, 0, source_address, 0, 0);
+        }
+        else
+        {
             mld_send_l2mcd_sync_group_upd(group_address, router_port, 1, phy_port, 0, 0, source_address, 0);
         }
     } else {
@@ -2203,27 +2206,25 @@ void mcgrp_mcast_change_vport_membership (MCGRP_CLASS  *mcgrp,
          */
 
         mcgrp_entry = mcgrp_find_group_address_entry(mcgrp, router_port, group_address);
-        if(mcast_is_valid_unicast(source_address))
+        if (mcast_is_valid_unicast(source_address))
         {
-            if (mcgrp_pport && (mcgrp_pport->oper_version == IGMP_VERSION_3) &&
-                    (!mcast_addr_any(source_address))) 
+            if (mcgrp_pport && (!mcast_addr_any(source_address)) &&
+                ((afi == MCAST_IPV4_AFI && mcgrp_pport->oper_version == IGMP_VERSION_3) || (afi == MCAST_IPV6_AFI && mcgrp_pport->oper_version == MLD_VERSION_2)))
             {
 
-                L2MCD_VLAN_LOG_INFO(router_port, "%s:%d:[vlan:%d] Sending delete to l2mcd_sync (%s, %s) mode:%d %s", 
-                        FN, LN, router_port, mcast_print_addr(source_address), mcast_print_addr(group_address), 
-                        mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port));
+                L2MCD_VLAN_LOG_INFO(router_port, "%s:%d:[vlan:%d] Sending delete to l2mcd_sync (%s, %s) mode:%d %s",
+                                    FN, LN, router_port, mcast_print_addr(source_address), mcast_print_addr(group_address),
+                                    mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port));
 
-                igmpv3_send_l2mcd_sync_group_upd(group_address, router_port,
-                        0, 0 , 1 , phy_port, source_address, 0, 0);
+                mld_send_l2mcd_sync_src_group_upd(group_address, router_port, 0, 0, 1, phy_port, source_address, 0, 0);
             }
-            else 
+            else
             {
-                L2MCD_VLAN_LOG_INFO(router_port, "%s:%d:[vlan:%d]Sending delete to l2mcd_sync (%s, %s) mode:%d %s", 
-                        FN, LN, router_port, mcast_print_addr(source_address), mcast_print_addr(group_address), 
-                        mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port));
+                L2MCD_VLAN_LOG_INFO(router_port, "%s:%d:[vlan:%d]Sending delete to l2mcd_sync (%s, %s) mode:%d %s",
+                                    FN, LN, router_port, mcast_print_addr(source_address), mcast_print_addr(group_address),
+                                    mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port));
 
-                mld_send_l2mcd_sync_group_upd(group_address, router_port, 
-                        0, 0 , 1 , phy_port, source_address, 0);
+                mld_send_l2mcd_sync_group_upd(group_address, router_port, 0, 0, 1, phy_port, source_address, 0);
             }
         }
         else {
@@ -2429,7 +2430,7 @@ MCGRP_MBRSHP* mcgrp_alloc_add_mbrshp_entry (MCGRP_CLASS  *mcgrp,
         }
     }
 
-    new_mbrshp->group_uptime =  mld_get_current_monotime();
+    // new_mbrshp->group_uptime =  mld_get_current_monotime();
     new_mbrshp->group_timer = 0; 
 
     grp_entry->num_mbr_ports++;
@@ -2553,24 +2554,23 @@ void mcgrp_destroy_mbrshp_entry (MCGRP_CLASS  *mcgrp,
     mcgrp_free_mbrshp_entry(mcgrp, mcgrp_mbrshp);
 }
 
-
-BOOL mcgrp_src_list_empty ( MCGRP_MBRSHP      *mcgrp_mbrsh,
-        MCGRP_FILTER_MODE  src_mode,
-        UINT8 version)
+BOOL mcgrp_src_list_empty(MCGRP_MBRSHP     *mcgrp_mbrsh,
+                          MCGRP_FILTER_MODE src_mode,
+                          UINT8             version,
+                          UINT32            afi)
 {
-    if(version == IGMP_VERSION_3)
+    if ((version == IGMP_VERSION_3 && afi == IP_IPV4_AFI) || (version == MLD_VERSION_2 && afi == IP_IPV6_AFI))
     {
-        if(mcgrp_mbrsh->src_list[src_mode])
+        if (mcgrp_mbrsh->src_list[src_mode])
             return FALSE;
         else
             return TRUE;
     }
-    else// For igmp ver 2 operating , just return true.
+    else // For igmp ver 2 operating , just return true.
     {
         return TRUE;
     }
 }
-
 
 // Find and delink an MCGRP_SOURCE from the mode-specific source list
 // anchored in a MCGRP_MBRSHP

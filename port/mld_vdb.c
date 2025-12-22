@@ -31,43 +31,35 @@ struct list *
 mld_vdb_vlan_get_mrtr_list(mld_vlan_node_t *vlan_node, int create, uint8_t afi);
 extern BOOLEAN pim_enabled (UINT32 afi, UINT16 port);
 extern int mld_set_vlan_dcm_flag(uint32_t gvid,uint8_t type);
-uint32_t
-mld_is_flag_set(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
+uint32_t mld_is_flag_set(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
 {
-	return (vlan_p->flags[afi -1] & flag);
-
+    return (vlan_p->flags[afi - 1] & flag);
 }
 
-void
-mld_set_vlan_flag(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
+void mld_set_vlan_flag(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
 {
-	vlan_p->flags[afi -1] |= flag; 
+    vlan_p->flags[afi - 1] |= flag;
 }
 
-void
-mld_unset_vlan_flag(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
+void mld_unset_vlan_flag(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
 {
-    vlan_p->flags[afi -1] &= ~flag;
+    vlan_p->flags[afi - 1] &= ~flag;
 }
 
-void
-mld_vlan_add_list(mld_vlan_node_t *vlan_p, uint8_t afi)
+void mld_vlan_add_list(mld_vlan_node_t *vlan_p, uint8_t afi)
 {
-	if(listnode_lookup(snooping_enabled_vlans[afi - 1], vlan_p)!= NULL)
+    if (listnode_lookup(snooping_enabled_vlans[afi - 1], vlan_p) != NULL)
     {
-		return ;
+        return;
     }
-	
-	listnode_add(snooping_enabled_vlans[afi - 1], vlan_p);
+    listnode_add(snooping_enabled_vlans[afi - 1], vlan_p);
 }
 
-
-void
-mld_vlan_del_list(mld_vlan_node_t *vlan_p, uint8_t afi)
+void mld_vlan_del_list(mld_vlan_node_t *vlan_p, uint8_t afi)
 {
-    if(listnode_lookup(snooping_enabled_vlans[afi - 1], vlan_p) == NULL)
+    if (listnode_lookup(snooping_enabled_vlans[afi - 1], vlan_p) == NULL)
     {
-        return ;
+        return;
     }
     listnode_delete(snooping_enabled_vlans[afi - 1], vlan_p);
 }
@@ -241,10 +233,9 @@ int mld_vlan_port_cmp_cb (void *keya,void *keyb)
 }
 
 /* See mld_vlan_db.h for description */
-mld_vlan_node_t *
-mld_vdb_vlan_create(mld_vlan_db_t *vlan_db, uint32_t vlan_id, uint8_t type,
-							uint32_t flags, uint32_t vlan_flags, uint16_t ivid, 
-							char *name, int vlan_creation_type)
+mld_vlan_node_t *mld_vdb_vlan_create(mld_vlan_db_t *vlan_db, uint32_t vlan_id, uint8_t type,
+                                     uint32_t flags, uint32_t vlan_flags, uint16_t ivid,
+                                     char *name, int vlan_creation_type)
 {
     mld_vlan_node_t *vlan_node = NULL;
     int bmap_size = 0;
@@ -767,7 +758,7 @@ int mld_portdb_delete_gvid(unsigned long gvid)
     #endif
 }
 
-unsigned int mld_portdb_get_ivid_from_gvid(uint32_t vlan_id,uint8_t type)
+unsigned int mld_portdb_get_ivid_from_gvid(uint32_t vlan_id, uint8_t type)
 {
    
     mld_vlan_node_t *vlan_node = NULL;

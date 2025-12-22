@@ -115,8 +115,6 @@ enum MLD_PDUTYPE
 #define IPVRF_INVALID_VRF_IDX		(IPVRF_MAX_VRF_IDX+1)
 #define IPVRF_DEFAULT_VRF_IDX		     MVRF_DEFAULT_VRF_ID
 
-#define INVALID_BMP					0xFFFFFFFF
-//TODO_L2MCD - taken back to avoid compilation error
 #define PIM_ENCODE_SRC_ADDRESS_WC (0)
 
 /*#define MLD_SNOOPING_ENABLED  0x1*/
@@ -471,7 +469,7 @@ typedef struct MCGRP_MBRSHP
     MCGRP_TIMER_ELEM lmq_tmr;
     UINT64           group_timer;
     UINT64           lmq_timer; // timestamp for src list
-    UINT64           group_uptime;
+    // UINT64           group_uptime;
     /* This is for sending client leave to mrouter  ports, if within expiry ,
      *  switch does not recieve the response on this port */
 
@@ -524,9 +522,9 @@ typedef struct MCGRP_PORT_ENTRY
     UINT16  v1_rtr_present : 1; // Did we hear from a V1 router ?
     UINT16  v2_rtr_present : 1; // Did we hear from a V2 router ?
     UINT16  spare : 6;
-    UINT32  verwarn_intvl_start; // Can we add a syslog...msg for this????
-    UINT32  verwarn_count;
-    BOOLEAN snooping_mrouter_detected;
+    // UINT32  verwarn_intvl_start; // Can we add a syslog...msg for this????
+    // UINT32  verwarn_count;
+    // BOOLEAN snooping_mrouter_detected;
     BOOLEAN tagged;
 } MCGRP_PORT_ENTRY;
 
@@ -536,8 +534,8 @@ typedef struct MCGRP_ROUTER_ENTRY
     struct MCGRP_ROUTER_ENTRY *next; // For VE ports, this give the next elem
                                      // For physical ports it is NULL
     UINT32           phy_port_id;
-    UINT32           verwarn_intvl_start; // Can we add a syslog...msg for this????
-    UINT32           verwarn_count;
+    // UINT32           verwarn_intvl_start; // Can we add a syslog...msg for this????
+    // UINT32           verwarn_count;
     UINT32           is_static : 1;   // static or dynamic mrouter
     UINT16           cfg_version : 2; // configured version, if any (0,1,2 )
     UINT64           uptime;
@@ -588,8 +586,8 @@ typedef struct MCGRP_L3IF
     MLD_PORT_MASK      *ve_port_mask;
     MCGRP_STATIC_ENTRY *static_mcgrp_list_head;
     MCGRP_ROUTER_ENTRY *rtr_port_list;
-    UINT32              verwarn_intvl_start; // Can we add a syslog...msg for this????
-    UINT32              verwarn_count;
+    // UINT32              verwarn_intvl_start; // Can we add a syslog...msg for this????
+    // UINT32              verwarn_count;
     UINT32              flags;
     UINT8               is_l3_up; /* For running protocol as part of l2 , doing is_up whenever vlan is added,
                                    *  to explicitly know about l3 up status, will be using this , in future
@@ -598,7 +596,7 @@ typedef struct MCGRP_L3IF
     UINT32  pims_num_wg_entries;
     UINT32  pims_num_sg_entries;
     // Statistics
-    UINT32 rx_bad_if;
+    // UINT32 rx_bad_if;
 } MCGRP_L3IF;
 
 typedef struct MCGRP_CLASS
@@ -642,7 +640,7 @@ typedef struct MCGRP_CLASS
     // IGMPv3 & SSM MAP
     L2MCD_AVL_TREE group_tree;
     UINT32         ngroups;
-} MCGRP_CLASS;
+} MCGRP_CLASS; // Multicast Group Protocol
 
 typedef struct MCGRP_GLOBAL_CLASS
 {
@@ -651,19 +649,19 @@ typedef struct MCGRP_GLOBAL_CLASS
     MCGRP_L3IF **port_list;
 
     SORTED_LINKLIST_KEYINFO *mcgrp_src_keyinfo;
-    // klin, change to growable pool
+    // change to growable pool
     generic_pool_struct *group_pool;
     generic_pool_struct *grp_mbrshp_pool;
     generic_pool_struct *src_specific_pool;
     generic_pool_struct *src_specific_client_pool;
-    BOOLEAN              g_snooping_enabled;
-    BOOLEAN              no_flood_enabled;
-    L2MCD_AVL_TREE       portdb_tree;    // Mainly for ipv6 addresses and port_state
-    L2MCD_AVL_TREE       ve_portdb_tree; // Used for Ve port
+    // BOOLEAN              g_snooping_enabled;
+    // BOOLEAN              no_flood_enabled;
+    // L2MCD_AVL_TREE       portdb_tree;    // Mainly for ipv6 addresses and port_state
+    // L2MCD_AVL_TREE       ve_portdb_tree; // Used for Ve port
     UINT8                mac[6];
     UINT8                cfg_version;  // configured version, if any (0,1,2 or 3)
     UINT8                oper_version; // version we are operating at (1,2 or 3)
-    generic_pool_struct *vlan_pool;
+    // generic_pool_struct *vlan_pool;
     UINT32               mld_snp_vlan_count; /*Global Vlan count*/
     BOOLEAN              g_pim_snoop_enabled;
     UINT32               pims_snp_vlan_count;
@@ -676,20 +674,19 @@ typedef struct MCAST_CLASS
     VRF_INDEX           vrf_index;
 
     UINT8                allocated;
-    generic_pool_struct *sptr_tx_free_entry_pool;
-    generic_pool_struct *sptr_glb_mld_pool;
-    generic_pool_struct *sptr_mldv2_sorted_list_pool;
-    UINT16               source_virtual_port;
-    UINT32               source_port;
+    // generic_pool_struct *sptr_tx_free_entry_pool;
+    // generic_pool_struct *sptr_glb_mld_pool;
+    // generic_pool_struct *sptr_mldv2_sorted_list_pool;
+    // UINT16               source_virtual_port;
+    // UINT32               source_port;
 
-    generic_pool_struct *sptr_oif_info_pool;
-    generic_pool_struct *sptr_vlan_info_pool;
-    generic_pool_struct *sptr_glb_grp_pool;
-    generic_pool_struct *sptr_source_pool; // Used for storing source data for IGMPv3 groups
+    // generic_pool_struct *sptr_oif_info_pool;
+    // generic_pool_struct *sptr_vlan_info_pool;
+    // generic_pool_struct *sptr_glb_grp_pool;
+    // generic_pool_struct *sptr_source_pool;
     UINT32               ngroups;
     L2MCD_AVL_TREE       group_tree;
-
-} MCAST_CLASS;
+} MCAST_CLASS; // Multicast Forwarding
 
 typedef struct MCAST_GLOBAL_CLASS
 {
@@ -1149,11 +1146,6 @@ typedef enum intf_type_new_s {
     INTF_MODE_OF
 } intf_type_new_t;
 
-//MLD versions
-#define MLD_VERSION_NONE							0
-#define MLD_VERSION_1								1 
-#define MLD_VERSION_2								2
-
 //response time range
 #define MLD_MIN_RESPONSE_TIME		1
 #define MLD_MAX_RESPONSE_TIME		64
@@ -1369,10 +1361,8 @@ void igmpv3_sorted_linklist_free_list (MCGRP_CLASS *igmp, generic_pool_struct *p
         SORTED_LINKLIST_KEYINFO *key_info, SORTED_LINKLIST *src);
 void mldv2_sorted_linklist_free_list (MCGRP_CLASS *mld, generic_pool_struct *pool,
         SORTED_LINKLIST_KEYINFO *key_info, SORTED_LINKLIST *src);
-void mcgrp_mcast_change_vport_membership (MCGRP_CLASS  *mcgrp, MADDR_ST *source_address,
-        MADDR_ST *group_address, UINT16 router_port, UINT32 phy_port, UINT32 mcgrp_op);
 void mcgrp_add_update_client (MCGRP_CLASS *mcgrp, L2MCD_AVL_TREE *clnt_tree, MADDR_ST *clnt_addr);
-BOOL mcgrp_src_list_empty ( MCGRP_MBRSHP *mcgrp_mbrsh, MCGRP_FILTER_MODE src_mode, UINT8 version);
+BOOL mcgrp_src_list_empty ( MCGRP_MBRSHP *mcgrp_mbrsh, MCGRP_FILTER_MODE src_mode, UINT8 version, UINT32 afi);
 BOOLEAN mcgrp_send_group_source_query (MCGRP_CLASS *mcgrp, MCGRP_MBRSHP *mcgrp_mbrshp,
         UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST *group_address, SORTED_LINKLIST **p_src_list,
         BOOLEAN was_excl, MADDR_ST *clnt_ip_addr, enum BOOLEAN is_retx);
@@ -1409,15 +1399,13 @@ void mld_send_l2mcd_sync_group_upd (MADDR_ST *group_address,
         int num_del_port, UINT32 del_phy_port_id, MADDR_ST  *src_addr, 
         uint8_t is_remote_report);
 void mld_send_l2mcd_sync_group_clr (UINT16 ivid, BOOLEAN isGlobalClear, uint8_t afi);
-void mld_send_l2mcd_sync_group_add (MADDR_ST *group_address, 
-        UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST  *src_addr, UINT8  filter_mode) ;
-void igmpv3_send_l2mcd_sync_group_upd (MADDR_ST *group_address, 
+void mld_send_l2mcd_sync_group_add(MADDR_ST *group_address, UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST *src_addr, UINT8 filter_mode);
+void mld_send_l2mcd_sync_src_group_upd (MADDR_ST *group_address, 
         UINT16 vir_port_id, int num_add_port, UINT32 add_phy_port_id, 
         int num_del_port, UINT32 del_phy_port_id, MADDR_ST  *src_addr, 
         uint8_t is_remote_report, UINT8  filter_mode);
 
-void igmpv3_send_l2mcd_sync_group_add (MADDR_ST *group_address, 
-        UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST  *src_addr, UINT8  filter_mode);
+void mld_send_l2mcd_sync_src_group_add(MADDR_ST *group_address, UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST *src_addr, UINT8 filter_mode);
 
 void l2mcd_sync_inherit_xg_port_to_all_sg (MCGRP_ENTRY *mcgrp_entry, uint32_t phy_ifindex, uint32_t vid, int add);
 

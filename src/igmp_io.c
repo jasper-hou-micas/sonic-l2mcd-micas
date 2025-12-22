@@ -608,12 +608,8 @@ int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters)
     //    - if the port is part of a VE, it is the VE id,
     //    - if the port is part of a trunk, it is the trunk's primary port#
     //    - otherwise it is the same as the physical port#
-    multicast->source_port = sptr_ip_parameters->rx_phy_port_number;
-    multicast->source_virtual_port = sptr_ip_parameters->rx_port_number;
     mcast_set_ipv4_addr(&global_source_ip, ntohl(sptr_ip_parameters->source_address));
     
-        
-
     if (trunk_port_state(multicast->source_port) != TRUNK_NONE)
         rx_phy_port = trunk_primary_port(multicast->source_port);
     else
@@ -1204,24 +1200,24 @@ BOOLEAN igmp_send_igmp_message (MCGRP_CLASS *igmp,
         sptr_igmp_message->checksum = calculate_ip_checksum (NULL, (BYTE *) 
                 sptr_igmp_message, igmp_message_size);
     }
-    cmsg = calloc (1, sizeof(union mld_in6_cmsg));
+    cmsg = calloc(1, sizeof(union mld_in6_cmsg));
     if (cmsg == NULL)
     {
-        L2MCD_VLAN_LOG_ERR(tx_port_number,"IGMP:%s()%d IGMP.VRF%d.ERR: Failed to allocate cmsg.\n",FN,LN, igmp->vrf_index);
+        L2MCD_VLAN_LOG_ERR(tx_port_number, "IGMP:%s()%d IGMP.VRF%d.ERR: Failed to allocate cmsg.\n", FN, LN, igmp->vrf_index);
         return FALSE;
     }
 
     ifindex = portdb_get_port_ifindex(mld_portdb_tree, tx_port_number);
-    if(l2mcd_ifindex_is_physical(ifindex)) 
+    if (l2mcd_ifindex_is_physical(ifindex))
     {
         cmsg->vaddr.vlanid = mld_portdb_get_ivid_from_gvid(ifindex, MLD_ROUTE_PORT);
     }
     else
     {
-        cmsg->vaddr.vlanid = mld_get_ivid_vport(tx_port_number,MCAST_IPV4_AFI);
+        cmsg->vaddr.vlanid = mld_get_ivid_vport(tx_port_number, MCAST_IPV4_AFI);
     }
     cmsg->vaddr.port = physical_port;
-    vlan_id = cmsg->vaddr.vlanid;
+    vlan_id          = cmsg->vaddr.vlanid;
 
     /* Leave sent by switch should have system mac and not host mac as TTL is 1 */
     if ((type == IGMP_V2_LEAVE_GROUP_TYPE) || (type == IGMP_V2_MEMBERSHIP_REPORT_TYPE) ||

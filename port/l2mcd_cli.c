@@ -296,7 +296,7 @@ void l2mcd_dump_ve_portdb_tree(void)
     for (port_entry = M_AVLL_FIRST(gMld.ve_portdb_tree); port_entry; port_entry = M_AVLL_NEXT(gMld.ve_portdb_tree, port_entry->node))
     {
         j+= snprintf(pbuf+j, L2MCD_PBUF_SIZE-j,"%4d  ", port_entry->port_index);
-        head = (port_link_list_t *)port_entry->opaque_data;
+        head = (port_link_list_t *)port_entry->ipv4_addr_data;
         while(head)
         {
             in.s_addr=htonl(head->value.ipaddress);
@@ -409,8 +409,8 @@ void l2mcd_print_global_var()
 	L2MCD_CLI_PRINT( "\n========================================");
 	L2MCD_CLI_PRINT( "\tIGMP Global Variables");
 	L2MCD_CLI_PRINT( "========================================");
-	L2MCD_CLI_PRINT("g_snooping_enabled=%d",gIgmp.g_snooping_enabled);
-	L2MCD_CLI_PRINT("no_flood_enable=%d",gIgmp.no_flood_enabled);
+	// L2MCD_CLI_PRINT("g_snooping_enabled=%d",gIgmp.g_snooping_enabled);
+	// L2MCD_CLI_PRINT("no_flood_enable=%d",gIgmp.no_flood_enabled);
 	L2MCD_CLI_PRINT("oper_version=%d",gIgmp.oper_version);
 	L2MCD_CLI_PRINT("Global Config Version=%d",gIgmp.cfg_version);
 	L2MCD_CLI_PRINT("Snooping Vlan Count=%d",gIgmp.mld_snp_vlan_count);
@@ -617,8 +617,8 @@ void dump_mcgrpl3if(int vid)
     L2MCD_CLI_PRINT( "ve_port_mask : 0x%p", mcgrp_vport->ve_port_mask);
     L2MCD_CLI_PRINT( "static_mcgrp_list_head : 0x%p", mcgrp_vport->static_mcgrp_list_head);
     L2MCD_CLI_PRINT( "rtr_port_list : 0x%p", mcgrp_vport->rtr_port_list);
-    L2MCD_CLI_PRINT( "verwarn_intvl_start : %d", mcgrp_vport->verwarn_intvl_start);
-    L2MCD_CLI_PRINT( "verwarn_count : %d", mcgrp_vport->verwarn_count);
+    // L2MCD_CLI_PRINT( "verwarn_intvl_start : %d", mcgrp_vport->verwarn_intvl_start);
+    // L2MCD_CLI_PRINT( "verwarn_count : %d", mcgrp_vport->verwarn_count);
     L2MCD_CLI_PRINT( "flags : %d", mcgrp_vport->flags);
     L2MCD_CLI_PRINT( "is_l3_up : %d", mcgrp_vport->is_l3_up);
     L2MCD_CLI_PRINT( "pims_enable : %d", mcgrp_vport->pims_enable);

@@ -341,7 +341,7 @@ void l2mcd_mld_process_v1_report(IP6_RX_PKT_MSG* mld_msg)
             mld_msg->ip_param.rx_physical_port_number,
             mcast_print_addr(&mld_msg->ip_param.source_address));
 
-    mld_msg->ip_param.version = MLD_VER_1;
+    mld_msg->ip_param.version = MLD_VERSION_1;
     MLD_PACKET *mld_packet = (MLD_PACKET*)mld_msg->pkt_data;
     MLD_MESSAGE *mld_v1_report = &mld_packet->mld_message;
     
@@ -464,7 +464,7 @@ void l2mcd_mld_process_done(IP6_RX_PKT_MSG* mld_msg)
         return;
     }
     
-    mld_msg->ip_param.version = MLD_VER_1;
+    mld_msg->ip_param.version = MLD_VERSION_1;
     
     MLD_MESSAGE* mld_v1_report = NULL;
     MLD_PACKET* mld_v1_packet = NULL;
@@ -551,7 +551,7 @@ void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_pkt_msg)
         return;
     }
 
-    UINT8 mldver = MLD_VER_2;
+    UINT8 mldver = MLD_VERSION_2;
     mld_pkt_msg->ip_param.version = mldver;
     mld_vport = gMld.port_list[rx_port_number];
 
@@ -721,13 +721,13 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
     {
         L2MCD_VLAN_LOG_ERR(tx_port_number, "MLD:%s()%d MLD. ERR: [ Port %s,%s, Grp %s ] BUG !!! Request to send a Version None pkt\n", FN, LN,
                            mld_get_if_name_from_ifindex(physical_port), mld_get_if_name_from_port(tx_port_number), mcast_print_addr(&group_addr));
-        version = MLD_VER_1;
+        version = MLD_VERSION_1;
     }
 
     // ---------------------------------------------------------
     // 1. Memory Allocation
     // ---------------------------------------------------------
-    if (version == MLD_VER_1)
+    if (version == MLD_VERSION_1)
     {
         packet_total_size = sizeof(MLD_PACKET);
         sptr_mld_packet = (MLD_PACKET *)calloc(1, packet_total_size);
@@ -743,7 +743,7 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
         sptr_mld_message = &sptr_mld_packet->mld_message;
         mld_message_size = sizeof(MLD_MESSAGE);
     }
-    else if (version == MLD_VER_2)
+    else if (version == MLD_VERSION_2)
     {
         if (src_list)
         {
@@ -798,7 +798,7 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
 
     switch (version)
     {
-    case MLD_VER_1:
+    case MLD_VERSION_1:
     {
         sptr_mld_message->type = type;
         sptr_mld_message->code = 0;
@@ -810,7 +810,7 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
         memcpy(&sptr_mld_message->group_address, &group_address, sizeof(IPV6_ADDRESS));
         break;
     }
-    case MLD_VER_2:
+    case MLD_VERSION_2:
     {
         sptr_mldv2_message->type = type;
         sptr_mldv2_message->code = 0;
@@ -907,8 +907,8 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
     // 4. Checksum Calculation (ICMPv6 includes Pseudo-Header)
     // ---------------------------------------------------------
 
-    UINT8 *msg_ptr = (version == MLD_VER_2) ? (UINT8 *)sptr_mldv2_message : (UINT8 *)sptr_mld_message;
-    if (version == MLD_VER_2)
+    UINT8 *msg_ptr = (version == MLD_VERSION_2) ? (UINT8 *)sptr_mldv2_message : (UINT8 *)sptr_mld_message;
+    if (version == MLD_VERSION_2)
     {
         sptr_mldv2_message->checksum = 0;
         // calculate_icmpv6_checksum must handle IPv6 Pseudo Header + Payload
@@ -972,7 +972,7 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
     rx_pkt_msg.ip_param.rx_physical_port_number = physical_port;
     rx_pkt_msg.ip_param.vrf_index = L2MCD_DEFAULT_VRF_IDX;
     rx_pkt_msg.ip_param.vlan_id = vlan_id;
-    rx_pkt_msg.pkt_data = (version == MLD_VER_2) ? (void *)sptr_mldv2_packet : (void *)sptr_mld_packet;
+    rx_pkt_msg.pkt_data = (version == MLD_VERSION_2) ? (void *)sptr_mldv2_packet : (void *)sptr_mld_packet;
     rx_pkt_msg.pkt_size = packet_total_size;
 
     MADDR_ST dest_addr_st;
@@ -1029,7 +1029,7 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
     L2MCD_VLAN_LOG_DEBUG(tx_port_number, "dest ip: %s", mcast_print_addr(&dest_addr_st));
 
     // Cleanup
-    if (version == MLD_VER_2)
+    if (version == MLD_VERSION_2)
         free(sptr_mldv2_packet);
     else
         free(sptr_mld_packet);

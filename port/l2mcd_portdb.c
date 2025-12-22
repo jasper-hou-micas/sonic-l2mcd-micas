@@ -297,8 +297,8 @@ portdb_get_port_lowest_ipv4_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 p
 
     port_entry  = portdb_find_port_entry(portdb_tree, port_index);
     if(port_entry) {
-        if(port_entry->opaque_data)
-            return port_entry->opaque_data; 
+        if(port_entry->ipv4_addr_data)
+            return port_entry->ipv4_addr_data; 
     }
 
 	return (0);
@@ -341,11 +341,7 @@ int portdb_remove_port_entry_from_tree(L2MCD_AVL_TREE *portdb_tree, unsigned int
     portdb_entry_t *port_entry;
 
     port_entry = portdb_find_port_entry(portdb_tree, port_index);
-    if (!port_entry || port_entry->opaque_data) {
-        return -1;
-    }
-    
-    if (port_entry->ip6_enabled && port_entry->ip6->number_of_ip6_addresses) {
+    if (!port_entry || port_entry->ipv4_addr_data || listhead(port_entry->ip6->ip6_address_list)) {
         return -1;
     }
 
@@ -449,7 +445,7 @@ portdb_insert_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
     ipv4_entry->vrf_index = vrf_index;
     ipv4_entry->flags = flags;
 
-    head = (port_link_list_t *)port_entry->opaque_data;
+    head = (port_link_list_t *)port_entry->ipv4_addr_data;
 
     while(head && head->value.ipaddress < ipaddress)
     {
@@ -461,9 +457,9 @@ portdb_insert_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
         temp_entry->next = prev->next;
         prev->next = temp_entry;
     } else {
-        temp = port_entry->opaque_data;
+        temp = port_entry->ipv4_addr_data;
         temp_entry->next = temp;
-        port_entry->opaque_data = temp_entry;
+        port_entry->ipv4_addr_data = temp_entry;
     }
 }
 
@@ -477,7 +473,7 @@ portdb_remove_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, UIN
     if(!port_entry)
         return 1;
 
-    head = (port_link_list_t *)port_entry->opaque_data;
+    head = (port_link_list_t *)port_entry->ipv4_addr_data;
 
     while(head && head->value.ipaddress != ipaddress)
     {
@@ -489,11 +485,11 @@ portdb_remove_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, UIN
         if(prev) {
             prev->next = head->next;
         } else
-            port_entry->opaque_data = head->next;
+            port_entry->ipv4_addr_data = head->next;
         free(head);
         head=NULL;
     }
-    if (!port_entry->opaque_data) return 0;
+    if (!port_entry->ipv4_addr_data) return 0;
     return 1;
 }
 
