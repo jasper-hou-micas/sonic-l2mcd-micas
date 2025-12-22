@@ -120,6 +120,6 @@ int portdb_remove_port_entry_from_tree(L2MCD_AVL_TREE *portdb_tree, unsigned int
 int portdb_add_port_entry_to_tree(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index, 
             VRF_INDEX vrf_id, unsigned long ifindex);
 int portdb_remove_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, UINT32 ipaddress);
-int portdb_remove_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, IPV6_ADDRESS ip6address);
+int portdb_remove_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, IPV6_ADDRESS *ip6address);
 unsigned long portdb_get_port_ifindex(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index);
 #endif //__L2MCD_PORTDB__

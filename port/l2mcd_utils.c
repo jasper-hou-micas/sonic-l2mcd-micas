@@ -207,7 +207,7 @@ int l2mcd_portstate_update(int kif, int state, char *iname)
 }
 int l2mcd_port_list_update(char *pnames, int oper_state, int is_add) 
 {
-    int ifidx, kif, rc;
+    int ifidx, kif, rc = 0;
     l2mcd_if_tree_t *if_tree = NULL;
     struct event *igmp_rx_event = NULL;
     struct event *mld_rx_event = NULL;

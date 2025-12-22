@@ -411,7 +411,7 @@ void l2mcd_clear_snooping(int vid);
 void portdb_insert_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
                      UINT32 ipaddress, UINT8 prefix_length, VRF_INDEX vrf_index, UINT32 flags);
 void portdb_insert_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
-                     IPV6_ADDRESS ipaddress, UINT8 prefix_length, VRF_INDEX vrf_index, UINT32 flags);
+                     IPV6_ADDRESS *ipaddress, UINT8 prefix_length, VRF_INDEX vrf_index, UINT32 flags);
 int l2mcd_portstate_update(int kif, int state, char *iname);
 int l3_time_freq_init(void);
 int l2mcd_port_list_update(char *pnames, int oper_state, int is_add);

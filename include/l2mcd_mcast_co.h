@@ -596,7 +596,7 @@ typedef struct MCGRP_L3IF
     UINT32  pims_num_wg_entries;
     UINT32  pims_num_sg_entries;
     // Statistics
-    // UINT32 rx_bad_if;
+    UINT32 rx_bad_if;
 } MCGRP_L3IF;
 
 typedef struct MCGRP_CLASS
@@ -656,8 +656,8 @@ typedef struct MCGRP_GLOBAL_CLASS
     generic_pool_struct *src_specific_client_pool;
     // BOOLEAN              g_snooping_enabled;
     // BOOLEAN              no_flood_enabled;
-    // L2MCD_AVL_TREE       portdb_tree;    // Mainly for ipv6 addresses and port_state
-    // L2MCD_AVL_TREE       ve_portdb_tree; // Used for Ve port
+    L2MCD_AVL_TREE       portdb_tree;    // Mainly for ipv6 addresses and port_state
+    L2MCD_AVL_TREE       ve_portdb_tree; // Used for Ve port
     UINT8                mac[6];
     UINT8                cfg_version;  // configured version, if any (0,1,2 or 3)
     UINT8                oper_version; // version we are operating at (1,2 or 3)
@@ -1306,6 +1306,9 @@ UINT32 ip_get_lowest_ip_address_on_port(UINT16 port_number, uint8_t type);
 IPV6_ADDRESS ip_get_lowest_ipv6_address_on_port(UINT16 port_number, uint8_t type);
 BOOLEAN igmp_update_ssm_parameters(MCGRP_CLASS *mcgrp, MADDR_ST *group_addr, UINT8 *version,
         PORT_ID vir_port_id, UINT32 phy_port_id, UINT8 *igmp_action, UINT16 *num_srcs,
+        UINT32 **src_list);
+BOOLEAN mld_update_ssm_parameters(MCGRP_CLASS *mcgrp, MADDR_ST *group_addr, UINT8 *version,
+        PORT_ID vir_port_id, UINT32 phy_port_id, UINT8 *mld_action, UINT16 *num_srcs,
         UINT32 **src_list);
 MCGRP_MBRSHP* mcgrp_update_group_address_table (MCGRP_CLASS *mcgrp, UINT16 vir_port_id, 
         UINT32 phy_port_id, MADDR_ST *group_address, MADDR_ST *clnt_src_ip, 

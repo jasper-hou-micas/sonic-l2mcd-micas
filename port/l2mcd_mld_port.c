@@ -45,8 +45,7 @@ uint32_t pim_get_ifindex_from_port(int port)
 }
 
 /* MLDS Set Query Interval */		
-int 
-mld_query_interval_set(uint32_t afi, uint32_t vid, uint32_t query_interval , uint8_t type)
+int mld_query_interval_set(uint32_t afi, uint32_t vid, uint32_t query_interval , uint8_t type)
 {
 	int ret = MLD_SUCCESS;
 	mld_vlan_node_t *vlan_node = NULL;
@@ -95,8 +94,7 @@ mld_query_interval_set(uint32_t afi, uint32_t vid, uint32_t query_interval , uin
 }
 
 /*MLD Snooping Query Max Response Time Set*/
-int
-mld_query_max_response_time_set(uint32_t afi, uint32_t vid, uint32_t qmrt, uint8_t type)
+int mld_query_max_response_time_set(uint32_t afi, uint32_t vid, uint32_t qmrt, uint8_t type)
 {
 	int ret = MLD_SUCCESS;
 	mld_vlan_node_t *vlan_node  = NULL;
@@ -124,16 +122,13 @@ mld_query_max_response_time_set(uint32_t afi, uint32_t vid, uint32_t qmrt, uint8
 		ret = mld_proto_query_max_response_time_set(afi, vlan_node->ivid,
 						      qmrt, vlan_node->type);
 	else
-		L2MCD_LOG_NOTICE("%s %d %d %d", FN, LN, vid,
-			       vlan_node->ivid);
+        L2MCD_LOG_NOTICE("%s %d %d %d", FN, LN, vid, vlan_node->ivid);
 
-      EXIT:
-	return (ret);
+    return (ret);
 }
 
 /*Last Member Query Interval value set*/
-int
-mld_lmqi_set(uint32_t afi, uint32_t vid, uint32_t lmqi, uint8_t type)
+int mld_lmqi_set(uint32_t afi, uint32_t vid, uint32_t lmqi, uint8_t type)
 {
     	int ret = 0;
 	mld_vlan_node_t *vlan_node  = NULL;
@@ -164,7 +159,6 @@ mld_lmqi_set(uint32_t afi, uint32_t vid, uint32_t lmqi, uint8_t type)
 		L2MCD_LOG_NOTICE("%s %d %d %d", FN, LN, vid,
 				vlan_node->ivid);
 
-      EXIT:
 	return (ret);
 }
 
@@ -275,8 +269,7 @@ int mld_if_set_version_api(int vrf_index, uint32_t vid, int version, int afi,uin
 	return 0; 
 }
 
-int
-mld_snooping_mrouter_if_set_api(int vid, int iftype, char *ifname,
+int mld_snooping_mrouter_if_set_api(int vid, int iftype, char *ifname,
 				int enable, uint8_t afi, uint8_t type)
 {
 	ifindex_t ifindex = 0;
@@ -331,8 +324,7 @@ mld_snooping_mrouter_if_set_api(int vid, int iftype, char *ifname,
 }
 
 /*MLD Static Group set function*/
-int 
-mld_static_group_source_set(uint32_t vid, char *ifname, int iftype,
+int mld_static_group_source_set(uint32_t vid, char *ifname, int iftype,
 			    mcast_grp_addr_t * gaddr, enum BOOLEAN insert_flag, BOOLEAN is_ve, uint8_t type)
 {
 	MCGRP_CLASS      *mcgrp = NULL;
@@ -396,8 +388,7 @@ exit:
 }
 
 /*MLD Static Group unset function*/
-    int 
-mld_static_group_source_unset(uint32_t vid, char *ifname, int iftype,
+int mld_static_group_source_unset(uint32_t vid, char *ifname, int iftype,
         mcast_grp_addr_t * gaddr,
         enum BOOLEAN insert_flag, BOOLEAN is_ve, uint8_t type)
 {
@@ -513,8 +504,7 @@ int mld_if_snoop_unset(uint32_t afi, uint32_t vid, int user_cfg, uint8_t type)
 }
 
 /*Set MLD Snooping on an interface*/
-int
-mld_if_snoop_set(uint32_t afi, uint16_t vid, int user_cfg, uint8_t type)
+int mld_if_snoop_set(uint32_t afi, uint16_t vid, int user_cfg, uint8_t type)
 {
 	VRF_INDEX vrfid = MLD_DEFAULT_VRF_ID;
 	MCGRP_CLASS *mld = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, vrfid);
@@ -706,8 +696,7 @@ int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
 }
 
 /*Unset MLD Snooping Querier*/
-int
-mld_snoop_querier_unset(uint32_t afi, uint16_t vid, uint8_t type)
+int mld_snoop_querier_unset(uint32_t afi, uint16_t vid, uint8_t type)
 {
     int ret = MLD_SUCCESS;
 	MCGRP_L3IF *mcgrp_vport = NULL;
@@ -747,8 +736,7 @@ mld_snoop_querier_unset(uint32_t afi, uint16_t vid, uint8_t type)
 }
 
 /*Set fastleave*/
-int
-mld_fastleave_set(uint32_t afi, uint32_t vid, uint8_t type)
+int mld_fastleave_set(uint32_t afi, uint32_t vid, uint8_t type)
 {
     int ret = MLD_SUCCESS;
     mld_vlan_node_t *vlan_node  = NULL;
@@ -776,8 +764,7 @@ mld_fastleave_set(uint32_t afi, uint32_t vid, uint8_t type)
 }
 
 /*Unset fastleave*/
-int
-mld_fastleave_unset(uint32_t afi, uint32_t vid, uint8_t type)
+int mld_fastleave_unset(uint32_t afi, uint32_t vid, uint8_t type)
 {
     int ret = MLD_SUCCESS;
 	MCGRP_L3IF *mcgrp_vport = NULL;
@@ -811,8 +798,7 @@ mld_fastleave_unset(uint32_t afi, uint32_t vid, uint8_t type)
 }
 
 /*Set MLD Snooping Querier*/
-int
-mld_snoop_querier_set(uint32_t afi, uint16_t vid, uint8_t type)
+int mld_snoop_querier_set(uint32_t afi, uint16_t vid, uint8_t type)
 {
     int ret = MLD_SUCCESS;
 	mld_vlan_node_t *vlan_node  = NULL;
@@ -1793,7 +1779,7 @@ int mld_vlan_clear_group(uint32_t ifindex, MADDR_ST * grp_addr_clr,
 	    MCGRP_GET_INSTANCE_FROM_VRFINDEX(grp_addr_clr->afi, vrfid);
 	PORT_ID vport;
 	MCGRP_L3IF *mld_vport = NULL;
-    MCGRP_STATIC_ENTRY  *mcgrp_st_entry = NULL;
+    // MCGRP_STATIC_ENTRY  *mcgrp_st_entry = NULL;
 	int ret = MLD_SUCCESS;
 
 	//ifindex = l2mcd_ifindex_create_logical_idx(L2MCD_IF_TYPE_SVI, vlan_id);
@@ -1809,7 +1795,7 @@ int mld_vlan_clear_group(uint32_t ifindex, MADDR_ST * grp_addr_clr,
 	L2MCD_LOG_INFO("%s(%d) ifindex:0x%x vport:%d %s ", FN, LN, ifindex, vport, mld_get_if_name_from_port(vport));
     ret = _mld_clear_group(mld, mld_vport, grp_addr_clr, clr_grp_flag);
 
-    mcgrp_st_entry = mld_vport->static_mcgrp_list_head;
+    // mcgrp_st_entry = mld_vport->static_mcgrp_list_head;
 
 	/*community add static entry back after vlan snp disable clear group all entry
 	 * but local need keep:
@@ -1922,48 +1908,51 @@ IPV6_ADDRESS mld_portdb_get_port_lowest_ipv6_addr_from_list(uint32_t port_num)
 
 void insert_linklocal_ipv6_into_portdb(int port_id)
 {
-    char ifname_buf[IFNAMSIZ] = {0};
-    const char *ifname = portdb_get_ifname_from_portindex(port_id);
+    char        ifname_buf[IFNAMSIZ] = {0};
+    const char *ifname               = portdb_get_ifname_from_portindex(port_id);
 
-    if (!ifname) {
+    if (!ifname)
+    {
         L2MCD_LOG_ERR("%s: Failed to get interface name for port %d", FN, port_id);
         return;
     }
-	L2MCD_LOG_DEBUG("%s: Original ifname for port %d is '%s'", FN, port_id, ifname);
+    L2MCD_LOG_DEBUG("%s: Original ifname for port %d is '%s'", FN, port_id, ifname);
     // VLAN -> Vlan
-    if (strncmp(ifname, "VLAN", 4) == 0 && strlen(ifname) > 4) {
+    if (strncmp(ifname, "VLAN", 4) == 0 && strlen(ifname) > 4)
+    {
         snprintf(ifname_buf, sizeof(ifname_buf), "Vlan%s", ifname + 4);
         ifname = ifname_buf;
     }
-	L2MCD_LOG_DEBUG("%s: Original ifname for port %d is '%s'", FN, port_id, ifname);
+    L2MCD_LOG_DEBUG("%s: Original ifname for port %d is '%s'", FN, port_id, ifname);
 
     struct ifaddrs *ifaddr = NULL, *ifa = NULL;
-    if (getifaddrs(&ifaddr) != 0) {
+    if (getifaddrs(&ifaddr) != 0)
+    {
         L2MCD_LOG_ERR("%s: getifaddrs failed", FN);
         return;
     }
 
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) 
-	{
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
         if (!ifa->ifa_addr || strcmp(ifa->ifa_name, ifname) != 0)
             continue;
 
-        if (ifa->ifa_addr->sa_family == AF_INET6) {
-            struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
-            char addr_str[INET6_ADDRSTRLEN] = {0};
+        if (ifa->ifa_addr->sa_family == AF_INET6)
+        {
+            struct sockaddr_in6 *sin6                       = (struct sockaddr_in6 *)ifa->ifa_addr;
+            char                 addr_str[INET6_ADDRSTRLEN] = {0};
             inet_ntop(AF_INET6, &sin6->sin6_addr, addr_str, sizeof(addr_str));
 
-            if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+            if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+            {
                 IPV6_ADDRESS ip6_address;
                 memset(&ip6_address, 0, sizeof(IPV6_ADDRESS));
                 memcpy(ip6_address.address.address8, sin6->sin6_addr.s6_addr, 16);
 
-                L2MCD_LOG_INFO("%s: Found link-local IPv6 %s on interface %s (port %d)", 
-                                FN, addr_str, ifname, port_id);
+                L2MCD_LOG_INFO("%s: Found link-local IPv6 %s on interface %s (port %d)", FN, addr_str, ifname, port_id);
 
                 portdb_add_port_entry_to_tree(&gMld.ve_portdb_tree, port_id, L2MCD_DEFAULT_VRF_IDX, port_id);
-                portdb_insert_addr_ipv6_list(&gMld.ve_portdb_tree, port_id,
-                                             ip6_address, 64, L2MCD_DEFAULT_VRF_IDX, 0);
+                portdb_insert_addr_ipv6_list(&gMld.ve_portdb_tree, port_id, &ip6_address, 64, L2MCD_DEFAULT_VRF_IDX, 0);
             }
         }
     }
@@ -2081,10 +2070,7 @@ void mcgrp_delete_router_port(MCGRP_CLASS * mcgrp,
 			 MCGRP_L3IF * mcgrp_vport, UINT32 phy_port_id)
 {
     MCGRP_ROUTER_ENTRY  *mcgrp_rport = NULL, *mcgrp_prev_rport = NULL;
-    MCGRP_PORT_ENTRY *mcgrp_pport = NULL;
-	//MCGRP_ENTRY	*mcgrp_entry, *next_entry;
 	mcgrp_rport = mcgrp_vport->rtr_port_list;
-	//bool_t	wg_grp_del = FALSE;
 
 	while (mcgrp_rport && (mcgrp_rport->phy_port_id != phy_port_id)) {
         mcgrp_prev_rport = mcgrp_rport;
@@ -2112,18 +2098,15 @@ void mcgrp_delete_router_port(MCGRP_CLASS * mcgrp,
 	l2mcd_system_mrouter_notify(mcgrp_vport->vir_port_id, phy_port_id, mcgrp_rport->is_static, 0, is_igmp);
 
     dy_free(mcgrp_rport);
-
-    mcgrp_pport = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
 }
 
-MCGRP_ROUTER_ENTRY *
-mcgrp_add_router_port(MCGRP_CLASS * mcgrp,
-		      MCGRP_L3IF * mcgrp_vport,
-              UINT32        phy_port_id,
-		      BOOLEAN is_static, UINT16 type, UINT16 time, BOOLEAN is_mclag_remote)
+MCGRP_ROUTER_ENTRY *mcgrp_add_router_port(MCGRP_CLASS *mcgrp,
+            MCGRP_L3IF  *mcgrp_vport,
+            UINT32       phy_port_id,
+            BOOLEAN is_static, UINT16 type, UINT16 time, BOOLEAN is_mclag_remote)
 {
     MCGRP_ROUTER_ENTRY  *new_mcgrp_rport;
-    MCGRP_PORT_ENTRY *mcgrp_pport = NULL;
+    // MCGRP_PORT_ENTRY *mcgrp_pport = NULL;
 	char *if_name =NULL;
 	if_name = portdb_get_ifname_from_portindex(phy_port_id);
 
@@ -2134,8 +2117,7 @@ mcgrp_add_router_port(MCGRP_CLASS * mcgrp,
         return NULL;
     }
 
-	new_mcgrp_rport =
-	    mcgrp_find_router_port_entry(mcgrp_vport, phy_port_id);
+	new_mcgrp_rport = mcgrp_find_router_port_entry(mcgrp_vport, phy_port_id);
 	if (new_mcgrp_rport) {
 		if (new_mcgrp_rport->is_static)
 			return NULL;
@@ -2179,7 +2161,7 @@ mcgrp_add_router_port(MCGRP_CLASS * mcgrp,
     
 	new_mcgrp_rport->phy_port_id = phy_port_id;
 	// Inherit the operating version from the virtual port's version
-	new_mcgrp_rport->cfg_version  = MLD_NONE;
+	new_mcgrp_rport->cfg_version  = MLD_VERSION_NONE;
 	new_mcgrp_rport->type = type;
 	new_mcgrp_rport->time = time;
 	// Prepend the port to the list of ports
@@ -2191,8 +2173,7 @@ mcgrp_add_router_port(MCGRP_CLASS * mcgrp,
 	else {
 		mcgrp_vport->rtr_port_list->is_static = FALSE;
 		// Add to the wheel timer.
-		mcgrp_vport->rtr_port_list->mrtr_tmr.timer_type =
-			MCGRP_WTE_MROUTER;
+		mcgrp_vport->rtr_port_list->mrtr_tmr.timer_type = MCGRP_WTE_MROUTER;
 		mcgrp_vport->rtr_port_list->mrtr_tmr.mcgrp = mcgrp;
 		mcgrp_vport->rtr_port_list->mrtr_tmr.wte.mrtr_port.mcgrp_vport = mcgrp_vport;
 		mcgrp_vport->rtr_port_list->mrtr_tmr.wte.mrtr_port.phy_port_id = phy_port_id;
@@ -2203,9 +2184,9 @@ mcgrp_add_router_port(MCGRP_CLASS * mcgrp,
 					      (UINT32) time);
 	}
 	// Notify to write to the redis AppDB
-	BOOLEAN is_igmp = (IS_IGMP_CLASS(mcgrp))?TRUE:FALSE;
-	l2mcd_system_mrouter_notify(mcgrp_vport->vir_port_id, phy_port_id, is_static, 1, is_igmp);
-	mcgrp_pport =   mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
+    BOOLEAN is_igmp = (IS_IGMP_CLASS(mcgrp)) ? TRUE : FALSE;
+    l2mcd_system_mrouter_notify(mcgrp_vport->vir_port_id, phy_port_id, is_static, 1, is_igmp);
+	// mcgrp_pport =   mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
 	return (MLD_SUCCESS);
 }
 
@@ -3612,7 +3593,7 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
     UINT16 pkt_size = mld_pkt_msg->pkt_size;
     int vid = 0;
     UINT8 mldver = MLD_VERSION_NONE;
-    UINT16 mesg_size = NULL;
+    UINT16 mesg_size = 0;
     MADDR_ST dest_addr, group_addr;
 
     mcast_init_addr(&dest_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
@@ -3679,7 +3660,6 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
     mcast_set_ipv6_addr(&allnodes_addr, &allnodes);
     mcast_set_ipv6_addr(&allrouters_addr, &allrouters);
     mcast_set_ipv6_addr(&mldv2_addr, &mldv2);
-    char *if_name = portdb_get_ifname_from_portindex(mld_pkt_msg->ip_param.rx_physical_port_number);
     mld_vport = gMld.port_list[vir_port_id];
     vid = mld_l3_get_port_from_ifindex(vir_port_id, MLD_VLAN);
     switch (icmp6h->type)

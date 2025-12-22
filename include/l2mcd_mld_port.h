@@ -62,6 +62,7 @@ int mld_if_snoop_unset(uint32_t afi, uint32_t vid, int user_cfg, uint8_t type);
 int mld_if_snoop_set(uint32_t afi, uint16_t vid, int user_cfg, uint8_t type);
 int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
 							uint8_t type, int lif_type, int lif_state, int tagged);
+void mld_static_mr_grp_replay_confg(mld_vlan_node_t * vlan_node, int afi, uint32_t phy_port);
 int mld_snoop_querier_unset(uint32_t afi, uint16_t vid, uint8_t type);
 int mld_fastleave_set(uint32_t afi, uint32_t vid, uint8_t type);
 int mld_fastleave_unset(uint32_t afi, uint32_t vid, uint8_t type);

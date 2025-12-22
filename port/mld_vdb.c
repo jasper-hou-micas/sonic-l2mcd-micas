@@ -841,9 +841,9 @@ int mld_set_vlan_dcm_flag(uint32_t gvid,uint8_t type)
     mld_vlan_node_t *vlan_node = NULL;
 
     vlan_node = mld_vdb_vlan_get(gvid,type);
-    if(vlan_node)
+    if (vlan_node)
         SET_FLAG(vlan_node->rcvd_nsm_add, MLD_VLAN_DCM);
-	return 0;
+    return 0;
 }
 
 void mld_vlan_delete_confg(mld_vlan_node_t *vlan_node)

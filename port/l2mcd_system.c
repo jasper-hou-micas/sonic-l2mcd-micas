@@ -851,7 +851,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 {
                     grpaddr.afi = MCAST_IPV6_AFI;
                     inet_pton(AF_INET6, data->gaddr, &grpaddr.ip.ipv6_addr);
-                    portdb_insert_addr_ipv6_list(&gMld.ve_portdb_tree, vlan_id, (IPV6_ADDRESS)grpaddr.ip.ipv6_addr, val, L2MCD_DEFAULT_VRF_IDX, 0);
+                    portdb_insert_addr_ipv6_list(&gMld.ve_portdb_tree, vlan_id, (IPV6_ADDRESS *)&grpaddr.ip.ipv6_addr, val, L2MCD_DEFAULT_VRF_IDX, 0);
                 }
             }
             else
@@ -866,7 +866,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 {
                     grpaddr.afi = MCAST_IPV6_AFI;
                     inet_pton(AF_INET6, data->gaddr, &grpaddr.ip.ipv6_addr);
-                    rc = portdb_remove_addr_ipv6_list(&gMld.ve_portdb_tree, vlan_id, (IPV6_ADDRESS)grpaddr.ip.ipv6_addr);
+                    rc = portdb_remove_addr_ipv6_list(&gMld.ve_portdb_tree, vlan_id, (IPV6_ADDRESS *)&grpaddr.ip.ipv6_addr);
                     // portdb_remove_port_entry_from_tree(&gMld.ve_portdb_tree, vlan_id);
                 }
             }
@@ -1716,11 +1716,12 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
                 ip6h = (IPV6_HEADER *)(buf6 + sizeof(struct vlan_ethhdr));
                 L2MCD_LOG_NOTICE("real_proto == ETH_P_IPV6: %d", real_proto);
             }
-            L2MCD_LOG_NOTICE("vid: %d", vid2);
+            L2MCD_LOG_INFO("ether_type is not sopport  %d", ether_type);
+            continue;
         }
         else if (ether_type != ETH_P_IPV6)
         {
-            L2MCD_LOG_INFO("ether_type is mpt sopport  %d", ether_type);
+            L2MCD_LOG_INFO("ether_type is not sopport  %d", ether_type);
             continue;
         }
         else 

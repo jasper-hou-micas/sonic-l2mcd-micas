@@ -73,7 +73,6 @@ IPV6_ADDRESS ip_get_lowest_ipv6_address_on_port(UINT16 port_number, uint8_t type
         }
         else
         {
-            //insert_linklocal_ipv6_into_portdb(port_number);
             ip6_address = mld_portdb_get_port_lowest_ipv6_addr_from_list(port_number);
         }
     }
