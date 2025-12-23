@@ -20,7 +20,7 @@ BOOLEAN mld_check_if_checksum_is_valid(IPV6_ADDRESS *source_address, IPV6_ADDRES
     /* calculate checksum for the whole MLD message */
     if (icmp6h->checksum != 0x0000)
     {
-        calculated_checksum = calculate_ip6_checksum(source_address, dest_address, icmp6h, message_size, IP6_ICMPV6);
+        calculated_checksum = calculate_ip6_checksum(source_address, dest_address, (BYTE *)icmp6h, message_size, IP6_ICMPV6);
         if (calculated_checksum != 0x0000)
         {
             return FALSE;
@@ -96,7 +96,7 @@ void l2mcd_mld_process_query(IP6_RX_PKT_MSG* mld_pkt_msg)
     UINT8               mldver;
     MADDR_ST            group_addr;
     uint32_t            max_resp_time;
-    BOOLEAN             is_general_query;
+    // BOOLEAN             is_general_query;
 
     MLDV2_MESSAGE*      mldv2_qry_msg = NULL;
     MLD_MESSAGE*        mld_qry_msg = NULL;
@@ -206,7 +206,7 @@ void l2mcd_mld_process_query(IP6_RX_PKT_MSG* mld_pkt_msg)
         }
     }
 
-    L2MCD_VLAN_LOG_INFO(vir_port_id,"%s:%d:[vlan:%d] MLD. Querier Enable %d, addr %p",FN,LN, vir_port_id, mld_vport->querier);
+    L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] MLD. Querier Enable %d", FN, LN, vir_port_id, mld_vport->querier);
     if (mld_vport->querier == FALSE)
     {
         if (IP6_IS_ADDRESS_NOT_NULL(group_addr.ip.v6addr.address))
@@ -334,20 +334,19 @@ void l2mcd_mld_process_v1_report(IP6_RX_PKT_MSG* mld_msg)
         return;
     }
 
-    L2MCD_LOG_NOTICE("[MLD_V1] VLAN=%u rx_port=%hu rx_phy_port=%u SRC=%s",
-            mld_msg->ip_param.vlan_id,
-            mld_msg->ip_param.rx_port_number,
-            mld_msg->ip_param.rx_physical_port_number,
-            mcast_print_addr(&mld_msg->ip_param.source_address));
-
     mld_msg->ip_param.version = MLD_VERSION_1;
     MLD_PACKET *mld_packet = (MLD_PACKET*)mld_msg->pkt_data;
     MLD_MESSAGE *mld_v1_report = &mld_packet->mld_message;
-    
-    
+        
     MADDR_ST group_addr,source_addr;
     mcast_set_ipv6_addr(&group_addr, &mld_v1_report->group_address); 
-    mcast_set_ipv6_addr(&source_addr,&mld_msg->ip_param.source_address); 
+    mcast_set_ipv6_addr(&source_addr,&mld_msg->ip_param.source_address);
+
+    L2MCD_LOG_NOTICE("[MLD_V1] VLAN=%u rx_port=%hu rx_phy_port=%u SRC=%s",
+                     mld_msg->ip_param.vlan_id,
+                     mld_msg->ip_param.rx_port_number,
+                     mld_msg->ip_param.rx_physical_port_number,
+                     mcast_print_addr(&source_addr));
 
     L2MCD_LOG_NOTICE("[MLD_V1] Parsed MLDv1 Report: group=%s",
                      mcast_print_addr(&group_addr));
@@ -531,7 +530,6 @@ void l2mcd_mld_process_done(IP6_RX_PKT_MSG* mld_msg)
 
 void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_pkt_msg)
 {
-    MCGRP_MBRSHP    *mld_mbrshp = NULL;
     MCGRP_CLASS     *mld = MLD_GET_INSTANCE_FROM_VRFINDEX(L2MCD_DEFAULT_VRF_IDX);
     MCGRP_L3IF      *mld_vport = NULL;
     MADDR_ST        group_addr, src_addr;
@@ -566,8 +564,11 @@ void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_pkt_msg)
 
     if (is_mld_snooping_enabled(mld_vport, MCAST_IPV6_AFI))
     {
-        L2MCD_VLAN_LOG_INFO(rx_port_number, "%s:%d:[vlan:%d] send MLD V2 Report to Rtr ports", __FUNCTION__, __LINE__, rx_port_number);
-        mld_tx_reports_and_leave_rcvd_on_edge_port(&mld_pkt_msg->ip_param, dest_ip, mld, mld_vport);
+        L2MCD_VLAN_LOG_INFO(rx_port_number, "%s:%d:[vlan:%d] send MLD V2 Report to Rtr ports", FN, LN, rx_port_number);
+        MADDR_ST dest_addr;
+        mcast_init_addr(&dest_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
+        mcast_set_ipv6_addr(&dest_addr, &mldv2_group_packet->ip_header.destination_ip_address); 
+        mld_tx_reports_and_leave_rcvd_on_edge_port(&mld_pkt_msg->ip_param, &dest_addr, mld, mld_vport);
     }
 
     if (l2mcd_is_peerlink(portdb_get_ifname_from_portindex(rx_phy_port_number)))
@@ -610,15 +611,12 @@ void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_pkt_msg)
         
         if (num_srcs > 0)
         {
-            int eff_num_srcs = (int)num_srcs;
-
             for (int i = 0; i < num_srcs; i++)
             {
                 mcast_init_addr(&src_addr, IP_IPV6_AFI, MADDR_GET_FULL_PLEN(IP_IPV6_AFI));
                 mcast_set_ipv6_addr(&src_addr, &src_list[i]);
                 L2MCD_LOG_INFO("[MLD_V2] Src[%d]=%s", i, mcast_print_addr(&src_addr));
             }
-
         }
          if (num_srcs > 0 && ((mldv2_group_rec->type == IS_EXCL) || (mldv2_group_rec->type == TO_EXCL)))
         {
@@ -693,11 +691,9 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
     // Pointers for Message construction
     MLD_MESSAGE *sptr_mld_message = NULL;
     MLDV2_MESSAGE *sptr_mldv2_message = NULL;
-    MLDV2_REPORT_MESSAGE *sptr_mldv2_group_message = NULL;
 
     MLD_PACKET *sptr_mld_packet = NULL;
     MLDV2_PACKET *sptr_mldv2_packet = NULL;
-    MLDV2_GROUP_PACKET *sptr_mldv2_group_packet = NULL;
 
     UINT32 packet_total_size = 0;
     UINT32 mld_message_size = 0;
@@ -711,12 +707,12 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
     mcast_set_ipv6_addr(&source_addr, &source_address);
 
     L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] type:%d ver:%d G:%s,S:%s port:0x%x tx_port:0x%x type:%d",
-                         __FUNCTION__, __LINE__, tx_port_number, type, version, mcast_print_addr(&group_addr),
+                         FN, LN, tx_port_number, type, version, mcast_print_addr(&group_addr),
                          mcast_print_addr(&source_addr), physical_port, tx_port_number, type);
     // Prepare TX Message Wrapper
     memset(&rx_pkt_msg, 0, sizeof(rx_pkt_msg));
 
-    if (version == MLD_NONE)
+    if (version == MLD_VERSION_NONE)
     {
         L2MCD_VLAN_LOG_ERR(tx_port_number, "MLD:%s()%d MLD. ERR: [ Port %s,%s, Grp %s ] BUG !!! Request to send a Version None pkt\n", FN, LN,
                            mld_get_if_name_from_ifindex(physical_port), mld_get_if_name_from_port(tx_port_number), mcast_print_addr(&group_addr));
@@ -852,7 +848,7 @@ BOOLEAN mld_send_mld_message(MCGRP_CLASS *mld,
         sptr_mldv2_message->num_srcs = htons((UINT16)num_srcs);
 
         L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] MLDv2 num_srcs:%d mld_packet_size:%d alloc_buff_size:%d mld_type:%d",
-                             __FUNCTION__, __LINE__, tx_port_number, num_srcs, packet_total_size, mld_message_size, type);
+                             FN, LN, tx_port_number, num_srcs, packet_total_size, mld_message_size, type);
         break;
     }
     } /* switch (version) */
@@ -1230,8 +1226,8 @@ BOOLEAN mldv2_send_group_source_query(MCGRP_CLASS *mld,
                                  (MCGRP_SOURCE *)*p_src_list, FALSE /* all_srcs */,
                                  is_retx))
         {
-            L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d][ Port %d. Grp 0x%x ] Sent MLDv2 Grp-Src-Qry Ver %d. ReTx %d",
-                                FN, LN, vir_port_id, phy_port_id, group_address, MLD_VERSION_2, is_retx);
+            L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d][ Port %d. Grp 0x%s ] Sent MLDv2 Grp-Src-Qry Ver %d. ReTx %d",
+                                FN, LN, vir_port_id, phy_port_id, mcast_print_addr(&addr), MLD_VERSION_2, is_retx);
             /* Update stats */
             mld->mld_stats[vir_port_id].mld_xmt_grp_src_query_msg++;
         }
@@ -1268,8 +1264,7 @@ BOOLEAN mld_staticGroup_exists_on_port (IPV6_ADDRESS*  group_addr,
     while (mld_entry)
     {
         if (mld_entry->port_num == port_id &&
-                (IP6_IS_ADDRESS_UNSPECIFIED(group_addr->address)) ||
-            (mcast_cmp_addr(&grp_addr, &mld_entry->group_address) == 0))
+            (IP6_IS_ADDRESS_UNSPECIFIED(group_addr->address) || (mcast_cmp_addr(&grp_addr, &mld_entry->group_address) == 0)))
         {
             if (mld_is_member_tree(&(mld_entry->port_tree), phy_port))
             {
@@ -1303,7 +1298,7 @@ void mld_send_general_query(
     mld_vport = gMld.port_list[tx_port_number];
     if (mld_vport == NULL)
     {
-        L2MCD_VLAN_LOG_ERR(tx_port_number, "%s mld_vport not found for %d", __FUNCTION__, tx_port_number);
+        L2MCD_VLAN_LOG_ERR(tx_port_number, "%s mld_vport not found for %d", FN, tx_port_number);
         return;
     }
 
@@ -1321,7 +1316,7 @@ void mld_send_general_query(
 
             L2MCD_VLAN_LOG_DEBUG(tx_port_number,
                 "%s:%d:[vlan:%d] VE ipv6 lookup ifindex=0x%x port=0x%x",
-                __FUNCTION__, __LINE__, tx_port_number,
+                FN, LN, tx_port_number,
                 vlan_node->ve_ifindex, port_id);
         }
         else
@@ -1332,13 +1327,13 @@ void mld_send_general_query(
             src_address = ve_mld_portdb_get_port_lowest_ipv6_addr_from_list(port_id);
             L2MCD_VLAN_LOG_DEBUG(tx_port_number,
                 "%s:%d:[vlan:%d] Router ipv6 lookup",
-                __FUNCTION__, __LINE__, tx_port_number);
+                FN, LN, tx_port_number);
         }
     }
 
     L2MCD_VLAN_LOG_DEBUG(tx_port_number,
         "%s:%d:[vlan:%d] phy_port:0x%x version:%d",
-        __FUNCTION__, __LINE__,
+        FN, LN,
         tx_port_number, physical_port, version);
 
   
@@ -1349,7 +1344,7 @@ void mld_send_general_query(
 
     L2MCD_VLAN_LOG_DEBUG(tx_port_number,
         "%s:%d:[vlan:%d] Outgoing MLD Query src=%pI6 version=%d",
-        __FUNCTION__, __LINE__, tx_port_number,
+        FN, LN, tx_port_number,
         &src_addr, version);
 
     if (mld_send_mld_message(
@@ -1366,7 +1361,7 @@ void mld_send_general_query(
     {
         L2MCD_VLAN_LOG_DEBUG(tx_port_number,
             "%s:%d:[vlan:%d] Sent MLD General Query src=%pI6",
-            __FUNCTION__, __LINE__,
+            FN, LN,
             tx_port_number, &src_addr);
 
         mld->mld_stats[tx_port_number].mld_xmt_gen_query_msg[version-1]++;
@@ -1492,17 +1487,14 @@ BOOLEAN mld_send_group_query(MCGRP_CLASS     *mld,
 
 int receive_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
 {
-    MADDR_ST                    group_addr;
     MCGRP_L3IF                  *mld_vport  = NULL;
     ICMP6_PSEUDO_HDR_MESSAGE    *icmp6h     = NULL;
 
     VRF_INDEX vrf_index = mld_pkt_msg->ip_param.vrf_index;
     USHORT rx_vir_port = mld_pkt_msg->ip_param.rx_port_number;
     UINT32 rx_phy_port = mld_pkt_msg->ip_param.rx_physical_port_number;
-    UINT16 mld_packet_size = mld_pkt_msg->pkt_size;
     IPV6_HEADER *ip6h = (IPV6_HEADER *)mld_pkt_msg->pkt_data;
     MCGRP_CLASS *mld = MLD_GET_INSTANCE_FROM_VRFINDEX(vrf_index);
-    UINT8 mldver = MLD_VERSION_NONE;
     UINT8 nexthdr = ip6h->next_header;
     UINT16 hbh_len;
 
@@ -1565,4 +1557,5 @@ int receive_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
         l2mcd_mld_process_done(mld_pkt_msg);
         break;
     }
+    return 0;
 }

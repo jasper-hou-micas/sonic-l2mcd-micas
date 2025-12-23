@@ -678,7 +678,7 @@ typedef struct MCAST_CLASS
     // generic_pool_struct *sptr_glb_mld_pool;
     // generic_pool_struct *sptr_mldv2_sorted_list_pool;
     // UINT16               source_virtual_port;
-    // UINT32               source_port;
+    UINT32               source_port;
 
     // generic_pool_struct *sptr_oif_info_pool;
     // generic_pool_struct *sptr_vlan_info_pool;
@@ -1321,6 +1321,7 @@ enum BOOLEAN igmp_check_valid_range(UINT32  group_address);
 enum BOOLEAN mld_check_valid_range(IPV6_ADDRESS  *group_address);
 unsigned short l3_get_port_from_bd_id(unsigned int bd_id);
 void igmp_reset_default_values(MCGRP_CLASS *igmp);
+void mld_reset_default_values(MCGRP_CLASS *mld);
 void mld_vport_state_notify (UINT16   vir_port_id, UINT32   phy_port_id, BOOLEAN  up, MCGRP_CLASS *mld);
 enum BOOLEAN is_physical_or_lag_port(int port);
 void mcgrp_notify_source_del_allowed (MCGRP_CLASS *mcgrp, MADDR_ST *group_address,

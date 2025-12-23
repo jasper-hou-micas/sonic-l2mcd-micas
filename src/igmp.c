@@ -2650,7 +2650,7 @@ void mcgrp_refresh_static_group (MCGRP_CLASS         *mcgrp,
     MADDR_ST            *group_address;
     MADDR_ST             addr;
     UINT8                version = 0;
-    UINT8                igmp_action = 0;
+    UINT8                action = 0;
     UINT16               num_srcs = 0;
     UINT32              *src_list = NULL;
     sg_port_t           *sg_port;
@@ -2711,18 +2711,18 @@ void mcgrp_refresh_static_group (MCGRP_CLASS         *mcgrp,
         if (IS_IGMP_CLASS(mcgrp))
         {
             mcast_set_ipv4_addr(&addr, ip_get_lowest_ip_address_on_port(vir_port_id, mcgrp_vport->type));
-            igmp_action = IS_EXCL ;
+            action = IS_EXCL;
             if(igmp_update_ssm_parameters(mcgrp, group_address, &version, vir_port_id,
-                        phy_port_id, &igmp_action, &num_srcs, &src_list) == FALSE)
+                        phy_port_id, &action, &num_srcs, &src_list) == FALSE)
                 continue;
         }
         else
         {
             IPV6_ADDRESS lowest_v6_addr = ip_get_lowest_ipv6_address_on_port(vir_port_id, mcgrp_vport->type);
             mcast_set_ipv6_addr(&addr, &lowest_v6_addr);
-            UINT mld_action = IS_EXCL ;
+            action = IS_EXCL;
             if(mld_update_ssm_parameters(mcgrp, group_address, &version, vir_port_id,
-                        phy_port_id, &mld_action, &num_srcs, &src_list) == FALSE)
+                        phy_port_id, &action, &num_srcs, &src_list) == FALSE)
                 continue;
             //MLD
         }               
@@ -2730,7 +2730,7 @@ void mcgrp_refresh_static_group (MCGRP_CLASS         *mcgrp,
         mcgrp_update_group_address_table(mcgrp, vir_port_id, phy_port_id,
                 group_address, 
                 &addr,    // use intf's addr as client source
-                igmp_action,
+                action,
                 version,
                 num_srcs, (void *)src_list /* No sources */);
 

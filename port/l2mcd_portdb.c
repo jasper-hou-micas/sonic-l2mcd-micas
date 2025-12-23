@@ -289,8 +289,7 @@ int portdb_set_port_state(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index, 
     return 0;
 }
 
-port_link_list_t *
-portdb_get_port_lowest_ipv4_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index)
+port_link_list_t *portdb_get_port_lowest_ipv4_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index)
 {
     //UINT32 retcode;
     portdb_entry_t *port_entry;

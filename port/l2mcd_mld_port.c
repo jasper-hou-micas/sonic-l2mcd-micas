@@ -525,8 +525,7 @@ int mld_if_snoop_set(uint32_t afi, uint16_t vid, int user_cfg, uint8_t type)
 			return MLD_CLI_ERR_NO_SUCH_IFF;
 		}
 	}
-	L2MCD_LOG_INFO("%s: vid:%d, afi:%d, user_cfg:%d", FN, 
-												vid, afi, user_cfg);
+	L2MCD_LOG_INFO("%s: vid:%d, afi:%d, user_cfg:%d", FN, vid, afi, user_cfg);
     ifindex = l2mcd_ifindex_create_logical_idx(L2MCD_IF_TYPE_SVI, vid);
     sprintf(vlan_name,"VLAN%d", vid);
     mld_set_vlan_dcm_flag(vid,type);
@@ -544,14 +543,11 @@ int mld_if_snoop_set(uint32_t afi, uint16_t vid, int user_cfg, uint8_t type)
 	mld_set_vlan_flag(vlan_node, afi, MLD_SNOOPING_ENABLED);
 
     if (user_cfg) {
-	        mld_unset_vlan_flag(vlan_node, afi, MLD_IF_CFLAG_SNOOPING_DISABLED);
-	        mld_set_vlan_flag(vlan_node, afi, MLD_IF_CFLAG_SNOOPING_ENABLED);
+        mld_unset_vlan_flag(vlan_node, afi, MLD_IF_CFLAG_SNOOPING_DISABLED);
+        mld_set_vlan_flag(vlan_node, afi, MLD_IF_CFLAG_SNOOPING_ENABLED);
     }
 
-
-	ret =
-	    is_mld_vlan_snooping_allowed(vlan_node->gvid, MLD_DEFAULT_VRF_ID,
-					 mld, FALSE, vlan_node->type);
+    ret = is_mld_vlan_snooping_allowed(vlan_node->gvid, MLD_DEFAULT_VRF_ID, mld, FALSE, vlan_node->type);
 	if (ret == MLD_VLAN_FWD_REF) {
 		return (MLD_SUCCESS);
 	} else if (ret == MLD_MAX_VLAN_REACHED) {
