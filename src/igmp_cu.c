@@ -51,7 +51,7 @@ void igmp_enable (VRF_INDEX  vrf_index,  UINT8   protocol)
         igmp = mcgrp_vrf_alloc(IP_IPV4_AFI, vrf_index);
         if (igmp == NULL)
         {
-            L2MCD_LOG_NOTICE("%s:%d vrf allocate fail vrf %d ", __FUNCTION__, __LINE__, vrf_index);
+            L2MCD_LOG_NOTICE("%s:%d vrf allocate fail vrf %d ", FN, LN, vrf_index);
             return;
         }
     }
@@ -67,7 +67,7 @@ void igmp_enable (VRF_INDEX  vrf_index,  UINT8   protocol)
 
     static int group_address_offset = M_AVLL_OFFSETOF(GROUP_ENTRY, group_address.ip.v4addr);
     igmp->group_tree= L2MCD_AVL_CREATE(l2mcd_avl_compare_u32, (void *) &group_address_offset, NULL);
-    L2MCD_LOG_NOTICE("%s Completed vrf:%d protocol:%d igmp:%p group_tree:%p", __FUNCTION__,vrf_index, protocol, igmp, igmp->group_tree);
+    L2MCD_LOG_NOTICE("%s Completed vrf:%d protocol:%d igmp:%p group_tree:%p", FN,vrf_index, protocol, igmp, igmp->group_tree);
     return;
 }
 
@@ -138,8 +138,7 @@ void igmp_set_global_version (VRF_INDEX  vrf_index,
         // If the port does not exist or is part of a virtual port
         // or has a version explicitly configured, skip it.
         // The reason why we skip virtual port members is that they are taken care of later
-        if (igmp_vport == NULL ||
-                (!force && (igmp_vport->cfg_version != IGMP_VERSION_NONE)) )
+        if (igmp_vport == NULL || (!force && igmp_vport->cfg_version != IGMP_VERSION_NONE))
         {
             continue;
         }
@@ -152,8 +151,7 @@ void igmp_set_global_version (VRF_INDEX  vrf_index,
         // and if this is a virtual port, update its member ports too.
         if (MCGRP_IS_PORT_VIRTUAL(igmp_vport))
         {
-            igmp_update_ve_member_ports(igmp, igmp_vport, (UINT8)igmp_vport->oper_version, 
-                    force);
+            igmp_update_ve_member_ports(igmp, igmp_vport, (UINT8)igmp_vport->oper_version, force);
         }
         else
         {
@@ -195,8 +193,7 @@ int igmp_set_if_igmp_version (VRF_INDEX  vrf_index,
             return 0;
     }
 
-    L2MCD_LOG_DEBUG("%s(%d) vport:%d version:%d Prev vport->cfg_version:%d ", __FUNCTION__, __LINE__,
-            vport, version, igmp_vport->cfg_version);
+    L2MCD_LOG_DEBUG("%s(%d) vport:%d version:%d Prev vport->cfg_version:%d ", FN, LN, vport, version, igmp_vport->cfg_version);
     igmp_vport->cfg_version  = version;
     igmp_vport->oper_version = (igmp_vport->cfg_version == IGMP_VERSION_NONE) ?
         igmp->oper_version : igmp_vport->cfg_version;
@@ -204,17 +201,15 @@ int igmp_set_if_igmp_version (VRF_INDEX  vrf_index,
     // Update the version for this VE's member ports if this is a virtual port
     if (MCGRP_IS_PORT_VIRTUAL(igmp_vport))
     {
-        igmp_update_ve_member_ports(igmp, igmp_vport, (UINT8) igmp_vport->oper_version,
-                FALSE /* do not force */);
+        igmp_update_ve_member_ports(igmp, igmp_vport, (UINT8)igmp_vport->oper_version, FALSE /* do not force */);
     }
     else
     { 
         if (igmp_vport->phy_port_list)
         {
             igmp_vport->phy_port_list->oper_version = igmp_vport->oper_version;
-            (igmp->igmp_stats[igmp_vport->vir_port_id]).igmp_wrong_ver_query = 0;
-            L2MCD_LOG_DEBUG("%s(%d) phy_port:%d oper_version:%d ", __FUNCTION__, __LINE__, 
-                    igmp_vport->phy_port_list->phy_port_id, igmp_vport->phy_port_list->oper_version);
+            igmp->igmp_stats[igmp_vport->vir_port_id].igmp_wrong_ver_query = 0;
+            L2MCD_LOG_DEBUG("%s(%d) phy_port:%d oper_version:%d ", FN, LN, igmp_vport->phy_port_list->phy_port_id, igmp_vport->phy_port_list->oper_version);
         }
     }
     mcgrp_handle_intf_ver_change(igmp, igmp_vport);

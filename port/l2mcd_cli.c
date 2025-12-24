@@ -579,7 +579,7 @@ void dump_mcgrpl3if(int vid)
     L2MCD_CLI_PRINT( "vir_port_id : %d", mcgrp_vport->vir_port_id);
     L2MCD_CLI_PRINT( "phy_port_id : %d", mcgrp_vport->phy_port_id);
     L2MCD_CLI_PRINT( "is_ve : %d", mcgrp_vport->is_ve);
-    L2MCD_CLI_PRINT( "cfg_mcast_disable : %d", mcgrp_vport->cfg_mcast_disable);
+    // L2MCD_CLI_PRINT( "cfg_mcast_disable : %d", mcgrp_vport->cfg_mcast_disable);
     L2MCD_CLI_PRINT( "cfg_version : %d", mcgrp_vport->cfg_version);
     L2MCD_CLI_PRINT( "oper_version : %d", mcgrp_vport->oper_version);
     L2MCD_CLI_PRINT( "tracking_enabled : %d", mcgrp_vport->tracking_enabled);
@@ -620,7 +620,7 @@ void dump_mcgrpl3if(int vid)
     // L2MCD_CLI_PRINT( "verwarn_intvl_start : %d", mcgrp_vport->verwarn_intvl_start);
     // L2MCD_CLI_PRINT( "verwarn_count : %d", mcgrp_vport->verwarn_count);
     L2MCD_CLI_PRINT( "flags : %d", mcgrp_vport->flags);
-    L2MCD_CLI_PRINT( "is_l3_up : %d", mcgrp_vport->is_l3_up);
+    // L2MCD_CLI_PRINT( "is_l3_up : %d", mcgrp_vport->is_l3_up);
     L2MCD_CLI_PRINT( "pims_enable : %d", mcgrp_vport->pims_enable);
     L2MCD_CLI_PRINT( "pims_num_wg_entries : %d", mcgrp_vport->pims_num_wg_entries);
     L2MCD_CLI_PRINT( "pims_num_sg_entries : %d", mcgrp_vport->pims_num_sg_entries);
@@ -643,8 +643,8 @@ void dump_mcgrpl3if(int vid)
     rtr_port_list=mcgrp_vport->rtr_port_list;
     while(rtr_port_list)
     {
-        L2MCD_CLI_PRINT("mrtportr: %s ifindex:0x%x ver:%d static:%d",
-        portdb_get_ifname_from_portindex(rtr_port_list->phy_port_id), rtr_port_list->phy_port_id, rtr_port_list->cfg_version, rtr_port_list->is_static);
+        L2MCD_CLI_PRINT("mrtportr: %s ifindex:0x%x static:%d",
+        portdb_get_ifname_from_portindex(rtr_port_list->phy_port_id), rtr_port_list->phy_port_id, rtr_port_list->is_static);
         rtr_port_list=rtr_port_list->next;
     }
     L2MCD_CLI_PRINT( "========================================\n\n");

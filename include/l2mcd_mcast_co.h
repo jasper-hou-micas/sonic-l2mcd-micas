@@ -505,26 +505,11 @@ typedef struct MCGRP_PORT_ENTRY
     struct MCGRP_PORT_ENTRY *next; // For VE ports, this give the next elem
                                    // For physical ports it is NULL
     UINT32 phy_port_id;
-    UINT16 start_up_query_count;
-
-    /* IP address of the querier on this port;
-     * If we are querier, it will be this port's IP address */
-    MADDR_ST querier_router;
-
-    UINT16 querier : 1; // Are we querier on this port ?
     UINT16 is_up : 1;
-    // UINT16 has_static_grps : 1;
 
     // Configured values
-    UINT16  cfg_mcast_disable : 1;
     UINT16  cfg_version : 2;    // configured version, if any (0,1,2 or 3 )
     UINT16  oper_version : 2;   // Version we are operating at (1,2 or 3)
-    UINT16  v1_rtr_present : 1; // Did we hear from a V1 router ?
-    UINT16  v2_rtr_present : 1; // Did we hear from a V2 router ?
-    UINT16  spare : 6;
-    // UINT32  verwarn_intvl_start; // Can we add a syslog...msg for this????
-    // UINT32  verwarn_count;
-    // BOOLEAN snooping_mrouter_detected;
     BOOLEAN tagged;
 } MCGRP_PORT_ENTRY;
 
@@ -534,11 +519,7 @@ typedef struct MCGRP_ROUTER_ENTRY
     struct MCGRP_ROUTER_ENTRY *next; // For VE ports, this give the next elem
                                      // For physical ports it is NULL
     UINT32           phy_port_id;
-    // UINT32           verwarn_intvl_start; // Can we add a syslog...msg for this????
-    // UINT32           verwarn_count;
     UINT32           is_static : 1;   // static or dynamic mrouter
-    UINT16           cfg_version : 2; // configured version, if any (0,1,2 )
-    UINT64           uptime;
     MCGRP_TIMER_ELEM mrtr_tmr;
     UINT8            type;
     UINT16           time;
@@ -555,7 +536,6 @@ typedef struct MCGRP_L3IF
     UINT8  type;
 
     UINT8  is_ve : 1; // Port part of a VE interface ?
-    UINT8  cfg_mcast_disable : 1;
     UINT8  cfg_version : 2;  // configured version, if any (0,1,2 or 3 )
     UINT8  oper_version : 2; // Version we are operating at (1,2 or 3)
     UINT8  tracking_enabled : 1;
@@ -586,12 +566,8 @@ typedef struct MCGRP_L3IF
     MLD_PORT_MASK      *ve_port_mask;
     MCGRP_STATIC_ENTRY *static_mcgrp_list_head;
     MCGRP_ROUTER_ENTRY *rtr_port_list;
-    // UINT32              verwarn_intvl_start; // Can we add a syslog...msg for this????
-    // UINT32              verwarn_count;
     UINT32              flags;
-    UINT8               is_l3_up; /* For running protocol as part of l2 , doing is_up whenever vlan is added,
-                                   *  to explicitly know about l3 up status, will be using this , in future
-                                   */
+
     BOOLEAN pims_enable;          /* PIM snooping enabled flag */
     UINT32  pims_num_wg_entries;
     UINT32  pims_num_sg_entries;

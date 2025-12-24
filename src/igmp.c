@@ -279,14 +279,13 @@ BOOL mcgrp_initialize (UINT32 afi, MCGRP_CLASS *mcgrp)
     return TRUE;
 }
 
-
 BOOLEAN mcgrp_initialize_port_db_array(UINT32 afi)
 {
     if (afi == IP_IPV4_AFI)
     {
         gIgmp.port_list = (MCGRP_L3IF**) dy_malloc_zero(sizeof(MCGRP_L3IF *) * (MAX_MC_INTFS));
         gIgmp.mcgrp_src_keyinfo = &igmpv3_src_keyinfo;
-        L2MCD_INIT_LOG("%s port_list_size:%d",__FUNCTION__,MAX_MC_INTFS);
+        L2MCD_INIT_LOG("%s port_list_size:%d", FN, MAX_MC_INTFS);
     }
     else
     {
@@ -528,7 +527,6 @@ void mcgrp_update_static_groups (MCGRP_CLASS         *mcgrp,
 //v4/v6 compliant
 void mcgrp_activate_static_groups (MCGRP_CLASS  *mcgrp, 
         UINT16        vir_port_id, 
-        //UINT16        target_port)
         UINT32        target_port)
 {
     if (!mcgrp)

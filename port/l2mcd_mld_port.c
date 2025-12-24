@@ -634,12 +634,9 @@ int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
 		{
 			if (mld_vdb_vlan_is_present_in_protocol(vlan_node, afi)) {
 				mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, MLD_DEFAULT_VRF_ID);
-				mcgrp_vport =
-				    IS_IGMP_CLASS(mcgrp) ?
-				    gIgmp.port_list[vlan_port]
-				    : gMld.port_list[vlan_port];
+                mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vlan_port] : gMld.port_list[vlan_port];
 
-				if (mcgrp_vport) {
+                if (mcgrp_vport) {
                     mcgrp_pport = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, port);
                     if (mcgrp_pport)
                         continue;
@@ -677,11 +674,8 @@ int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
                 if (vlan_node && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED))
                     mcgrp_vport_state_notify(mcgrp, vlan_port, port, FALSE);
 
-				mcgrp_vport =
-				    IS_IGMP_CLASS(mcgrp) ?
-				    gIgmp.port_list[vlan_port]
-				    : gMld.port_list[vlan_port];
-				if (mcgrp_vport)
+                mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vlan_port] : gMld.port_list[vlan_port];
+                if (mcgrp_vport)
 					mcgrp_delete_veport(mcgrp, mcgrp_vport, port);
 			}
 		}
@@ -859,10 +853,9 @@ MCGRP_L3IF * mld_get_l3if_from_vlanid(UINT32 afi, UINT32 vid, uint8_t type)
 	vport = mld_l3_get_port_from_ifindex(vlan_node->ifindex,vlan_node->type);
 	L2MCD_LOG_INFO("%s(%d) ifindex:0x %x vport %d ", 
 		FN, LN, vlan_node->ifindex, vport);
-	mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vport] :
-														gMld.port_list[vport];
+    mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vport] : gMld.port_list[vport];
 
-	if (!mcgrp_vport) {
+    if (!mcgrp_vport) {
 		L2MCD_LOG_INFO
 		    ("%s(%d): mcgrp_vport is NULL for vlanid=%d. vport %d Probably MLD"
 		     " Snooping Not Enabled", FN, LN, vid, vport);
@@ -1016,10 +1009,8 @@ void mld_del_vlan_from_protocol(int vrfid, MCGRP_GLOBAL_CLASS * mcgrp_glb,
 
 
 	if (!is_mld_vlan_l3_enabled(vlan_node, afi)) {
-		mcgrp_vport =
-		    IS_IGMP_CLASS(mld) ? gIgmp.
-		    port_list[port] : gMld.port_list[port];
-		if (mcgrp_vport) {
+        mcgrp_vport = IS_IGMP_CLASS(mld) ? gIgmp.port_list[port] : gMld.port_list[port];
+        if (mcgrp_vport) {
 			mcgrp_delete_l2_staticGroup_if(mld, mcgrp_vport);
 			ret =
 			    mld_map_set_if_mld_mode(afi, ifindex, FALSE, vrfid, vlan_node->type);
@@ -1072,11 +1063,9 @@ void mld_add_vlan_to_protocol(int vrfid, MCGRP_GLOBAL_CLASS * mcgrp_glb,
 		MLD_SNP_VLAN_COUNT_INC(mcgrp_glb, vlan_node, afi);
 		//mld_vlan_add_list(vlan_node);
 		mld_map_set_if_mld_mode(mld->afi, ifindex, TRUE, vrfid, vlan_node->type);
-		mcgrp_vport =
-		    IS_IGMP_CLASS(mld) ? gIgmp.
-		    port_list[port] : gMld.port_list[port];
+        mcgrp_vport = IS_IGMP_CLASS(mld) ? gIgmp.port_list[port] : gMld.port_list[port];
 
-		if (mcgrp_vport) {
+        if (mcgrp_vport) {
 			L2MCD_LOG_INFO("%s(%d) setting the flags on vport for ivid: %d ", FN, LN,
 				       vlan_node->ivid);
 			memcpy(&mcgrp_vport->flags, &vlan_node->flags[afi - 1],
@@ -1589,12 +1578,10 @@ int mld_proto_snooping_mrouter_if_set_api(mld_vlan_node_t * vlan_node,
 
    vport = mld_l3_get_port_from_ifindex(vlan_node->ifindex, vlan_node->type);
 
-	mcgrp_vport =
-	    IS_IGMP_CLASS(mld) ? gIgmp.port_list[vport] : gMld.port_list[vport];
-	if (!mcgrp_vport) {
-		L2MCD_LOG_INFO
-		    ("%s.VRF%d: ERROR: Failed to get the vlan(%d) mcgrp_vport",
-                     FN, mld->vrf_index, vlan_node->ivid);
+   mcgrp_vport = IS_IGMP_CLASS(mld) ? gIgmp.port_list[vport] : gMld.port_list[vport];
+   if (!mcgrp_vport) {
+       L2MCD_LOG_INFO("%s.VRF%d: ERROR: Failed to get the vlan(%d) mcgrp_vport",
+                      FN, mld->vrf_index, vlan_node->ivid);
        return (MLD_SUCCESS);
   }
 
@@ -1691,24 +1678,22 @@ mcgrp_notify_l2_staticGroup_change(UINT32 afi,
        mld_sg_porttree_delport(&(mcgrp_entry->port_tree),phy_port_id);
     }
 	// Now if the port is enabled and UP, spread knowledge of this group.
-	if ((mcgrp_vport =
-	     IS_IGMP_CLASS(mcgrp) ? gIgmp.
-	     port_list[vir_port_id] : gMld.port_list[vir_port_id]) == NULL) {
+    mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vir_port_id] : gMld.port_list[vir_port_id];
+    if (mcgrp_vport == NULL)
+    {
         L2MCD_LOG_NOTICE("%s port:%d vport NULL port:%d", FN, vir_port_id,phy_port_id);
 		return;
-	}
+    }
     // Join is equivalent to a EXCL none; Leave is equivalent to INCL none
     mcgrp_action = (insert_flag ? IS_EXCL : TO_INCL);
-	mcgrp_update_l2_static_group(mcgrp, mcgrp_vport, mcgrp_entry,
-				     mcgrp_action, phy_port_id);
-	
-	// Send the static group over mrouter ports on this vlan.
+    mcgrp_update_l2_static_group(mcgrp, mcgrp_vport, mcgrp_entry, mcgrp_action, phy_port_id);
+
+    // Send the static group over mrouter ports on this vlan.
 	mld_tx_static_report_leave_on_mrtr_port(mcgrp, &mcgrp_entry->group_address, mcgrp_vport, phy_port_id, insert_flag);
     l2mcd_system_group_entry_notify(&mcgrp_entry->group_address, NULL, vir_port_id, phy_port_id, TRUE, insert_flag);
 	if (!insert_flag) {
 		if (M_AVLL_FIRST(mcgrp_entry->port_tree) ==  NULL) {
-			mcgrp_delete_l2_staticGroup(mcgrp, vir_port_id,
-						    mcgrp_entry);
+            mcgrp_delete_l2_staticGroup(mcgrp, vir_port_id, mcgrp_entry);
             dy_free(mcgrp_entry);
         }
 	}
@@ -1780,14 +1765,13 @@ int mld_vlan_clear_group(uint32_t ifindex, MADDR_ST * grp_addr_clr,
 
 	//ifindex = l2mcd_ifindex_create_logical_idx(L2MCD_IF_TYPE_SVI, vlan_id);
 	vport = mld_l3_get_port_from_ifindex(ifindex,vlan_type);
-	mld_vport =
-	    IS_IGMP_CLASS(mld) ? gIgmp.port_list[vport] : gMld.port_list[vport];
+    mld_vport = IS_IGMP_CLASS(mld) ? gIgmp.port_list[vport] : gMld.port_list[vport];
 
-	if (!mld_vport) {
-		L2MCD_LOG_INFO("%s mld_vport NULL for ifindex =0x%x", FN, ifindex);
-       return ret;
+    if (!mld_vport) {
+        L2MCD_LOG_INFO("%s mld_vport NULL for ifindex =0x%x", FN, ifindex);
+        return ret;
     }
-	//Added to RC TR000613866 where mld_vport content is corrupted.
+    //Added to RC TR000613866 where mld_vport content is corrupted.
 	L2MCD_LOG_INFO("%s(%d) ifindex:0x%x vport:%d %s ", FN, LN, ifindex, vport, mld_get_if_name_from_port(vport));
     ret = _mld_clear_group(mld, mld_vport, grp_addr_clr, clr_grp_flag);
 
@@ -2016,9 +2000,8 @@ void pims_clear_statistics(int afi, mld_vid_t vlan_id, uint8_t type)
 		vport = mld_l3_get_port_from_ifindex(ifindex,type);
 		mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vport] : gMld.port_list[vport];
 		if (!mcgrp_vport) {
-			L2MCD_LOG_INFO("%s: mcgrp_vport is NULL. afi %d, vlan %d", 
-												FN, afi, vlan_id);
-			return;
+            L2MCD_LOG_INFO("%s: mcgrp_vport is NULL. afi %d, vlan %d", FN, afi, vlan_id);
+            return;
 		}
 	
 		mcgrp_entry = (MCGRP_ENTRY *) M_AVLL_FIRST(mcgrp_vport->sptr_grp_tree);
@@ -2157,13 +2140,13 @@ MCGRP_ROUTER_ENTRY *mcgrp_add_router_port(MCGRP_CLASS *mcgrp,
     
 	new_mcgrp_rport->phy_port_id = phy_port_id;
 	// Inherit the operating version from the virtual port's version
-	new_mcgrp_rport->cfg_version  = MLD_VERSION_NONE;
+	// new_mcgrp_rport->cfg_version  = MLD_VERSION_NONE;
 	new_mcgrp_rport->type = type;
 	new_mcgrp_rport->time = time;
 	// Prepend the port to the list of ports
 	new_mcgrp_rport->next       = mcgrp_vport->rtr_port_list;
 	mcgrp_vport->rtr_port_list  = new_mcgrp_rport;
-    mcgrp_vport->rtr_port_list->uptime = mld_get_current_monotime();
+    // mcgrp_vport->rtr_port_list->uptime = mld_get_current_monotime();
     if (is_static)
        mcgrp_vport->rtr_port_list->is_static  = TRUE;
 	else {
@@ -2193,8 +2176,7 @@ MCGRP_STATIC_ENTRY * mcgrp_add_l2_staticGroup(MCGRP_CLASS * mcgrp,
     MCGRP_STATIC_ENTRY  *mcgrp_entry;
     MCGRP_L3IF          *mcgrp_vport;
 
-	mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[port_id] :
-														gMld.port_list[port_id];
+    mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[port_id] : gMld.port_list[port_id];
 
     mcgrp_entry = mcgrp_find_l2_staticGroup(mcgrp, port_id, group_addr);
 
@@ -2350,8 +2332,7 @@ MCGRP_STATIC_ENTRY * mcgrp_find_l2_staticGroup(MCGRP_CLASS * mcgrp,
     MCGRP_STATIC_ENTRY *mcgrp_entry;
     MCGRP_L3IF          *mcgrp_vport;
 
-	mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[port_id] : 
-										gMld.port_list[port_id];
+    mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[port_id] : gMld.port_list[port_id];
 
     mcgrp_entry = mcgrp_vport->static_mcgrp_list_head;
 
@@ -2568,10 +2549,9 @@ void mcgrp_refresh_l2_static_group(MCGRP_CLASS * mcgrp,
 
     vir_port_id = mcgrp_entry->port_num;
 
-    mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vir_port_id] :
-																gMld.port_list[vir_port_id];
+    mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vir_port_id] : gMld.port_list[vir_port_id];
 
-	if (mcgrp_vport == NULL || (!mcgrp_vport->is_up)) {
+    if (mcgrp_vport == NULL || (!mcgrp_vport->is_up)) {
 		if (mcgrp_vport == NULL) {
                 return;
         }
@@ -2887,11 +2867,9 @@ void mcgrp_delete_l2_staticGroup(MCGRP_CLASS * mcgrp,
 {
 	MCGRP_L3IF *mcgrp_vport;
 
-	mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[port_id] :
-	    gMld.port_list[port_id];
-	WheelTimer_DelElement(mcgrp->mcgrp_wtid,
-			      &mcgrp_entry->l2_static_grp_tmr.mcgrp_wte);
-	if (mcgrp_entry) {
+    mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[port_id] : gMld.port_list[port_id];
+    WheelTimer_DelElement(mcgrp->mcgrp_wtid, &mcgrp_entry->l2_static_grp_tmr.mcgrp_wte);
+    if (mcgrp_entry) {
 		linklist_delete_pointer((LINKLIST_TYPE **)
 					& mcgrp_vport->static_mcgrp_list_head,
 					(LINKLIST_TYPE *) mcgrp_entry);
@@ -3063,9 +3041,8 @@ int mld_proto_query_max_response_time_set(uint32_t afi, uint32_t vid, uint32_t q
 	    GROUP_MEMBERSHIP_INTERVAL(mcgrp_vport);
 
 	/*Recalculate OQI if not configured */
-	mcgrp_vport->older_host_present_time = OTHER_QUERIER_PRESENT_INTERVAL
-	    (mcgrp_vport);
-	return MLD_SUCCESS;
+    mcgrp_vport->older_host_present_time = OTHER_QUERIER_PRESENT_INTERVAL(mcgrp_vport);
+    return MLD_SUCCESS;
 }
 
 int mld_proto_fastleave_set(uint32_t afi, uint32_t vid, uint8_t type)
@@ -3076,13 +3053,12 @@ int mld_proto_fastleave_set(uint32_t afi, uint32_t vid, uint8_t type)
 	if (!mcgrp_vport)
 		return MLD_SUCCESS;
 
-	if (!is_mld_fast_leave_configured(mcgrp_vport)) {
-		SET_FLAG(mcgrp_vport->flags, MLD_FAST_LEAVE_CONFIGURED);
-		L2MCD_LOG_INFO("%s(): MLD_FAST_LEAVE_CONFIGURED flag SET"
-			       " for vlanid=%d", FN, vid);
-	}
+    if (!is_mld_fast_leave_configured(mcgrp_vport)) {
+        SET_FLAG(mcgrp_vport->flags, MLD_FAST_LEAVE_CONFIGURED);
+        L2MCD_LOG_INFO("%s(): MLD_FAST_LEAVE_CONFIGURED flag SET for vlanid=%d", FN, vid);
+    }
 
-	return (MLD_SUCCESS);
+    return (MLD_SUCCESS);
 }
 
 int mld_proto_snoop_querier_set(uint32_t afi, uint16_t vid, uint8_t type)
@@ -3215,29 +3191,29 @@ void mld_replay_config(mld_vlan_node_t * vlan_node, int afi, MCGRP_CLASS * mld)
 		}
 	}
 		port = mld_l3_get_port_from_ifindex(vlan_node->ifindex, vlan_node->type);
-		mcgrp_vport = IS_IGMP_CLASS(mld) ? gIgmp.port_list[port] : 
-												gMld.port_list[port];
+        mcgrp_vport = IS_IGMP_CLASS(mld) ? gIgmp.port_list[port] : gMld.port_list[port];
 
-    if (is_mld_snooping_enabled(mcgrp_vport, afi)) {
-		mrtr_list = mld_vdb_vlan_get_mrtr_list(vlan_node, FALSE, afi);
-		LIST_LOOP(mrtr_list, mrt, list_node) {
-		//	pport = portdb_get_portindex_from_ifname
-		//				     (mrt->ifname);
-		    pport = mld_get_lif_ifindex_from_ifname(mrt->ifname,vlan_node->gvid,vlan_node->type); 
-			L2MCD_LOG_INFO("%s %d %d %d", FN, vlan_node->ivid,
-				       pport, mld_is_port_member_of_vlan(vlan_node,
-									 pport));
-			mcgrp_pport = mcgrp_find_phy_port_entry(mld, mcgrp_vport, pport);
-		    if (mcgrp_pport == NULL || !mcgrp_pport->is_up) {
-				L2MCD_LOG_INFO("%s Port %d is not up", FN, pport); 
-            	continue;
-        	}
-			if (mld_is_port_member_of_vlan(vlan_node, pport)) {
-				mcgrp_add_router_port(mld, mcgrp_vport, pport, TRUE,
-						      MLD_PROTO_MROUTER,
-						      DEFAULT_MROUTER_AGING_TIME, FALSE);
-			}
-		}
+        if (is_mld_snooping_enabled(mcgrp_vport, afi))
+        {
+            mrtr_list = mld_vdb_vlan_get_mrtr_list(vlan_node, FALSE, afi);
+            LIST_LOOP(mrtr_list, mrt, list_node)
+            {
+                // pport = portdb_get_portindex_from_ifname(mrt->ifname);
+                pport = mld_get_lif_ifindex_from_ifname(mrt->ifname, vlan_node->gvid, vlan_node->type);
+                L2MCD_LOG_INFO("%s %d %d %d", FN, vlan_node->ivid, pport, mld_is_port_member_of_vlan(vlan_node, pport));
+                mcgrp_pport = mcgrp_find_phy_port_entry(mld, mcgrp_vport, pport);
+                if (mcgrp_pport == NULL || !mcgrp_pport->is_up)
+                {
+                    L2MCD_LOG_INFO("%s Port %d is not up", FN, pport);
+                    continue;
+                }
+                if (mld_is_port_member_of_vlan(vlan_node, pport))
+                {
+                    mcgrp_add_router_port(mld, mcgrp_vport, pport, TRUE,
+                                          MLD_PROTO_MROUTER,
+                                          DEFAULT_MROUTER_AGING_TIME, FALSE);
+                }
+            }
 	}
 
    if_type = mld_get_l3if_type (vlan_node->ifindex);
@@ -3434,10 +3410,9 @@ void mcgrp_activate_l2_static_groups(MCGRP_CLASS * mcgrp,
 	MCGRP_L3IF *mcgrp_vport;
 	MCGRP_STATIC_ENTRY *mcgrp_entry;
 
-	mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vir_port_id] :
-	    gMld.port_list[vir_port_id];
+    mcgrp_vport = IS_IGMP_CLASS(mcgrp) ? gIgmp.port_list[vir_port_id] : gMld.port_list[vir_port_id];
 
-	if (mcgrp_vport == NULL) {
+    if (mcgrp_vport == NULL) {
 		return;
 	}
 
@@ -3464,8 +3439,7 @@ BOOLEAN mld_l2_staticGroup_exists_on_port(mcast_grp_addr_t * group_addr,
 	if (!mld)
 		return FALSE;
 
-    mcgrp_vport = IS_IGMP_CLASS(mld) ? gIgmp.port_list[port_id] :
-											gMld.port_list[port_id];
+    mcgrp_vport = IS_IGMP_CLASS(mld) ? gIgmp.port_list[port_id] : gMld.port_list[port_id];
 
     mld_entry = mcgrp_vport->static_mcgrp_list_head;
 	mcast_set_ip_addr(&g_addr, group_addr);
@@ -3760,7 +3734,8 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
         }
         if (mesg_size != offset + sizeof(MLDV2_REPORT_MESSAGE) - sizeof(MLDV2_GROUP_RECORD))
         {
-            L2MCD_LOG_WARN("[MLDv%d RX] MLDV2_REPORT_MESSAGE size: %d, rx size: %d", mldver, offset + sizeof(MLDV2_REPORT_MESSAGE) - sizeof(MLDV2_GROUP_RECORD), mesg_size);
+            L2MCD_LOG_WARN("[MLDv%d RX] MLDV2_REPORT_MESSAGE size:%d, rx size:%d, num_grps:%d", 
+				mldver, offset + sizeof(MLDV2_REPORT_MESSAGE) - sizeof(MLDV2_GROUP_RECORD), mesg_size, num_grps);
             mld->mld_stats[vir_port_id].recv_size_or_range_error++;
             return FALSE;
         }
@@ -3805,7 +3780,8 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
         int num_grps = ntohs(mesg->num_srcs);
         if (mesg_size != sizeof(MLDV2_MESSAGE) - (num_grps - 1) * sizeof(IPV6_ADDRESS))
         {
-            L2MCD_LOG_WARN("[MLDv%d RX] MLDV2_REPORT_MESSAGE size: %d, rx size: %d", mldver, sizeof(MLDV2_MESSAGE) - (num_grps - 1) * sizeof(IPV6_ADDRESS), mesg_size);
+            L2MCD_LOG_WARN("[MLDv%d RX] MLD_MEMBERSHIP_QUERY_TYPE size:%d, rx size:%d num_grps:%d", 
+				mldver, sizeof(MLDV2_MESSAGE) - (num_grps - 1) * sizeof(IPV6_ADDRESS), mesg_size, num_grps);
             mld->mld_stats[vir_port_id].recv_size_or_range_error++;
             return FALSE;
         }

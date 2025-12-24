@@ -54,26 +54,13 @@ typedef struct portdb_entry_s {
     unsigned int        ipv6_mtu;
     unsigned long       ivid;
     unsigned long       gvid;        
-    float               bandwidth;
-    float               bw_configured; /* Configured bw value; (when not configured) overloaded with full trunk bw irrespective of active portlist */
-    UINT8               hwAddr[6];
     UINT16              port_state:1;
-    UINT16              ip6_enabled:1; /* Current Enabled/Disabled state for processing IP6 packet */
-    UINT16              ip4_enabled:1; /* Current Enabled/Disabled state for processing IP4 packet */
     UINT16              type:3;        /* interface type : NSM_INTF_MODE_UNK/NSM_INTF_MODE_L2/NSM_INTF_MODE_L3 */
                                        /* this follows nsm_intf_type_new_s
                                         * ENUM which will take upto a value of
                                         * '4'; hence 3 bits are needed.*/
-    UINT16              netdev_state:1; /* Indicates the interface got netdevice is created or not */
-    UINT16              admin_state:1;
-    UINT16              unnumbered:1;  /* Indicates if the interface is unnumbered interface*/
-    UINT16              neighbor_up:1; /* Indicates if neighbor is discovered on the unnumbered interface */
-    UINT16              spare:6; 
-
     PORTDB_IP6          *ip6;
     struct list         *ip4;
-    // Fusion ISIS: Store MAC for easier SYNC to standby
-    u_char              mac_addr[MAC_ADDR_LEN];
     void                *ipv4_addr_data; 
 } portdb_entry_t;
 
