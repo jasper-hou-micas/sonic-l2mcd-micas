@@ -608,6 +608,7 @@ int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters)
     //    - if the port is part of a VE, it is the VE id,
     //    - if the port is part of a trunk, it is the trunk's primary port#
     //    - otherwise it is the same as the physical port#
+    multicast->source_port = sptr_ip_parameters->rx_phy_port_number;
     mcast_set_ipv4_addr(&global_source_ip, ntohl(sptr_ip_parameters->source_address));
     
     if (trunk_port_state(multicast->source_port) != TRUNK_NONE)

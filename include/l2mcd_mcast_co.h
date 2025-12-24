@@ -513,7 +513,7 @@ typedef struct MCGRP_PORT_ENTRY
 
     UINT16 querier : 1; // Are we querier on this port ?
     UINT16 is_up : 1;
-    UINT16 has_static_grps : 1;
+    // UINT16 has_static_grps : 1;
 
     // Configured values
     UINT16  cfg_mcast_disable : 1;
@@ -1251,15 +1251,11 @@ void mcgrp_notify_vif_del(MCGRP_CLASS  *mcgrp,
 MCGRP_CLASS  *mcgrp_vrf_alloc (UINT32 afi, VRF_INDEX  vrf_index);
 MCGRP_L3IF* mcgrp_create_l3intf (MCGRP_CLASS  *mcgrp, UINT16        vir_port_id);
 MCGRP_MBRSHP* mcgrp_find_first_mbrshp (MCGRP_ENTRY *mcgrp_grp);
-MCGRP_MBRSHP* mcgrp_find_next_mbrshp (MCGRP_ENTRY   *mcgrp_grp,
-        MCGRP_MBRSHP  *mcgrp_mbrshp);
-MCGRP_ENTRY* mcgrp_find_group_address_entry (MCGRP_CLASS  *mcgrp, 
-        UINT16        vir_port_id, MADDR_ST     *group_address);
-MCGRP_SOURCE* mcgrp_find_source (MCGRP_MBRSHP      *mcgrp_mbrshp, 
-        MADDR_ST          *src_addr, MCGRP_FILTER_MODE  src_mode);
+MCGRP_MBRSHP *mcgrp_find_next_mbrshp(MCGRP_ENTRY *mcgrp_grp, MCGRP_MBRSHP *mcgrp_mbrshp);
+MCGRP_ENTRY *mcgrp_find_group_address_entry(MCGRP_CLASS *mcgrp, UINT16 vir_port_id, MADDR_ST *group_address);
+MCGRP_SOURCE *mcgrp_find_source(MCGRP_MBRSHP *mcgrp_mbrshp, MADDR_ST *src_addr, MCGRP_FILTER_MODE src_mode);
 MCGRP_L3IF *mcgrp_alloc_init_l3if_entry (MCGRP_CLASS   *mcgrp, UINT16         vir_port_id);
-MCGRP_ENTRY* mcgrp_alloc_group_entry (MCGRP_CLASS  *mcgrp,
-        MCGRP_L3IF   *mcgrp_l3if, MADDR_ST     *group_address);
+MCGRP_ENTRY *mcgrp_alloc_group_entry(MCGRP_CLASS *mcgrp, MCGRP_L3IF *mcgrp_l3if, MADDR_ST *group_address);
 MCGRP_MBRSHP* mcgrp_alloc_add_mbrshp_entry (MCGRP_CLASS  *mcgrp, 
         MCGRP_ENTRY  *grp_entry, MCGRP_L3IF   *mcgrp_vport, 
         UINT32        phy_port_id, BOOLEAN       is_static, 

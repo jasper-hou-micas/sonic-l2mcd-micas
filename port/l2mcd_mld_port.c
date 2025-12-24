@@ -238,7 +238,7 @@ int mld_if_set_version_api(int vrf_index, uint32_t vid, int version, int afi,uin
 
     
     if (mld_vdb_vlan_is_present_in_protocol(vlan_node, afi))
-     {
+    {
         L2MCD_LOG_INFO("%s PIM/Snooping enabled, continue updating L2 static groups : ivid %d", FN, vlan_node->ivid);
     }
     else{
