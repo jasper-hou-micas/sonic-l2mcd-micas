@@ -708,10 +708,8 @@ void mcgrp_stop_vir_port (MCGRP_CLASS  *mcgrp,
         mcgrp_stop_phy_port(mcgrp, mcgrp_vport, mcgrp_pport);
         mcgrp_pport = mcgrp_pport->next;
     }
-    if (WheelTimerSuccess ==
-            WheelTimer_IsElementEnqueued(&mcgrp_vport->vport_tmr.mcgrp_wte))
-        WheelTimer_DelElement(mcgrp->mcgrp_wtid,
-                &mcgrp_vport->vport_tmr.mcgrp_wte);
+    if (WheelTimerSuccess == WheelTimer_IsElementEnqueued(&mcgrp_vport->vport_tmr.mcgrp_wte))
+        WheelTimer_DelElement(mcgrp->mcgrp_wtid, &mcgrp_vport->vport_tmr.mcgrp_wte);
 
     // Stop/Reset the querier process and any other timers
     mcgrp_vport->querier = FALSE;
@@ -2844,10 +2842,8 @@ void mcgrp_port_state_notify (UINT32        afi,
         else
         {
             mcgrp_stop_phy_port(mcgrp, mcgrp_vport, mcgrp_vport->phy_port_list);
-            if (WheelTimerSuccess ==
-                    WheelTimer_IsElementEnqueued(&mcgrp_vport->vport_tmr.mcgrp_wte))
-                WheelTimer_DelElement(mcgrp->mcgrp_wtid,
-                        &mcgrp_vport->vport_tmr.mcgrp_wte);
+            if (WheelTimerSuccess == WheelTimer_IsElementEnqueued(&mcgrp_vport->vport_tmr.mcgrp_wte))
+                WheelTimer_DelElement(mcgrp->mcgrp_wtid, &mcgrp_vport->vport_tmr.mcgrp_wte);
             // Stop/Reset the querier process and any other timers
             mcgrp_vport->querier = TRUE;
             mcgrp_vport->v1_rtr_present = FALSE;

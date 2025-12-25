@@ -1716,8 +1716,11 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
                 ip6h = (IPV6_HEADER *)(buf6 + sizeof(struct vlan_ethhdr));
                 L2MCD_LOG_NOTICE("real_proto == ETH_P_IPV6: %d", real_proto);
             }
-            L2MCD_LOG_INFO("ether_type is not sopport  %d", ether_type);
-            continue;
+            else
+            {
+                L2MCD_LOG_INFO("ether_type %d, real_proto %d is not sopport", ether_type, real_proto);
+                continue;
+            }
         }
         else if (ether_type != ETH_P_IPV6)
         {

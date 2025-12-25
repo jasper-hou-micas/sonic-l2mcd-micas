@@ -751,11 +751,6 @@ int mld_portdb_add_gvid(unsigned long gvid, unsigned long ivid)
 int mld_portdb_delete_gvid(unsigned long gvid)
 {
 	return 0;
-    #if 0
-    unsigned int ivid_ptr = 0;
-    ret = hashGrowGenericGetAndDelete(mld_portdb_gvid_to_ivid_hash, gvid, (unsigned long *)&ivid_ptr, NULL);
-	L2MCD_LOG_INFO("%s(%d) ret :%d ", FN, LN, ret);
-    #endif
 }
 
 unsigned int mld_portdb_get_ivid_from_gvid(uint32_t vlan_id, uint8_t type)
@@ -822,8 +817,7 @@ mld_vlan_create_fwd_ref(uint32_t gvid,uint8_t type)
 		}
 	}
 
-    vlan_node = mld_vdb_vlan_create(mld_vlan_get_db(), gvid, type, 0,
-                                            0, 0, tmp_if_name, MLD_VLAN_DCM);
+    vlan_node = mld_vdb_vlan_create(mld_vlan_get_db(), gvid, type, 0, 0, 0, tmp_if_name, MLD_VLAN_DCM);
     L2MCD_LOG_INFO("%s(%d) new vlan_node created for gvid : 0x%x ", __FUNCTION__, __LINE__, gvid);
 	return (vlan_node);
 }
