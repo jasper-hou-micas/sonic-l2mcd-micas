@@ -530,7 +530,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 {
                     lif_state = is_interface_up(data->ports[i].pnames);
                     mld_map_port_vlan_state(vlan_id, ifidx, data->op_code, MLD_VLAN , TRUE, lif_state, data->ports[i].tagged);
-                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:VLAN_MEMBER port:%s ifindx:%d, op:%d", FN,LN, vlan_id, data->ports[i].pnames, ifidx,data->op_code);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:VLAN_MEMBER port:%s ifindx:%d, op:%d", FN, LN, vlan_id, data->ports[i].pnames, ifidx,data->op_code);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, data->op_code? 1:0, -1, L2MCD_IPV4_AFI);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, data->op_code? 1:0, -1, L2MCD_IPV6_AFI);
                     if (data->op_code) 
@@ -584,7 +584,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 l2mcsync_add_vlan_entry(vlan_id);
                 vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
                 portdb_entry_t *port_entry = portdb_find_port_entry(&gMld.ve_portdb_tree, vlan_id);
-                if (vlan_node && port_entry && port_entry->ipv4_addr_data)
+                if (vlan_node && port_entry && (port_entry->ipv4_addr_data || listhead(port_entry->ip6->ip6_address_list)))
                 {
                     /* IP adress is already configured for the vlan */
                     vlan_node->ve_ifindex = vlan_node->ifindex;
@@ -598,7 +598,12 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 {
                     L2MCD_VLAN_LOG_INFO(vlan_id, "igmps/mld disable for vlan:%d", vlan_id);
                     mld_if_snoop_unset(afi, vlan_id, TRUE, MLD_VLAN);
-                    l2mcsync_del_vlan_entry(vlan_id);
+
+                    vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
+                    if (!vlan_node)
+                    {
+                        l2mcsync_del_vlan_entry(vlan_id);
+                    }
                     sprintf(param, "%s|%d", NOTIFY_PARAM_ACTION_DISABLE, vlan_id);
                     l2mcsync_notify_config_done(NOTIFY_PARAM_SNP, param);
                     break;

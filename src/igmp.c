@@ -1019,27 +1019,26 @@ void mcgrp_delete_static_groups_on_if (MCGRP_CLASS  *mcgrp,
 //
 // Delete all group entries on this port and then delete the port entry itself
 //v4/v6 compliant
-void mcgrp_delete_l3intf (MCGRP_CLASS  *mcgrp, 
-        UINT16        vir_port_id)
+void mcgrp_delete_l3intf(MCGRP_CLASS *mcgrp, UINT16 vir_port_id)
 {
 
     MCGRP_GLOBAL_CLASS  *mcgrp_glb  = (IS_IGMP_CLASS(mcgrp) ? &gIgmp : & gMld);
     MCGRP_ENTRY         *grp_entry, *next_grp_entry;
     MCGRP_L3IF          *mcgrp_vport;
 
-    if (! MCGRP_IS_VALID_INTF(vir_port_id))
+    if (!MCGRP_IS_VALID_INTF(vir_port_id))
     {
         L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] Port %s. Ignoring Delete on invalid intf",
-                  FN, LN, vir_port_id,mld_get_if_name_from_port(vir_port_id));
+                            FN, LN, vir_port_id, mld_get_if_name_from_port(vir_port_id));
         return;
     }
-    L2MCD_VLAN_LOG_DEBUG(vir_port_id,"%s:%d:[vlan:%d] Port %s: Delete event",
-            FN,LN,vir_port_id,  mld_get_if_name_from_port(vir_port_id));
+    L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] Port %s: Delete event",
+                         FN, LN, vir_port_id, mld_get_if_name_from_port(vir_port_id));
     mcgrp_vport = mcgrp_glb->port_list[vir_port_id];
     if (!mcgrp_vport)
     {
-        L2MCD_VLAN_LOG_DEBUG(vir_port_id,"%s:%d:[vlan:%d].ERR: Port %s: Port already deleted; skipping member port delete",
-                FN,LN,vir_port_id,  mld_get_if_name_from_port(vir_port_id));
+        L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d].ERR: Port %s: Port already deleted; skipping member port delete",
+                             FN, LN, vir_port_id, mld_get_if_name_from_port(vir_port_id));
         return;
     }
 
@@ -1050,9 +1049,7 @@ void mcgrp_delete_l3intf (MCGRP_CLASS  *mcgrp,
     while (grp_entry)
     {
         next_grp_entry = M_AVLL_NEXT(mcgrp_vport->sptr_grp_tree, grp_entry->node);
-
         mcgrp_destroy_group_addr(mcgrp, mcgrp_vport, grp_entry);
-
         grp_entry = next_grp_entry;
 
     } /* while (grp_entry) */
@@ -1085,13 +1082,11 @@ void mcgrp_delete_l3intf (MCGRP_CLASS  *mcgrp,
     // Free the port-entry itself
     dy_free(mcgrp_vport);
     mcgrp_glb->port_list[vir_port_id] = NULL;
-    
 }
 
 
 //v4/v6 compliant
-MCGRP_L3IF* mcgrp_create_l3intf (MCGRP_CLASS  *mcgrp,
-        UINT16        vir_port_id)
+MCGRP_L3IF *mcgrp_create_l3intf(MCGRP_CLASS *mcgrp, UINT16 vir_port_id)
 {
     MCGRP_L3IF          *mcgrp_vport;
     MCGRP_GLOBAL_CLASS  *mcgrp_glb;
@@ -1116,16 +1111,14 @@ MCGRP_L3IF* mcgrp_create_l3intf (MCGRP_CLASS  *mcgrp,
     mcgrp_vport = mcgrp_glb->port_list[vir_port_id];
     // If an entry for this port already exists, verify, it is what we need
     if (mcgrp_vport != NULL)
-    {   
-        if ((mcgrp_vport->vir_port_id != vir_port_id) ||
-                ((mcgrp_vport->phy_port_id != vir_port_id) &&
-                 !is_ip_tnnl_port(vir_port_id)))
+    {
+        if (mcgrp_vport->vir_port_id != vir_port_id || (mcgrp_vport->phy_port_id != vir_port_id && !is_ip_tnnl_port(vir_port_id)))
         {
             L2MCD_VLAN_LOG_ERR(vir_port_id,"%s:%d:[vlan:%d] [Port %s ] BUG!!!  invalid port configuration %s/%s",
                     FN, LN, vir_port_id,
                     mld_get_if_name_from_port(vir_port_id), mld_get_if_name_from_ifindex(mcgrp_vport->phy_port_id), 
                     mld_get_if_name_from_port(mcgrp_vport->vir_port_id));
-            //RD: Need to check if any phy port has been allocated and free them up
+            // RD: Need to check if any phy port has been allocated and free them up
             // Before freeing the l3 interface.
             mcgrp_glb->port_list[vir_port_id] = NULL;
             dy_free(mcgrp_vport);
@@ -2780,10 +2773,10 @@ BOOLEAN mcgrp_send_group_source_query (MCGRP_CLASS        *mcgrp,
 
 // This function is invoked to signal change in state of an IP interface
 //v4/v6 compliant
-void mcgrp_port_state_notify (UINT32        afi, 
-        VRF_INDEX     vrf_index, 
-        UINT16        port_id, 
-        enum BOOLEAN  up)
+void mcgrp_port_state_notify(UINT32       afi,
+        VRF_INDEX    vrf_index,
+        UINT16       port_id,
+        enum BOOLEAN up)
 {
     MCGRP_CLASS         *mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, vrf_index); 
     MCGRP_L3IF          *mcgrp_vport;
