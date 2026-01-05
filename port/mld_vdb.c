@@ -405,14 +405,13 @@ int mld_vdb_add_port_to_vlan(mld_vlan_db_t *vlan_db, uint32_t vlan_id, uint32_t 
     memcpy(&key[MLD_VLAN_KEY_ID_OFFSET],&vlan_id,sizeof(uint32_t));
 
     vlan_node = mld_vdb_vlan_get(vlan_id, type);
-    if(!vlan_node)
-		{
-			L2MCD_LOG_INFO(" %s vlan does not exist %d", __FUNCTION__, vlan_id);
-			goto vdb_apv_done;
+    if (!vlan_node)
+    {
+        L2MCD_LOG_INFO(" %s vlan does not exist %d", __FUNCTION__, vlan_id);
+        goto vdb_apv_done;
     }
 
-
-   	vlan_port = calloc(1,sizeof(mld_vlan_port_t));
+    vlan_port = calloc(1,sizeof(mld_vlan_port_t));
    	if(vlan_port == NULL)
        	return (MLD_VLAN_DB_ENOMEM);
 	M_AVLL_INIT_NODE(vlan_port->node); 

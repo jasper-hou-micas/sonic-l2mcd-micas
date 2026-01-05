@@ -544,7 +544,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                     }
                     break;
                 }
-                L2MCD_VLAN_LOG_INFO(vlan_id,"%s:%d:[vlan:%d] val:%d vlan-member:%s ifindx:%d op:%d ignored",FN, LN, vlan_id, val,data->ports[i].pnames, ifidx,data->op_code);
+                L2MCD_VLAN_LOG_INFO(vlan_id,"%s:%d:[vlan:%d] val:%d vlan-member:%s ifindx:%d op:%d",FN, LN, vlan_id, val,data->ports[i].pnames, ifidx,data->op_code);
             }
             break;
         }
@@ -703,9 +703,9 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 break;
             }
 
-            enableFlag=data->op_code;
+            enableFlag = data->op_code;
             rc = mld_snooping_mrouter_if_set_api(data->vlan_id, iftype, data->ports[0].pnames, enableFlag, afi, MLD_VLAN);
-            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:MROUTER op:%d cnt:%d port[0]:%s", FN,LN,vlan_id,data->op_code,data->count,data->ports[0].pnames);
+            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:MROUTER op:%d cnt:%d port[0]:%s", FN, LN, vlan_id, data->op_code, data->count, data->ports[0].pnames);
             break;
         }
         

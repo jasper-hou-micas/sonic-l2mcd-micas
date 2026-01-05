@@ -269,8 +269,7 @@ int mld_if_set_version_api(int vrf_index, uint32_t vid, int version, int afi,uin
 	return 0; 
 }
 
-int mld_snooping_mrouter_if_set_api(int vid, int iftype, char *ifname,
-				int enable, uint8_t afi, uint8_t type)
+int mld_snooping_mrouter_if_set_api(int vid, int iftype, char *ifname, int enable, uint8_t afi, uint8_t type)
 {
 	ifindex_t ifindex = 0;
 	mld_vlan_node_t *vlan_node = NULL;
@@ -302,7 +301,7 @@ int mld_snooping_mrouter_if_set_api(int vid, int iftype, char *ifname,
 		       ifindex, if_name, enable);
 	mld_add_static_mrtr_to_pending_list(vlan_node, if_name, enable, afi);
 
-     port_num = ifindex;
+    port_num = ifindex;
 
 	if (!mld_is_port_member_of_vlan(vlan_node, port_num))
 	{
@@ -611,9 +610,8 @@ int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
 
 	vlan_node = mld_vdb_vlan_get(vlan_id, type);
 	if (!vlan_node) {
-		L2MCD_LOG_INFO("%s %d is not available %x %d", FN,
-			       vlan_id, ifindex, add_port);
-		return (MLD_ERROR); 
+        L2MCD_LOG_INFO("%s %d is not available %x %d", FN, vlan_id, ifindex, add_port);
+        return (MLD_ERROR); 
 	}
 	port = ifindex;
 	vlan_ifindex = vlan_node->ifindex;
@@ -633,17 +631,11 @@ int mld_map_port_vlan_state(uint32_t vlan_id, uint32_t ifindex, int add_port,
 
                 if (mcgrp_vport) {
                     mcgrp_pport = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, port);
-                    if (mcgrp_pport)
+                    if (!mcgrp_pport)
                     {
-                        if (lif_type)
-                        {
-                            mcgrp_pport->is_up  = lif_state;
-                            mcgrp_pport->tagged = tagged;
-                        }
-                        continue;
+                        mcgrp_pport = mcgrp_add_phy_port(mcgrp, mcgrp_vport, port);
                     }
 
-                    mcgrp_pport = mcgrp_add_phy_port(mcgrp, mcgrp_vport, port);
                     L2MCD_VLAN_LOG_INFO(vlan_node->gvid, "%s:%d:[vlan:%d] Port:%d PPORT:%p LIF:%d LIF_State:%d tagged: %d",
                                         FN, LN, vlan_id, port, mcgrp_pport, lif_type, lif_state, tagged);
 
@@ -2360,13 +2352,9 @@ void mld_static_mr_grp_replay_confg(mld_vlan_node_t * vlan_node, int afi, uint32
 		{
 			if (mld_vdb_vlan_is_present_in_protocol(vlan_node, afi))
 			{
-				mld_proto_snooping_mrouter_if_set_api(vlan_node,
-									MLD_DEFAULT_VRF_ID,
-									phy_port, TRUE,
-									afi);
-				L2MCD_VLAN_LOG_INFO(vlan_node->gvid, "%s:%d:[vlan:%d] proto_mrtr_set - port:%d",
-				        FN, LN, vlan_node->gvid, phy_port);
-			}
+                mld_proto_snooping_mrouter_if_set_api(vlan_node, MLD_DEFAULT_VRF_ID, phy_port, TRUE, afi);
+                L2MCD_VLAN_LOG_INFO(vlan_node->gvid, "%s:%d:[vlan:%d] proto_mrtr_set - port:%d", FN, LN, vlan_node->gvid, phy_port);
+            }
 		}
 
 	}

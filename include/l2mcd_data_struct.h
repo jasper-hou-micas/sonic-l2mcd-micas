@@ -55,7 +55,7 @@ typedef UINT32 IP_ADDRESS;
 #define NONE    0
 typedef enum BOOLEAN
 {
-    TRUE= 1,
+    TRUE  = 1,
     FALSE = 0
 } BOOLEAN;
 
