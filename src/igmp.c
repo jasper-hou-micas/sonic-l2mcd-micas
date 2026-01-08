@@ -822,8 +822,7 @@ MCGRP_SOURCE* mcgrp_find_source (MCGRP_MBRSHP      *mcgrp_mbrshp,
         mcgrp_src = mcgrp_mbrshp->pims_src_list;
     else    //IGMPv3 source
         mcgrp_src = mcgrp_mbrshp->src_list[src_mode];
-    while (mcgrp_src &&
-            (mcast_cmp_addr(&mcgrp_src->src_addr, src_addr) != 0))
+    while (mcgrp_src && mcast_cmp_addr(&mcgrp_src->src_addr, src_addr) != 0)
         mcgrp_src = mcgrp_src->next;
 
     return mcgrp_src;
