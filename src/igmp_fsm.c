@@ -2050,7 +2050,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                             IPV6_ADDRESS *mld_src_array =  (IPV6_ADDRESS *)src_array;
                             mcast_set_ipv6_addr(&src_temp, &mld_src_array[i]);
                         }
-                        igmpv3_src_temp = mcgrp_find_source(mcgrp_mbrshp, &src_temp, i);
+                        igmpv3_src_temp = mcgrp_find_source(mcgrp_mbrshp, &src_temp, j);
                         if (igmpv3_src_temp && (igmpv3_src_temp->is_remote !=is_remote))
                         {
                             igmpv3_src_temp->is_remote = is_remote;
