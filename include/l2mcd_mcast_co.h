@@ -146,6 +146,8 @@ enum MLD_PDUTYPE
 #define NOTIFY_PARAM_WARM_STATUS		"WARM_REBOOT"
 #define NOTIFY_PARAM_ACTION_ENABLE		"enable"
 #define NOTIFY_PARAM_ACTION_DISABLE		"disable"
+#define NOTIFY_PARAM_WARM_IGMP_SNP		 1
+#define NOTIFY_PARAM_WARM_MLD_SNP		 2
 
 /* MLD Flags for struct MCGRP_L3IF */															
 #define MLD_IF_CFLAG_LAST_MEMBER_QUERY_COUNT       (1 << 7)

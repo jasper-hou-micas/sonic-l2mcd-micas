@@ -349,14 +349,14 @@ mld_vlan_node_t *mld_vdb_vlan_create(mld_vlan_db_t *vlan_db, uint32_t vlan_id, u
     vdb_port_offset=M_AVLL_OFFSETOF(mld_vlan_port_t, ifindex);
     vlan_node->port_tree= L2MCD_AVL_CREATE(l2mcd_avl_compare_u32, (void *) &vdb_port_offset, NULL);
 
-	SET_FLAG(vlan_node->rcvd_nsm_add, vlan_creation_type);
+    SET_FLAG(vlan_node->rcvd_nsm_add, vlan_creation_type);
 
     M_AVLL_INSERT(vlan_db->vdb_tree, vlan_node);
-	L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] Created vlan_node %p gvid:0x%x ivid:0x%x ifidx:0x%x bmap_size:0x%x igmpver:%d", 
-		 __FUNCTION__, __LINE__, vlan_id, vlan_node, vlan_node->gvid, vlan_node->ivid, vlan_node->ifindex, bmap_size, vlan_node->cfg_version);
+    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] Created vlan_node %p gvid:0x%x ivid:0x%x ifidx:0x%x bmap_size:0x%x",
+                        FN, LN, vlan_id, vlan_node, vlan_node->gvid, vlan_node->ivid, vlan_node->ifindex, bmap_size);
 
-	if(vlan_node->rcvd_nsm_add & MLD_VLAN_NSM)
-		mld_portdb_add_gvid( vlan_node->ivid, vlan_node->gvid);
+    if (vlan_node->rcvd_nsm_add & MLD_VLAN_NSM)
+        mld_portdb_add_gvid(vlan_node->ivid, vlan_node->gvid);
 
 vdb_vid_create_done:
     return vlan_node;

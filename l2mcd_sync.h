@@ -43,6 +43,8 @@ namespace swss {
             void notify_config_done(std::string option, std::string paraname);
             void notify_warm_reboot_done(std::string option, std::string paraname);
             void clearL2mcVlanEntry(void);
+            int getL2mcVlanEntryCount(uint16_t vlan_id, uint16_t afi);
+            void dumpL2mcVlanEntry(DUMP_L2MCD_APP_TABLE_ENTRY *msg);
 
         protected:
         private:

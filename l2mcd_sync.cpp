@@ -29,6 +29,7 @@
 #include <algorithm> 
 #include "debugframework.h"
 #include "notificationproducer.h"
+#include "tokenize.h"
 
 #define L2MC_APPL_NOTIFICATIONS             "L2MC_NOTIFICATIONS"
 #define L2MC_APPL_MROUTE_NOTIFICATIONS      "L2MC_MROUTER_NOTIFICATIONS"
@@ -153,6 +154,14 @@ extern "C" {
     void l2mcsync_clear_l2mc_entry()
     {
         l2mcsync.clearL2mcVlanEntry();
+    }
+    int l2mcsync_get_l2mc_info_count(uint16_t vlan_id, uint16_t afi)
+    {
+        return l2mcsync.getL2mcVlanEntryCount(vlan_id, afi);
+    }
+    void l2mcsync_dump_l2mc_info(DUMP_L2MCD_APP_TABLE_ENTRY *msg)
+    {
+        l2mcsync.dumpL2mcVlanEntry(msg);
     }
 }
 
@@ -357,12 +366,12 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     if (msg->is_igmp)
     {
         key = key + ":V4";
-        stateKey = stateKey + ":V4";
+        stateKey = stateKey + "|V4";
     }
     else
     {
         key = key + ":V6";
-        stateKey = stateKey + ":V6";
+        stateKey = stateKey + "|V6";
     }
 
     if(msg->is_static) type.assign("static");
@@ -556,4 +565,280 @@ bool L2mcSync::isPortPeerLink(std::string portname)
             return 1;
     }
     return 0;
+}
+int L2mcSync::getL2mcVlanEntryCount(uint16_t vlan_id, uint16_t afi)
+{
+    int count = 0;
+    int vlanid = 0;
+    std::vector<string> l2mcd_keys;
+    m_appEntryTable.getKeys(l2mcd_keys);
+    for (auto key: l2mcd_keys)
+    {
+        vector<string> keys = tokenize(key, ':');
+
+        if (keys.size() < 4)
+        {
+            SWSS_LOG_ERROR("Invalid key size, skipping %s", key.c_str());
+            continue;
+        }
+        
+        /* Ensure the key starts with "Vlan" otherwise ignore */
+        if (strncmp(keys[0].c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", keys[0].c_str());
+            continue;
+        }
+
+        int  vlanid;
+
+        vlanid = stoi(keys[0].substr(4));
+        if (vlanid != vlan_id)
+            continue;
+
+        string source_addr, group_addr;
+        
+        if (keys.size() == 4)
+        {
+            /*IPv4 addresses*/
+            source_addr = keys[1];
+            group_addr = keys[2];
+        }
+        else
+        {
+            /*IPv6 addresses*/
+            vector<string> address_parts(keys.begin() + 1, keys.end() - 1);
+
+            SWSS_LOG_NOTICE(" address_parts size %lu", address_parts.size());
+            
+            if (address_parts.size() == 16)
+            {
+                size_t mid_point = 8;
+                
+                source_addr = address_parts[0];
+                for (size_t i = 1; i < mid_point; i++)
+                {
+                    source_addr += ":" + address_parts[i];
+                }
+                
+                group_addr = address_parts[mid_point];
+                for (size_t i = mid_point + 1; i < address_parts.size(); i++)
+                {
+                    group_addr += ":" + address_parts[i];
+                }
+            }
+            else
+            {
+                SWSS_LOG_ERROR("Invalid IPv6 address format in key %s", key.c_str());
+                continue;
+            }
+        }
+
+        bool is_v6 = (group_addr.find(':') != string::npos);
+        if ((is_v6 && afi == 2) || (!is_v6 && afi == 1))
+        {
+            count++;
+            SWSS_LOG_ERROR(" l2mc group count %d", count);
+        }
+    }
+    l2mcd_keys.clear();
+    m_appMrouteTable.getKeys(l2mcd_keys);
+    for (auto key: l2mcd_keys)
+    {
+        vector<string> keys = tokenize(key, ':');
+        if (keys.size() != 3)
+        {
+            SWSS_LOG_ERROR("Invalid key size, skipping %s", key.c_str());
+            continue;
+        }
+        if (strncmp(keys[0].c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", keys[0].c_str());
+            continue;
+        }
+        std::string protocol;
+
+        vlanid = stoi(keys[0].substr(4));
+        if (vlanid != vlan_id)
+            continue;
+        protocol = keys[2];
+
+        if ((protocol == "V4" && afi == 1) || (protocol == "V6" && afi == 2))
+        {
+            count++;
+            SWSS_LOG_ERROR(" mrouter count %d", count);
+        }
+    }
+    return count ;
+}
+
+void L2mcSync::dumpL2mcVlanEntry(DUMP_L2MCD_APP_TABLE_ENTRY *msg)
+{
+    int vlan_id, afi;
+    uint32_t idx = 0;
+    
+    vlan_id = msg->vlan_id;
+    afi = msg->afi;
+
+    std::vector<string> l2mcd_keys;
+
+    m_appEntryTable.getKeys(l2mcd_keys);
+    for (auto key: l2mcd_keys)
+    {
+        msg->count = idx;
+        if (idx >= msg->max_count)
+            return;
+        vector<string> keys = tokenize(key, ':');
+        /* Key: <VLAN_name>:<source_address>:<group_address>:<member_port> */
+
+        /* Ensure the key has at least 4 fields otherwise ignore */
+
+        if (keys.size() < 4)
+        {
+            SWSS_LOG_ERROR("Invalid key size, skipping %s", key.c_str());
+            continue;
+        }
+        
+        /* Ensure the key starts with "Vlan" otherwise ignore */
+        if (strncmp(keys[0].c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", keys[0].c_str());
+            continue;
+        }
+
+        int vlanid;
+        std::string port_alias;
+
+        vlanid = stoi(keys[0].substr(4));
+        if (vlanid != vlan_id)
+            continue;
+        
+        port_alias = keys[keys.size() - 1];
+
+        string source_addr, group_addr;
+        
+        if (keys.size() == 4)
+        {
+            /*IPv4 addresses*/
+            source_addr = keys[1];
+            group_addr = keys[2];
+        }
+        else
+        {
+            /*IPv6 addresses*/
+            vector<string> address_parts(keys.begin() + 1, keys.end() - 1);
+
+            SWSS_LOG_NOTICE(" address_parts size %lu", address_parts.size());
+            
+            if (address_parts.size() == 16)
+            {
+                size_t mid_point = 8;
+                
+                source_addr = address_parts[0];
+                for (size_t i = 1; i < mid_point; i++)
+                {
+                    source_addr += ":" + address_parts[i];
+                }
+                
+                group_addr = address_parts[mid_point];
+                for (size_t i = mid_point + 1; i < address_parts.size(); i++)
+                {
+                    group_addr += ":" + address_parts[i];
+                }
+            }
+            else
+            {
+                SWSS_LOG_ERROR("Invalid IPv6 address format in key %s", key.c_str());
+                continue;
+            }
+        }
+
+        bool is_v6 = (group_addr.find(':') != string::npos);
+        if ((is_v6 && afi != 2) || (!is_v6 && afi != 1))
+            continue;
+
+        L2MCD_APP_TABLE_ENTRY &entry = msg->data[idx];
+        memset(&entry, 0, sizeof(entry));
+
+        entry.op_code   = 1;
+        std::vector<swss::FieldValueTuple> value;
+        if (m_appEntryTable.get(key, value))
+        {
+            auto it_en = std::find_if(
+                value.begin(), value.end(),
+                [](auto &t){ return t.first == "type"; });
+
+            if (it_en != value.end() && fvValue(*it_en) == "dynamic")
+                entry.is_static = 0;
+            else 
+                entry.is_static = 1;
+        }
+        entry.vlan_id   = vlanid;
+        entry.is_igmp = (afi == 1) ? TRUE : FALSE;
+        memcpy(entry.port.pnames, port_alias.c_str() , L2MCD_IFNAME_SIZE);
+        memcpy(entry.gaddr,group_addr.c_str(), L2MCD_IP_ADDR_STR_SIZE);
+        memcpy(entry.saddr,source_addr.c_str(), L2MCD_IP_ADDR_STR_SIZE);
+
+        idx++;
+
+    }
+    l2mcd_keys.clear();
+    m_appMrouteTable.getKeys(l2mcd_keys);
+    for (auto key: l2mcd_keys)
+    {
+        msg->count = idx;
+        if (idx >= msg->max_count)
+            return;
+        vector<string> keys = tokenize(key, ':');
+        
+        /* Key: <VLAN_name>:<mrouter_port> */
+
+        /* Ensure the key size is 1 otherwise ignore */
+        if (keys.size() != 3)
+        {
+            SWSS_LOG_ERROR("Invalid key size, skipping %s", key.c_str());
+            continue;
+        }
+
+        /* Ensure the key starts with "Vlan" otherwise ignore */
+        if (strncmp(keys[0].c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", keys[0].c_str());
+            continue;
+        }
+        int vlanid ;
+        vlanid = stoi(keys[0].substr(4));
+        if (vlanid != vlan_id)
+            continue;
+
+        std::string port_alias, protocol;
+        port_alias = keys[1];
+        protocol = keys[2];
+
+        if ((protocol == "V4" && afi != 1) || (protocol == "V6" && afi != 2))
+            continue;
+        
+        L2MCD_APP_TABLE_ENTRY &entry = msg->data[idx];
+        memset(&entry, 0, sizeof(entry));
+
+        entry.op_code   = 1;
+        std::vector<swss::FieldValueTuple> value;
+        if (m_appMrouteTable.get(key, value))
+        {
+            auto it_en = std::find_if(
+                value.begin(), value.end(),
+                [](auto &t){ return t.first == "type"; });
+
+            if (it_en != value.end() && fvValue(*it_en) == "dynamic")
+                entry.is_static = 0;
+            else 
+                entry.is_static = 1;
+        }
+        entry.vlan_id   = vlanid;
+        entry.is_igmp = (afi == 1) ? TRUE : FALSE;
+        memcpy(entry.port.pnames, port_alias.c_str() , L2MCD_IFNAME_SIZE);
+        
+        idx++;
+        
+    }
+
 }

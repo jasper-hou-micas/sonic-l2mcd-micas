@@ -191,8 +191,7 @@ int mld_if_set_version_api(int vrf_index, uint32_t vid, int version, int afi,uin
         return MLD_CLI_ERR_NO_SUCH_IFF;
     }
 	port = mld_l3_get_port_from_ifindex(vlan_node->ifindex,vlan_node->type);
-	L2MCD_VLAN_LOG_DEBUG(vid,"%s:%d:[vlan:%d version:%d old_ver:%d port:%d ", 
-						FN, LN, vid, version, vlan_node->cfg_version, port);
+    L2MCD_VLAN_LOG_DEBUG(vid, "%s:%d:[vlan:%d version:%d old_ver:%d port:%d ", FN, LN, vid, version, port);
 
     if (afi == MLD_IP_IPV4_AFI) {
         if(cfg->cfg_version != version) {
@@ -202,7 +201,6 @@ int mld_if_set_version_api(int vrf_index, uint32_t vid, int version, int afi,uin
             mld_snoop_clear_on_version_change(vid, afi, type);
         }
 
-        vlan_node->cfg_version = version;
         cfg->cfg_version = version; //assign this to l3if in case protocol enable/disable.
         igmp_set_if_igmp_version(vrf_index, port, version);
     }
@@ -216,7 +214,6 @@ int mld_if_set_version_api(int vrf_index, uint32_t vid, int version, int afi,uin
             mld_snoop_clear_on_version_change(vid, afi, type);
         }
 
-        vlan_node->cfg_version = version;
         cfg->cfg_version = version; //assign this to l3if in case protocol enable/disable.
         mld_set_if_mld_version(vrf_index, port, version);
     }
@@ -225,9 +222,8 @@ int mld_if_set_version_api(int vrf_index, uint32_t vid, int version, int afi,uin
 	mcgrp_vport = (afi == MCAST_IPV4_AFI) ? gIgmp.port_list[port]: gMld.port_list[port];
 
 	if(mcgrp_vport) {
-        L2MCD_LOG_INFO("%s(%d): vid:%x, vlan_node_ver:%d, vport_version:%d, afi:%d", FN, LN, vid, 
-                vlan_node->cfg_version, mcgrp_vport->cfg_version, afi);
-	
+        L2MCD_LOG_INFO("%s(%d): vid:%x, vlan_node_ver:%d, vport_version:%d, afi:%d", FN, LN, vid, mcgrp_vport->cfg_version, afi);
+
         mcgrp_pport = mcgrp_vport->phy_port_list;
         for (; mcgrp_pport; mcgrp_pport = mcgrp_pport->next)
             mcgrp_pport->oper_version = version;
@@ -1550,15 +1546,14 @@ int mld_proto_snooping_mrouter_if_set_api(mld_vlan_node_t * vlan_node,
     /*Need to test out this code*/
     if (is_virtual_port(mcgrp_vport->vir_port_id)) {
         mcgrp_pport = mcgrp_find_phy_port_entry(mld, mcgrp_vport, port);
-        if (mcgrp_pport == NULL || !mcgrp_pport->is_up) {
+        if (mcgrp_pport == NULL || (!mcgrp_pport->is_up && !vlan_node->warm_reboot[afi-1])) {
             L2MCD_LOG_INFO("%s:%d Error: phy port 0x%x not found in vlan 0x%x or is not up",
                     FN, LN,  port, mld_get_vlan_id(mcgrp_vport->vir_port_id));
             return(MLD_SUCCESS);
         }
        /* TBD Revisit this condiftion Srikanth */
     } else if (mcgrp_vport->vir_port_id == mcgrp_vport->phy_port_id) {
-        mcgrp_pport =
-            mcgrp_find_phy_port_entry(mld, mcgrp_vport,port);
+        mcgrp_pport = mcgrp_find_phy_port_entry(mld, mcgrp_vport,port);
         if (mcgrp_pport == NULL) {
             L2MCD_VLAN_LOG_ERR(mcgrp_vport->vir_port_id, "%s:%d mcgrp_pport NULL vir_port_id:%d phyport:%d port:%d", 
                     FN, LN,mcgrp_vport->vir_port_id,mcgrp_vport->phy_port_id, port);

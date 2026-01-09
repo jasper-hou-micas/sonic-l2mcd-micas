@@ -286,6 +286,14 @@ typedef struct L2MCD_APP_TABLE_ENTRY {
     PORT_ATTR   port;
 } L2MCD_APP_TABLE_ENTRY;
 
+typedef struct DUMP_L2MCD_APP_TABLE_ENTRY {
+    int         vlan_id;
+    int         afi;
+    uint32_t    count;
+    uint32_t    max_count;
+    L2MCD_APP_TABLE_ENTRY   *data;
+} DUMP_L2MCD_APP_TABLE_ENTRY;
+
 
 extern L2MCD_CONTEXT l2mcd_context;
 #define g_l2mcd_evbase                    l2mcd_context.evbase

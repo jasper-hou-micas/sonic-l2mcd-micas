@@ -134,20 +134,23 @@ int l2mcd_system_group_entry_notify(MADDR_ST *group_address, MADDR_ST *src_addre
         return 0;
     }
 
-    msg.is_static=is_static;
+    msg.is_static = is_static;
     mcgrp_mbrshp = mcgrp_find_mbrshp_entry_for_grpaddr(mcgrp, group_address, vir_port, phy_port_id);
     if (mcgrp_mbrshp) 
     {
         msg.is_remote = mcgrp_mbrshp->is_remote;
-        msg.is_static=  mcgrp_mbrshp->static_mmbr;
-        rmt1=mcgrp_mbrshp->is_remote;
-        if (src_address && !mcast_addr_any(src_address)) 
+        if (!mcgrp_mbrshp->static_mmbr)
         {
-            igmpv3_src = mcgrp_find_source(mcgrp_mbrshp, src_address,  FILT_INCL);
-            if (igmpv3_src) 
+            msg.is_static = mcgrp_mbrshp->static_mmbr;
+        }
+        rmt1 = mcgrp_mbrshp->is_remote;
+        if (src_address && !mcast_addr_any(src_address))
+        {
+            igmpv3_src = mcgrp_find_source(mcgrp_mbrshp, src_address, FILT_INCL);
+            if (igmpv3_src)
             {
                 msg.is_remote = igmpv3_src->is_remote;
-                rmt2=msg.is_remote;
+                rmt2 = msg.is_remote;
             }
         }
     }
@@ -372,6 +375,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
     int vlan_id = 0;
     int remote_version = 0;
     int afi = MLD_IP_IPV4_AFI;
+    int warm_reboot = 0;
     uint8_t vlan_type = MLD_VLAN;
     mld_vlan_node_t *vlan_node = NULL;
     int rc = 0;
@@ -563,6 +567,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             }
             afi = data->afi;
             vlan_id = data->vlan_id;
+            warm_reboot = data->warm_reboot;
             vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
             L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:SNOOP ipc_rx type:%s, ver:%d,  querier:%s, fleave:%s , qtime:%d, lmq_time:%d, qmx_resp_time:%d, dyn_count:%d afi:%d",
                                 FN, LN, vlan_id, data->op_code ? "Add" : "Del", data->version, data->querier ? "Y" : "N", data->fast_leave ? "Y" : "N",
@@ -677,6 +682,144 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
 
                 sprintf(param, "%s|%d", NOTIFY_PARAM_ACTION_ENABLE, vlan_id);
                 l2mcsync_notify_config_done(NOTIFY_PARAM_SNP, param);
+            }
+
+            if (warm_reboot && vlan_node && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED))
+            {
+                vlan_node->warm_reboot[afi - 1] = 1;
+                int count = l2mcsync_get_l2mc_info_count(vlan_id, afi);
+                L2MCD_LOG_NOTICE("[WARM][%s] vlan=%d afi=%d dump_count=%d", FN, vlan_id, afi, count);
+                if (count <= 0)
+                {
+                    L2MCD_LOG_NOTICE("[WARM][%s] vlan=%d afi=%d no entry, notify directly", FN, vlan_id, afi);
+                    L2MCD_LOG_NOTICE("%s warm-reboot notify  vlan_id %d afi %d", FN, vlan_id, afi);
+                    sprintf(param, "%d|%d", (afi == MCAST_IPV4_AFI) ? NOTIFY_PARAM_WARM_IGMP_SNP : NOTIFY_PARAM_WARM_MLD_SNP, vlan_id);
+                    l2mcsync_notify_config_done(NOTIFY_PARAM_WARM_STATUS, param);
+                    vlan_node->warm_reboot[afi - 1] = 0;
+                    break;
+                }
+                L2MCD_APP_TABLE_ENTRY *entries = calloc(count, sizeof(L2MCD_APP_TABLE_ENTRY));
+                if (!entries)
+                    break;
+
+                DUMP_L2MCD_APP_TABLE_ENTRY msg = {
+                    .vlan_id   = vlan_id,
+                    .afi       = afi,
+                    .max_count = count,
+                    .count     = 0,
+                    .data      = entries};
+
+                l2mcsync_dump_l2mc_info(&msg);
+
+                mcgrp                   = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, L2MCD_DEFAULT_VRF_IDX);
+                MCGRP_L3IF *mcgrp_vport = NULL;
+                uint16_t    port        = mld_l3_get_port_from_ifindex(vlan_node->ifindex, vlan_node->type);
+                mcgrp_vport             = (afi == MCAST_IPV4_AFI) ? gIgmp.port_list[port] : gMld.port_list[port];
+                for (auto i = 0; i < count; i++)
+                {
+                    L2MCD_APP_TABLE_ENTRY *entry = &entries[i];
+
+                    L2MCD_LOG_NOTICE(
+                        "[WARM][%s] entry[%u] vlan=%d afi=%d static=%d "
+                        "port='%s' gaddr='%s' saddr='%s'",
+                        FN, i, entry->vlan_id, afi, entry->is_static,
+                        entry->port.pnames,
+                        entry->gaddr[0] ? entry->gaddr : "<empty>",
+                        entry->saddr[0] ? entry->saddr : "<empty>");
+
+                    ifidx = portdb_get_portindex_from_ifname(entry->port.pnames);
+                    if (!mld_is_port_member_of_vlan(vlan_node, ifidx))
+                        continue;
+
+                    MCGRP_PORT_ENTRY *mcgrp_pport = NULL;
+                    mcgrp_pport                   = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, ifidx);
+                    if (mcgrp_pport == NULL || (!mcgrp_pport->is_up && !warm_reboot))
+                    {
+                        L2MCD_LOG_NOTICE("%s Port %d is not up", FN, ifidx);
+                        continue;
+                    }
+
+                    int is_mrouter = (entry->gaddr[0] == '\0');
+                    int has_src    = (entry->saddr[0] != '\0');
+
+                    /* ---- mrouter ---- */
+                    if (is_mrouter)
+                    {
+                        if (entry->is_static)
+                            mld_snooping_mrouter_if_set_api(
+                                vlan_id, L2MCD_IF_TYPE_PHYSICAL,
+                                entry->port.pnames, 1, afi, MLD_VLAN);
+                        else
+                            mcgrp_add_router_port(mcgrp, mcgrp_vport, ifidx,
+                                                  FALSE, MLD_PROTO_MROUTER,
+                                                  DEFAULT_MROUTER_AGING_TIME, FALSE);
+
+                        L2MCD_LOG_NOTICE("%s warm-reboot mrouter", FN);
+                        continue;
+                    }
+
+                    /* ---- static group ---- */
+                    if (entry->is_static)
+                    {
+                        mcast_grp_addr_t grp_addr;
+                        memset(&grp_addr, 0, sizeof(grp_addr));
+
+                        if (afi == MCAST_IPV4_AFI)
+                        {
+                            grp_addr.afi = MCAST_IPV4_AFI;
+                            inet_aton(entry->gaddr, &grp_addr.ip.ipv4_addr);
+                        }
+                        else
+                        {
+                            grp_addr.afi = MCAST_IPV6_AFI;
+                            inet_pton(AF_INET6, entry->gaddr, &grp_addr.ip.ipv6_addr);
+                        }
+                        L2MCD_LOG_INFO("%s warm-reboot static group", FN);
+                        mld_static_group_source_set(
+                            vlan_id, entry->port.pnames, iftype,
+                            &grp_addr, 1, FALSE, vlan_type);
+                        continue;
+                    }
+                    /* ---- dynamic Group ---- */
+
+                    MADDR_ST src_addr;
+                    MADDR_ST grp_addr;
+                    uint8_t  sync_action = IS_EXCL;
+                    uint8_t  num_srcs    = 1;
+                    grpaddr.afi          = afi;
+                    srcaddr.afi          = afi;
+                    if (afi == MCAST_IPV4_AFI)
+                    {
+                        inet_aton(entry->gaddr, &ipaddr);
+                        grpaddr.ip.ipv4_addr = htonl(ipaddr.s_addr);
+                        inet_aton(entry->saddr, &ipaddr);
+                        srcaddr.ip.ipv4_addr = htonl(ipaddr.s_addr);
+                    }
+                    else
+                    {
+                        inet_pton(AF_INET6, entry->gaddr, &grpaddr.ip.ipv6_addr);
+                        inet_pton(AF_INET6, entry->saddr, &srcaddr.ip.ipv6_addr);
+                    }
+
+                    mcast_set_ip_addr(&grp_addr, &grpaddr);
+                    mcast_set_ip_addr(&src_addr, &srcaddr);
+                    L2MCD_LOG_NOTICE("%s:%d:[vlan:%d] group address %s src address %s", FN, LN, vlan_id, mcast_print_addr(&grp_addr), mcast_print_addr(&src_addr));
+
+                    sync_action = has_src ? ALLOW_NEW : IS_EXCL;
+                    num_srcs    = has_src ? 1 : 0;
+                    L2MCD_LOG_NOTICE("%s warm-reboot dynamic group  sync_action %d num_srcs %d oper_version %d", FN, sync_action, num_srcs, mcgrp_pport->oper_version);
+                    mcgrp_update_group_address_table(
+                        mcgrp, vlan_id, ifidx,
+                        &grp_addr, &src_addr,
+                        sync_action, mcgrp_pport->oper_version,
+                        num_srcs, has_src ? (void *)&src_addr : NULL);
+                }
+
+                free(entries);
+                L2MCD_LOG_NOTICE("%s warm-reboot notify  vlan_id %d afi %d", FN, vlan_id, afi);
+                sprintf(param, "%d|%d", (afi == MCAST_IPV4_AFI) ? NOTIFY_PARAM_WARM_IGMP_SNP : NOTIFY_PARAM_WARM_MLD_SNP, vlan_id);
+                l2mcsync_notify_config_done(NOTIFY_PARAM_WARM_STATUS, param);
+                vlan_node->warm_reboot[afi - 1] = 0;
             }
             break;
         }
