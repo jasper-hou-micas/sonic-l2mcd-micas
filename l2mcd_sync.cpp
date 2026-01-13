@@ -637,7 +637,7 @@ int L2mcSync::getL2mcVlanEntryCount(uint16_t vlan_id, uint16_t afi)
         if ((is_v6 && afi == 2) || (!is_v6 && afi == 1))
         {
             count++;
-            SWSS_LOG_ERROR(" l2mc group count %d", count);
+            SWSS_LOG_INFO(" l2mc group count %d", count);
         }
     }
     l2mcd_keys.clear();
@@ -665,7 +665,7 @@ int L2mcSync::getL2mcVlanEntryCount(uint16_t vlan_id, uint16_t afi)
         if ((protocol == "V4" && afi == 1) || (protocol == "V6" && afi == 2))
         {
             count++;
-            SWSS_LOG_ERROR(" mrouter count %d", count);
+            SWSS_LOG_INFO(" mrouter count %d", count);
         }
     }
     return count ;
