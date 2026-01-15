@@ -2048,32 +2048,42 @@ MCGRP_ROUTER_ENTRY *mcgrp_add_router_port(MCGRP_CLASS *mcgrp,
 	if (new_mcgrp_rport) {
 		if (new_mcgrp_rport->is_static)
 			return NULL;
+        
+        if (!new_mcgrp_rport->is_static && is_static) 
+        {
+            L2MCD_VLAN_LOG_INFO(mcgrp_vport->vir_port_id,
+                "%s:%d:[vlan:%d] dynamic -> static, delete old rport",
+                FN, LN, mcgrp_vport->vir_port_id);
 
-		if (new_mcgrp_rport->type != type) {
-			new_mcgrp_rport->type = type;
-		}
-		if (new_mcgrp_rport->time != time) {
-			new_mcgrp_rport->time = time;
-		}
+            mcgrp_delete_router_port(mcgrp, mcgrp_vport, phy_port_id);
+            new_mcgrp_rport = NULL;
+        }
+        else 
+        {
+            if (new_mcgrp_rport->type != type) {
+                new_mcgrp_rport->type = type;
+            }
+            if (new_mcgrp_rport->time != time) {
+                new_mcgrp_rport->time = time;
+            }
 
-		if (!is_static) {
-			if ((WheelTimerSuccess == WheelTimer_IsElementEnqueued
-									(&new_mcgrp_rport->mrtr_tmr.mcgrp_wte))&&
-				((type == MLD_PROTO_MROUTER || type == MLD_PIM_MROUTER))) {
-					WheelTimer_ReTimeElement(mcgrp->mcgrp_wtid,
-							 &new_mcgrp_rport->mrtr_tmr.
-							 mcgrp_wte,
-							 (UINT32) time);
-			}
-		} else {
-				new_mcgrp_rport->is_static = is_static;
-				if (WheelTimerSuccess == WheelTimer_IsElementEnqueued
-													(&new_mcgrp_rport->mrtr_tmr.mcgrp_wte))
-					WheelTimer_DelElement(mcgrp->mcgrp_wtid,
-						      &new_mcgrp_rport->mrtr_tmr.
-						      mcgrp_wte);
-		}
-        return (new_mcgrp_rport);
+            if (!is_static) {
+                if ((WheelTimerSuccess == WheelTimer_IsElementEnqueued(&new_mcgrp_rport->mrtr_tmr.mcgrp_wte)) &&
+                    ((type == MLD_PROTO_MROUTER || type == MLD_PIM_MROUTER)))
+                {
+                    WheelTimer_ReTimeElement(mcgrp->mcgrp_wtid,
+                                             &new_mcgrp_rport->mrtr_tmr.mcgrp_wte,
+                                             (UINT32)time);
+                }
+            }
+            else {
+                new_mcgrp_rport->is_static = is_static;
+                if (WheelTimerSuccess == WheelTimer_IsElementEnqueued(&new_mcgrp_rport->mrtr_tmr.mcgrp_wte))
+                    WheelTimer_DelElement(mcgrp->mcgrp_wtid,
+                                          &new_mcgrp_rport->mrtr_tmr.mcgrp_wte);
+            }
+            return (new_mcgrp_rport);
+        }
     }
 
     L2MCD_VLAN_LOG_INFO(mcgrp_vport->vir_port_id, "%s:%d:[vlan:%d] port id %d", FN, LN, mcgrp_vport->vir_port_id, phy_port_id);

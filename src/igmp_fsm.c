@@ -838,10 +838,9 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
     is_remote = IGMP_IS_REMOTE_MMBR(version);
     version    = MCGRP_GET_VERSION(version);
 
-
-    L2MCD_VLAN_LOG_DEBUG(vir_port_id,"%s:%d:[vlan:%d] %s port:%s(%d) GA:%s is_static:%d SSM:%d  ver:%d Action:%s num_srcs:%d ",
-            FN,LN, vir_port_id, portdb_get_ifname_from_portindex(vir_port_id), portdb_get_ifname_from_portindex(phy_port_id),phy_port_id,
-            mcast_print_addr(group_address),is_static, is_ssm_grp, version,mcgrp_action_label[action],num_srcs);
+    L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] %s port:%s(%d) GA:%s is_static:%d SSM:%d  ver:%d Action:%s num_srcs:%d ",
+                         FN, LN, vir_port_id, portdb_get_ifname_from_portindex(vir_port_id), portdb_get_ifname_from_portindex(phy_port_id), phy_port_id,
+                         mcast_print_addr(group_address), is_static, is_ssm_grp, version, mcgrp_action_label[action], num_srcs);
     if (IS_IGMP_CLASS(mcgrp))
     {
         int *srcarray = (int *)src_array;
@@ -2021,7 +2020,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                  */ 
                 if (!src_cnt) 
                 {
-                    if (mcgrp_mbrshp && (mcgrp_mbrshp->is_remote!= is_remote))
+                    if (mcgrp_mbrshp && (mcgrp_mbrshp->is_remote != is_remote))
                     {
                         if (IS_IGMP_CLASS(mcgrp))
                         {
@@ -2032,7 +2031,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                             mcast_set_ipv6_addr(&src_temp, &ip6_unspecified_address);
                         }
                         mcgrp_mbrshp->is_remote = is_remote;
-                        L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] rmt:%d", FN,LN,vir_port_id, is_remote);
+                        L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] rmt:%d", FN, LN, vir_port_id, is_remote);
                         l2mcd_system_group_entry_notify(group_address, &src_temp, vir_port_id, phy_port_id, TRUE, TRUE);
                     }
                 }

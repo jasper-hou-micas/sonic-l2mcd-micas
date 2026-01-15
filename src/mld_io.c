@@ -378,7 +378,7 @@ void l2mcd_mld_process_v1_report(IP6_RX_PKT_MSG* mld_msg)
     if (!mld_check_valid_range(&mld_v1_report->group_address))
     {
         L2MCD_LOG_ERR("[MLD_V1] Group address out of range: %s",
-                       mcast_print_addr(&source_addr));
+                       mcast_print_addr(&group_address));
 
         mld->mld_stats[mld_msg->ip_param.rx_port_number].recv_size_or_range_error++;
         return;
@@ -388,8 +388,7 @@ void l2mcd_mld_process_v1_report(IP6_RX_PKT_MSG* mld_msg)
     L2MCD_LOG_NOTICE("[MLD_V1] Group address valid: %s",
                      mcast_print_addr(&group_addr));
 
-    if (!l2mcd_is_peerlink(
-            portdb_get_ifname_from_portindex(mld_msg->ip_param.rx_physical_port_number)))
+    if (!l2mcd_is_peerlink(portdb_get_ifname_from_portindex(mld_msg->ip_param.rx_physical_port_number)))
     {
         UINT8 action = IS_EXCL;
         UINT16 num_srcs = 0;
