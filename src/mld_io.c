@@ -378,7 +378,7 @@ void l2mcd_mld_process_v1_report(IP6_RX_PKT_MSG* mld_msg)
     if (!mld_check_valid_range(&mld_v1_report->group_address))
     {
         L2MCD_LOG_ERR("[MLD_V1] Group address out of range: %s",
-                       mcast_print_addr(&group_address));
+                       mcast_print_addr(&group_addr));
 
         mld->mld_stats[mld_msg->ip_param.rx_port_number].recv_size_or_range_error++;
         return;
