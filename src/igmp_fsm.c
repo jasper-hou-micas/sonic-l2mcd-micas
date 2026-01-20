@@ -1613,6 +1613,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                         {
                             mcgrp_mbrshp->aging_enabled = TRUE;
                             mcgrp_mbrshp->static_mmbr   = FALSE;
+                            mcgrp_mbrshp->filter_mode   = FILT_INCL;
                         }
 
                         if (IS_IGMP_CLASS(mcgrp))
