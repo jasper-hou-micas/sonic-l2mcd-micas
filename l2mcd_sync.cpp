@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include <string.h>
 #include <errno.h>
 #include <system_error>
@@ -28,8 +29,12 @@
 #include <algorithm> 
 #include "debugframework.h"
 #include "notificationproducer.h"
+#include "tokenize.h"
 
-#define STATE_L2MC_MROUTER_TABLE_NAME   "L2MC_STATE_MROUTER_TABLE"
+#define L2MC_APPL_NOTIFICATIONS             "L2MC_NOTIFICATIONS"
+#define L2MC_APPL_MROUTE_NOTIFICATIONS      "L2MC_MROUTER_NOTIFICATIONS"
+#define L2MC_APPL_CONFIG_NOTIFICATIONS      "L2MC_CONFIG_PARA_DONE"
+#define L2MC_APPL_WARMREBOOT_NOTIFICATIONS  "L2MC_WARMREBOOT_NOTIFICATIONS"
 
 using namespace std;
 using namespace swss;
@@ -38,17 +43,25 @@ void l2mcd_debugCLI(std::string s, KeyOpFieldsValuesTuple t);
 string g_L2McdCompstring = "l2mcd_debug";
 
 L2mcSync::L2mcSync(DBConnector *db, DBConnector *cfgDb, DBConnector *stateDb) :
-    m_l2mcdAppVlanTable(db, APP_L2MC_VLAN_TABLE_NAME),
-    m_l2mcdEntryTable(db,  APP_L2MC_MEMBER_TABLE_NAME),
-    m_l2mcdMrouterTable(db, APP_L2MC_MROUTER_TABLE_NAME),
+    m_appVlanProducerTable(db, APP_L2MC_VLAN_TABLE_NAME),
+    m_appEntryProducerTable(db,  APP_L2MC_MEMBER_TABLE_NAME),
+    m_appMrouterProducerTable(db, APP_L2MC_MROUTER_TABLE_NAME),
+    m_appSuppressProducerTable(db, APP_L2MC_SUPPRESS_TABLE_NAME),
     m_statel2mcdLocalMemberTable(stateDb, STATE_L2MC_MEMBER_TABLE_NAME),
-    m_statel2mcdLocalMrouterTable(stateDb, STATE_L2MC_MROUTER_TABLE_NAME)
+    m_statel2mcdLocalMrouterTable(stateDb, STATE_L2MC_MROUTER_TABLE_NAME),
+    m_featureTable(cfgDb, CFG_FEATURE_TABLE_NAME),
+    m_appVlanTable(db, APP_L2MC_VLAN_TABLE_NAME),
+    m_appEntryTable(db, APP_L2MC_MEMBER_TABLE_NAME),
+    m_appMrouteTable(db, APP_L2MC_MROUTER_TABLE_NAME),
+    m_appSuppressTable(db, APP_L2MC_SUPPRESS_TABLE_NAME)
 {
     SWSS_LOG_NOTICE("L2MCD: sync object");
-    l2mc_entry_notifications = new swss::NotificationProducer(db, "L2MC_NOTIFICATIONS");
-    l2mc_mrouter_notifications = new swss::NotificationProducer(db, "L2MC_MROUTER_NOTIFICATIONS");
-    l2mc_cfg_done_notifications = new swss::NotificationProducer(db, "L2MC_CONFIG_PARA_DONE");
-    m_mclagTable = std::unique_ptr<Table>(new Table(cfgDb, CFG_MCLAG_TABLE_NAME ));
+    l2mc_entry_notifications = new swss::NotificationProducer(db, L2MC_APPL_NOTIFICATIONS);
+    l2mc_mrouter_notifications = new swss::NotificationProducer(db, L2MC_APPL_MROUTE_NOTIFICATIONS);
+    l2mc_cfg_done_notifications = new swss::NotificationProducer(db, L2MC_APPL_CONFIG_NOTIFICATIONS);
+    l2mc_warm_reboot_notifications = new swss::NotificationProducer(db, L2MC_APPL_WARMREBOOT_NOTIFICATIONS);
+
+    m_mclagTable = std::unique_ptr<Table>(new Table(cfgDb, CFG_MCLAG_TABLE_NAME));
 }
 
 L2mcSync::~L2mcSync()
@@ -64,6 +77,10 @@ L2mcSync::~L2mcSync()
     if (l2mc_cfg_done_notifications)
     {
         delete l2mc_cfg_done_notifications;
+    }
+    if (l2mc_warm_reboot_notifications)
+    {
+        delete l2mc_warm_reboot_notifications;
     }
 }
 
@@ -130,6 +147,22 @@ extern "C" {
     {
         l2mcsync.notify_config_done(option, paraname);
     }
+    void l2mcsync_notify_warm_reboot_done(char *option, char *paraname)
+    {
+        l2mcsync.notify_warm_reboot_done(option, paraname);
+    }
+    void l2mcsync_clear_l2mc_entry()
+    {
+        l2mcsync.clearL2mcVlanEntry();
+    }
+    int l2mcsync_get_l2mc_info_count(uint16_t vlan_id, uint16_t afi)
+    {
+        return l2mcsync.getL2mcVlanEntryCount(vlan_id, afi);
+    }
+    void l2mcsync_dump_l2mc_info(DUMP_L2MCD_APP_TABLE_ENTRY *msg)
+    {
+        l2mcsync.dumpL2mcVlanEntry(msg);
+    }
 }
 
 int L2mcSync::getL2mcMgrDebugPrio(void)
@@ -145,6 +178,78 @@ void L2mcSync::notify_config_done(std::string option, std::string paraname)
     l2mc_cfg_done_notifications->send(option, paraname, value);
 }
 
+void L2mcSync::notify_warm_reboot_done(std::string option, std::string paraname)
+{
+    std::vector<swss::FieldValueTuple> value;
+    FieldValueTuple s("state", "done");
+    value.push_back(s);
+    l2mc_warm_reboot_notifications->send(option, paraname, value);
+}
+
+void L2mcSync::clearL2mcVlanEntry(void)
+{
+    SWSS_LOG_NOTICE("clear All L2mc Entry");
+    bool l2mcd_state = false;
+
+    std::vector<string> feature_keys;
+    m_featureTable.getKeys(feature_keys);
+    for (auto i: feature_keys)
+    {
+        if (i != "l2mcd")
+            continue;
+        std::vector<swss::FieldValueTuple> feature_fvs;
+        m_featureTable.get(i, feature_fvs);
+        for (auto f: feature_fvs)
+        {
+            if (fvField(f) == "state")
+            {
+                l2mcd_state = fvValue(f) == "enabled";
+                SWSS_LOG_NOTICE("l2mcd state: %s, %d", fvValue(f).c_str(), l2mcd_state);
+                break;
+            }
+        }
+    }
+    // feature enabled and maybe warm-restart
+    if (l2mcd_state)
+    {
+        SWSS_LOG_NOTICE("l2mcd state is still Enabled, there is no need to clear the l2mc entry");
+        return;
+    }
+    // feature disable and clear l2mcd entry
+    std::vector<string> l2mcd_keys;
+    m_statel2mcdLocalMemberTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_statel2mcdLocalMemberTable.del(i);
+    }
+    m_statel2mcdLocalMrouterTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_statel2mcdLocalMrouterTable.del(i);
+    }
+
+    m_appSuppressTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_appSuppressProducerTable.del(i);
+    }
+    m_appEntryTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_appEntryProducerTable.del(i);
+    }
+    m_appMrouteTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_appMrouterProducerTable.del(i);
+    }
+    m_appVlanTable.getKeys(l2mcd_keys);
+    for (auto i: l2mcd_keys)
+    {
+        m_appVlanProducerTable.del(i);
+    }
+}
+
 void L2mcSync::addL2mcVlanEntry(uint16_t vlan_id)
 {
     std::vector<FieldValueTuple> fvVector;
@@ -153,7 +258,7 @@ void L2mcSync::addL2mcVlanEntry(uint16_t vlan_id)
     vlan = VLAN_PREFIX + to_string(vlan_id);
     FieldValueTuple s("id", to_string(vlan_id));
     fvVector.push_back(s);
-    m_l2mcdAppVlanTable.set(vlan, fvVector);
+    m_appVlanProducerTable.set(vlan, fvVector);
     SWSS_LOG_NOTICE("APP_L2MC_VLAN_TABLE Add %s to L2MC ", vlan.c_str());
 }
 
@@ -162,10 +267,11 @@ void L2mcSync::delL2mcVlanEntry(uint16_t vlan_id)
     string vlan;
 
     vlan = VLAN_PREFIX + to_string(vlan_id);
-    m_l2mcdAppVlanTable.del(vlan);
+    m_appVlanProducerTable.del(vlan);
 
     SWSS_LOG_NOTICE("APP_L2MC_VLAN_TABLE Delete %s from L2MC ", vlan.c_str());
 }
+
 void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
 {
     string key;
@@ -180,13 +286,13 @@ void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     key.append(L2MCD_DEFAULT_KEY_SEPARATOR);
     key.append(msg->gaddr);
     key.append(L2MCD_DEFAULT_KEY_SEPARATOR);
-    key.append(msg->ports[0].pnames);
+    key.append(msg->port.pnames);
     stateKey = VLAN_PREFIX + to_string(msg->vlan_id)+L2MCD_STATE_KEY_SEPARATOR;
     stateKey.append(msg->saddr);
     stateKey.append(L2MCD_STATE_KEY_SEPARATOR);
     stateKey.append(msg->gaddr);
     stateKey.append(L2MCD_STATE_KEY_SEPARATOR);
-    stateKey.append(msg->ports[0].pnames);
+    stateKey.append(msg->port.pnames);
 
     if(msg->is_static) type.assign("static");
     if(msg->is_remote) type.assign("remote");
@@ -194,11 +300,11 @@ void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     fvVector.push_back(s);
     if (!msg->op_code)
     {
-        SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d is_remote:%d ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static,msg->is_remote);
-        m_l2mcdEntryTable.del(key);
+        SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d is_remote:%d ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->port.pnames, msg->is_static,msg->is_remote);
+        m_appEntryProducerTable.del(key);
         if (!m_statel2mcdLocalMemberTable.get(stateKey, fvVector1))
         {
-            SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d Not Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static);
+            SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-DEL key:%s vid:%d G:%s sa:%s port %s static:%d Not Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->port.pnames, msg->is_static);
             return;
         }
         m_statel2mcdLocalMemberTable.del(stateKey);
@@ -215,11 +321,11 @@ void L2mcSync::addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     }
     else
     {
-        SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d,is_remote:%d  ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static, msg->is_remote);
-        m_l2mcdEntryTable.set(key,fvVector);
+        SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d,is_remote:%d  ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->port.pnames, msg->is_static, msg->is_remote);
+        m_appEntryProducerTable.set(key,fvVector);
         if (m_statel2mcdLocalMemberTable.get(stateKey, fvVector1))
         {
-            SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->ports[0].pnames, msg->is_static);
+            SWSS_LOG_NOTICE("STATE_L2MC_ENTRY_TABLE Group-ADD key:%s vid:%d G:%s sa:%s port %s static:%d Exists ", key.c_str(), msg->vlan_id, msg->gaddr, msg->saddr, msg->port.pnames, msg->is_static);
             return;
         }
         m_statel2mcdLocalMemberTable.set(stateKey, fvVector);
@@ -240,7 +346,7 @@ void L2mcSync::delL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     key = VLAN_PREFIX + to_string(msg->vlan_id) +  L2MCD_DEFAULT_KEY_SEPARATOR + "*"+L2MCD_DEFAULT_KEY_SEPARATOR;
     key +=msg->gaddr;
     SWSS_LOG_NOTICE("APP_L2MC_ENTRY_TABLE Group delete vid:%d G:%s ", msg->vlan_id, msg->gaddr);
-    m_l2mcdEntryTable.del(key);
+    m_appEntryProducerTable.del(key);
 
 }
 
@@ -254,18 +360,18 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     std::vector<swss::FieldValueTuple> entry;
 
     key = VLAN_PREFIX + to_string(msg->vlan_id) + L2MCD_DEFAULT_KEY_SEPARATOR;
-    key.append(msg->ports[0].pnames);
+    key.append(msg->port.pnames);
     stateKey = VLAN_PREFIX + to_string(msg->vlan_id) + L2MCD_STATE_KEY_SEPARATOR;
-    stateKey.append(msg->ports[0].pnames);
+    stateKey.append(msg->port.pnames);
     if (msg->is_igmp)
     {
         key = key + ":V4";
-        stateKey = stateKey + ":V4";
+        stateKey = stateKey + "|V4";
     }
     else
     {
         key = key + ":V6";
-        stateKey = stateKey + ":V6";
+        stateKey = stateKey + "|V6";
     }
 
     if(msg->is_static) type.assign("static");
@@ -275,12 +381,12 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     if (msg->op_code)
     {
         SWSS_LOG_NOTICE("APP_L2MC_MROUTER_TABLE:Key:%s stateKey:%s Vlan%d:%s mrouter add",key.c_str(), stateKey.c_str(),
-                msg->vlan_id, msg->ports[0].pnames);
-        m_l2mcdMrouterTable.set(key,fvVector);
+                msg->vlan_id, msg->port.pnames);
+        m_appMrouterProducerTable.set(key,fvVector);
         if (m_statel2mcdLocalMrouterTable.get(stateKey, fvVector1))
         {
             SWSS_LOG_NOTICE("STATE_L2MC_MROUTER_TABLE Mroute port Add key:%s vid:%d port %s static:%d Exists ", stateKey.c_str(), 
-                    msg->vlan_id, msg->ports[0].pnames, msg->is_static);
+                    msg->vlan_id, msg->port.pnames, msg->is_static);
             return;
         }
         m_statel2mcdLocalMrouterTable.set(stateKey, fvVector);
@@ -294,14 +400,14 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     }
     else
     {
-        m_l2mcdMrouterTable.del(key);
+        m_appMrouterProducerTable.del(key);
         SWSS_LOG_NOTICE("APP_L2MC_MROUTER_TABLE:Key:%s stateKey:%s Vlan%d:%s mrouter entry deleted", key.c_str(),
-                stateKey.c_str(), msg->vlan_id, msg->ports[0].pnames);
+                stateKey.c_str(), msg->vlan_id, msg->port.pnames);
 
         if (!m_statel2mcdLocalMrouterTable.get(stateKey, fvVector1))
         {
             SWSS_LOG_NOTICE("STATE_L2MC_MROUTER_TABLE Mroute port DEL key:%s vid:%d port %s static:%d Not Exists ", stateKey.c_str(), 
-                    msg->vlan_id, msg->ports[0].pnames, msg->is_static);
+                    msg->vlan_id, msg->port.pnames, msg->is_static);
             return;
         }
         m_statel2mcdLocalMrouterTable.del(stateKey);
@@ -459,4 +565,280 @@ bool L2mcSync::isPortPeerLink(std::string portname)
             return 1;
     }
     return 0;
+}
+int L2mcSync::getL2mcVlanEntryCount(uint16_t vlan_id, uint16_t afi)
+{
+    int count = 0;
+    int vlanid = 0;
+    std::vector<string> l2mcd_keys;
+    m_appEntryTable.getKeys(l2mcd_keys);
+    for (auto key: l2mcd_keys)
+    {
+        vector<string> keys = tokenize(key, ':');
+
+        if (keys.size() < 4)
+        {
+            SWSS_LOG_ERROR("Invalid key size, skipping %s", key.c_str());
+            continue;
+        }
+        
+        /* Ensure the key starts with "Vlan" otherwise ignore */
+        if (strncmp(keys[0].c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", keys[0].c_str());
+            continue;
+        }
+
+        int  vlanid;
+
+        vlanid = stoi(keys[0].substr(4));
+        if (vlanid != vlan_id)
+            continue;
+
+        string source_addr, group_addr;
+        
+        if (keys.size() == 4)
+        {
+            /*IPv4 addresses*/
+            source_addr = keys[1];
+            group_addr = keys[2];
+        }
+        else
+        {
+            /*IPv6 addresses*/
+            vector<string> address_parts(keys.begin() + 1, keys.end() - 1);
+
+            SWSS_LOG_NOTICE(" address_parts size %lu", address_parts.size());
+            
+            if (address_parts.size() == 16)
+            {
+                size_t mid_point = 8;
+                
+                source_addr = address_parts[0];
+                for (size_t i = 1; i < mid_point; i++)
+                {
+                    source_addr += ":" + address_parts[i];
+                }
+                
+                group_addr = address_parts[mid_point];
+                for (size_t i = mid_point + 1; i < address_parts.size(); i++)
+                {
+                    group_addr += ":" + address_parts[i];
+                }
+            }
+            else
+            {
+                SWSS_LOG_ERROR("Invalid IPv6 address format in key %s", key.c_str());
+                continue;
+            }
+        }
+
+        bool is_v6 = (group_addr.find(':') != string::npos);
+        if ((is_v6 && afi == 2) || (!is_v6 && afi == 1))
+        {
+            count++;
+            SWSS_LOG_INFO(" l2mc group count %d", count);
+        }
+    }
+    l2mcd_keys.clear();
+    m_appMrouteTable.getKeys(l2mcd_keys);
+    for (auto key: l2mcd_keys)
+    {
+        vector<string> keys = tokenize(key, ':');
+        if (keys.size() != 3)
+        {
+            SWSS_LOG_ERROR("Invalid key size, skipping %s", key.c_str());
+            continue;
+        }
+        if (strncmp(keys[0].c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", keys[0].c_str());
+            continue;
+        }
+        std::string protocol;
+
+        vlanid = stoi(keys[0].substr(4));
+        if (vlanid != vlan_id)
+            continue;
+        protocol = keys[2];
+
+        if ((protocol == "V4" && afi == 1) || (protocol == "V6" && afi == 2))
+        {
+            count++;
+            SWSS_LOG_INFO(" mrouter count %d", count);
+        }
+    }
+    return count ;
+}
+
+void L2mcSync::dumpL2mcVlanEntry(DUMP_L2MCD_APP_TABLE_ENTRY *msg)
+{
+    int vlan_id, afi;
+    uint32_t idx = 0;
+    
+    vlan_id = msg->vlan_id;
+    afi = msg->afi;
+
+    std::vector<string> l2mcd_keys;
+
+    m_appEntryTable.getKeys(l2mcd_keys);
+    for (auto key: l2mcd_keys)
+    {
+        msg->count = idx;
+        if (idx >= msg->max_count)
+            return;
+        vector<string> keys = tokenize(key, ':');
+        /* Key: <VLAN_name>:<source_address>:<group_address>:<member_port> */
+
+        /* Ensure the key has at least 4 fields otherwise ignore */
+
+        if (keys.size() < 4)
+        {
+            SWSS_LOG_ERROR("Invalid key size, skipping %s", key.c_str());
+            continue;
+        }
+        
+        /* Ensure the key starts with "Vlan" otherwise ignore */
+        if (strncmp(keys[0].c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", keys[0].c_str());
+            continue;
+        }
+
+        int vlanid;
+        std::string port_alias;
+
+        vlanid = stoi(keys[0].substr(4));
+        if (vlanid != vlan_id)
+            continue;
+        
+        port_alias = keys[keys.size() - 1];
+
+        string source_addr, group_addr;
+        
+        if (keys.size() == 4)
+        {
+            /*IPv4 addresses*/
+            source_addr = keys[1];
+            group_addr = keys[2];
+        }
+        else
+        {
+            /*IPv6 addresses*/
+            vector<string> address_parts(keys.begin() + 1, keys.end() - 1);
+
+            SWSS_LOG_NOTICE(" address_parts size %lu", address_parts.size());
+            
+            if (address_parts.size() == 16)
+            {
+                size_t mid_point = 8;
+                
+                source_addr = address_parts[0];
+                for (size_t i = 1; i < mid_point; i++)
+                {
+                    source_addr += ":" + address_parts[i];
+                }
+                
+                group_addr = address_parts[mid_point];
+                for (size_t i = mid_point + 1; i < address_parts.size(); i++)
+                {
+                    group_addr += ":" + address_parts[i];
+                }
+            }
+            else
+            {
+                SWSS_LOG_ERROR("Invalid IPv6 address format in key %s", key.c_str());
+                continue;
+            }
+        }
+
+        bool is_v6 = (group_addr.find(':') != string::npos);
+        if ((is_v6 && afi != 2) || (!is_v6 && afi != 1))
+            continue;
+
+        L2MCD_APP_TABLE_ENTRY &entry = msg->data[idx];
+        memset(&entry, 0, sizeof(entry));
+
+        entry.op_code   = 1;
+        std::vector<swss::FieldValueTuple> value;
+        if (m_appEntryTable.get(key, value))
+        {
+            auto it_en = std::find_if(
+                value.begin(), value.end(),
+                [](auto &t){ return t.first == "type"; });
+
+            if (it_en != value.end() && fvValue(*it_en) == "dynamic")
+                entry.is_static = 0;
+            else 
+                entry.is_static = 1;
+        }
+        entry.vlan_id   = vlanid;
+        entry.is_igmp = (afi == 1) ? TRUE : FALSE;
+        memcpy(entry.port.pnames, port_alias.c_str() , L2MCD_IFNAME_SIZE);
+        memcpy(entry.gaddr,group_addr.c_str(), L2MCD_IP_ADDR_STR_SIZE);
+        memcpy(entry.saddr,source_addr.c_str(), L2MCD_IP_ADDR_STR_SIZE);
+
+        idx++;
+
+    }
+    l2mcd_keys.clear();
+    m_appMrouteTable.getKeys(l2mcd_keys);
+    for (auto key: l2mcd_keys)
+    {
+        msg->count = idx;
+        if (idx >= msg->max_count)
+            return;
+        vector<string> keys = tokenize(key, ':');
+        
+        /* Key: <VLAN_name>:<mrouter_port> */
+
+        /* Ensure the key size is 1 otherwise ignore */
+        if (keys.size() != 3)
+        {
+            SWSS_LOG_ERROR("Invalid key size, skipping %s", key.c_str());
+            continue;
+        }
+
+        /* Ensure the key starts with "Vlan" otherwise ignore */
+        if (strncmp(keys[0].c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", keys[0].c_str());
+            continue;
+        }
+        int vlanid ;
+        vlanid = stoi(keys[0].substr(4));
+        if (vlanid != vlan_id)
+            continue;
+
+        std::string port_alias, protocol;
+        port_alias = keys[1];
+        protocol = keys[2];
+
+        if ((protocol == "V4" && afi != 1) || (protocol == "V6" && afi != 2))
+            continue;
+        
+        L2MCD_APP_TABLE_ENTRY &entry = msg->data[idx];
+        memset(&entry, 0, sizeof(entry));
+
+        entry.op_code   = 1;
+        std::vector<swss::FieldValueTuple> value;
+        if (m_appMrouteTable.get(key, value))
+        {
+            auto it_en = std::find_if(
+                value.begin(), value.end(),
+                [](auto &t){ return t.first == "type"; });
+
+            if (it_en != value.end() && fvValue(*it_en) == "dynamic")
+                entry.is_static = 0;
+            else 
+                entry.is_static = 1;
+        }
+        entry.vlan_id   = vlanid;
+        entry.is_igmp = (afi == 1) ? TRUE : FALSE;
+        memcpy(entry.port.pnames, port_alias.c_str() , L2MCD_IFNAME_SIZE);
+        
+        idx++;
+        
+    }
+
 }

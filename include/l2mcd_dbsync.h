@@ -24,6 +24,7 @@ extern "C" {
 
 extern void l2mcsync_add_vlan_entry(uint16_t vlan_id);
 extern void l2mcsync_notify_config_done(char *option, char *paraname);
+extern void l2mcsync_notify_warm_reboot_done(char *option, char *paraname);
 extern void l2mcsync_del_vlan_entry(uint16_t vlan_id);
 extern void l2mcsync_add_l2mc_entry(L2MCD_APP_TABLE_ENTRY *msg);
 extern void l2mcsync_del_l2mc_entry(L2MCD_APP_TABLE_ENTRY *msg);
@@ -31,6 +32,9 @@ extern void l2mcsync_process_mrouterentry(L2MCD_APP_TABLE_ENTRY *msg);
 extern void l2mcsync_init_debug_framework(void);
 extern void l2mcsync_debug_print(const char *fmt, ...);
 extern int l2mcd_is_peerlink(char *portname);
+extern void l2mcsync_clear_l2mc_entry(void);
+extern int l2mcsync_get_l2mc_info_count(uint16_t vlan_id, uint16_t afi);
+extern void l2mcsync_dump_l2mc_info(DUMP_L2MCD_APP_TABLE_ENTRY *msg);
 #ifdef __cplusplus
 }/* extern "C" */
 #endif

@@ -38,20 +38,29 @@ namespace swss {
             void delL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg);
             void processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg);
             void initDebugFrameWork(void);
-            int  getL2mcMgrDebugPrio(void);
+            int getL2mcMgrDebugPrio(void);
             bool isPortPeerLink(std::string portname);
             void notify_config_done(std::string option, std::string paraname);
+            void notify_warm_reboot_done(std::string option, std::string paraname);
+            void clearL2mcVlanEntry(void);
+            int getL2mcVlanEntryCount(uint16_t vlan_id, uint16_t afi);
+            void dumpL2mcVlanEntry(DUMP_L2MCD_APP_TABLE_ENTRY *msg);
+
         protected:
         private:
-            ProducerStateTable m_l2mcdAppVlanTable;
-            ProducerStateTable m_l2mcdEntryTable;
-            ProducerStateTable m_l2mcdMrouterTable; 
-            Table m_statel2mcdLocalMemberTable;
-            Table m_statel2mcdLocalMrouterTable;   
-            NotificationProducer* l2mc_entry_notifications;
-            NotificationProducer* l2mc_mrouter_notifications;
-            NotificationProducer* l2mc_cfg_done_notifications;
+            ProducerStateTable m_appVlanProducerTable;
+            ProducerStateTable m_appEntryProducerTable;
+            ProducerStateTable m_appMrouterProducerTable;
+            ProducerStateTable m_appSuppressProducerTable;
+
+            NotificationProducer *l2mc_entry_notifications;
+            NotificationProducer *l2mc_mrouter_notifications;
+            NotificationProducer *l2mc_cfg_done_notifications;
+            NotificationProducer *l2mc_warm_reboot_notifications;
             std::unique_ptr<Table> m_mclagTable;
+
+            Table m_statel2mcdLocalMemberTable, m_statel2mcdLocalMrouterTable;
+            Table m_featureTable, m_appVlanTable, m_appEntryTable, m_appMrouteTable, m_appSuppressTable;
     };
 
 }

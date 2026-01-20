@@ -46,17 +46,16 @@ typedef struct { unsigned long ul[PORT_MASK_ARRAY_SIZE]; } PORT_MASK;
 
 struct MCAST_SOURCE_INFO
 {
-	struct MCAST_SOURCE_INFO* next;
-	MADDR_ST  src_addr;
+    struct MCAST_SOURCE_INFO *next;
+    MADDR_ST                  src_addr;
 };
 
 typedef struct MCAST_SOURCE_INFO MCAST_SOURCE_INFO;
 
 typedef struct GROUP_ENTRY
 {
-	L2MCD_AVL_NODE   node;
-
-	MADDR_ST      group_address;
+    L2MCD_AVL_NODE node;
+    MADDR_ST       group_address;
 } GROUP_ENTRY;
 
 #define IGMP_MAX_ACTION_TYPE      6
@@ -116,8 +115,6 @@ enum MLD_PDUTYPE
 #define IPVRF_INVALID_VRF_IDX		(IPVRF_MAX_VRF_IDX+1)
 #define IPVRF_DEFAULT_VRF_IDX		     MVRF_DEFAULT_VRF_ID
 
-#define INVALID_BMP					0xFFFFFFFF
-//TODO_L2MCD - taken back to avoid compilation error
 #define PIM_ENCODE_SRC_ADDRESS_WC (0)
 
 /*#define MLD_SNOOPING_ENABLED  0x1*/
@@ -132,6 +129,7 @@ enum MLD_PDUTYPE
 #define MLD_VLAN_DELETED 0x200
 #define MLD_VLAN_HOP_BY_HOP_TRAP_CONFIGURED 0x400
 #define MLD_START_UP_QUERY_INTERVAL 0x800
+
 #define NO_SUCH_PORT			0xFFFF
 #define PIMS_MAX_VLAN_SUPPORT_REACHED 500
 #define DEFAULT_MROUTER_AGING_TIME 300  //in seconds
@@ -145,8 +143,11 @@ enum MLD_PDUTYPE
 /*Notify param and action to l2mcmgr*/
 #define NOTIFY_PARAM_SNP 				"SNP"
 #define NOTIFY_PARAM_LINK_STATUS		"LINK_STATUS"
+#define NOTIFY_PARAM_WARM_STATUS		"WARM_REBOOT"
 #define NOTIFY_PARAM_ACTION_ENABLE		"enable"
 #define NOTIFY_PARAM_ACTION_DISABLE		"disable"
+#define NOTIFY_PARAM_WARM_IGMP_SNP		 1
+#define NOTIFY_PARAM_WARM_MLD_SNP		 2
 
 /* MLD Flags for struct MCGRP_L3IF */															
 #define MLD_IF_CFLAG_LAST_MEMBER_QUERY_COUNT       (1 << 7)
@@ -340,102 +341,101 @@ enum MCGRP_GRP_ACTION
 #define  IGMP_PROTOCOL 2
 #define IP_ROUTER_ALERT_OPTION_TYPE 148
 
-typedef struct sg_port_s {
+typedef struct sg_port_s
+{
     L2MCD_AVL_NODE node;
-    uint32_t ifindex;
+    uint32_t       ifindex;
 } sg_port_t;
 
 typedef struct PSEUDO_IP_PARAMETERS
 {
-	ULONG 		source_address;
-	ULONG 		destination_address;
-	BYTE		zero_field;
-	BYTE 		protocol;
-	USHORT 		length;
+    ULONG  source_address;
+    ULONG  destination_address;
+    BYTE   zero_field;
+    BYTE   protocol;
+    USHORT length;
 } PSEUDO_IP_PARAMETERS;
 
 typedef struct MCGRP_TMR_ELEM_CLNT
 {
-	L2MCD_AVL_TREE            *clnt_tree;
-	struct s_MCGRP_CLIENT  *mcgrp_clnt;
+    L2MCD_AVL_TREE        *clnt_tree;
+    struct s_MCGRP_CLIENT *mcgrp_clnt;
 } MCGRP_TMR_ELEM_CLNT;
 
-typedef	struct  MCGRP_ENTRY
+typedef struct MCGRP_ENTRY
 {
-	L2MCD_AVL_NODE     node;
-	MADDR_ST        group_address;
-	UINT32          num_mbr_ports;
-	struct MCGRP_MBRSHP*   mbr_port;
-	L2MCD_AVL_TREE     mbr_ports_tree;
+    L2MCD_AVL_NODE       node;
+    MADDR_ST             group_address;
+    UINT32               num_mbr_ports;
+    struct MCGRP_MBRSHP *mbr_port;
+    L2MCD_AVL_TREE       mbr_ports_tree;
 
-	BOOLEAN	        is_ssm;
-	UINT16 pims_num_wg_join_ports;
-	UINT16 pims_num_sg_join_ports;
-	UINT32 pims_num_wg_joins_rcvd;
-	UINT32 pims_num_sg_joins_rcvd;
-	UINT32 pims_num_wg_prunes_rcvd;
-	UINT32 pims_num_sg_prunes_rcvd;
+    BOOLEAN is_ssm;
+    UINT16  pims_num_wg_join_ports;
+    UINT16  pims_num_sg_join_ports;
+    UINT32  pims_num_wg_joins_rcvd;
+    UINT32  pims_num_sg_joins_rcvd;
+    UINT32  pims_num_wg_prunes_rcvd;
+    UINT32  pims_num_sg_prunes_rcvd;
 } MCGRP_ENTRY;
-
 
 typedef struct MCGRP_TMR_ELEM_MBRSHP
 {
-	struct MCGRP_MBRSHP *mcgrp_mbrshp;
-	struct MCGRP_L3IF   *vport;
-	struct MCGRP_ENTRY  *grp_entry;
-	struct s_MCGRP_SOURCE *pims_src_entry;
+    struct MCGRP_MBRSHP   *mcgrp_mbrshp;
+    struct MCGRP_L3IF     *vport;
+    struct MCGRP_ENTRY    *grp_entry;
+    struct s_MCGRP_SOURCE *pims_src_entry;
 } MCGRP_TMR_ELEM_MBRSHP;
 
 typedef struct MCGRP_TMR_ELEM_QUERIER
 {
-	struct MCGRP_L3IF *mcgrp_vport;
+    struct MCGRP_L3IF *mcgrp_vport;
 } MCGRP_TMR_ELEM_QUERIER;
 
 typedef struct MCGRP_TMR_ELEM_MROUTER
 {
-   struct MCGRP_L3IF *mcgrp_vport;
-   UINT32             phy_port_id;
+    struct MCGRP_L3IF *mcgrp_vport;
+    UINT32             phy_port_id;
 
 } MCGRP_TMR_ELEM_MROUTER;
 
 typedef struct MCGRP_TIMER_ELEM
 {
-	WheelTimerElement    mcgrp_wte;
-	MCGRP_TIMER_TYPE     timer_type;
-	struct MCGRP_CLASS  *mcgrp;
-	union
-	{
-		struct MCGRP_TMR_ELEM_CLNT       clnt;
-		struct MCGRP_TMR_ELEM_MBRSHP     mbrshp;
-		struct MCGRP_TMR_ELEM_QUERIER    pport;
-		struct MCGRP_STATIC_ENTRY       *static_grp;
-		struct MCGRP_TMR_ELEM_QUERIER    vport;
-		struct MCGRP_STATIC_ENTRY        *l2_static_grp;
-        struct MCGRP_TMR_ELEM_MROUTER    mrtr_port;
-	} wte;
+    WheelTimerElement   mcgrp_wte;
+    MCGRP_TIMER_TYPE    timer_type;
+    struct MCGRP_CLASS *mcgrp;
+    union
+    {
+        struct MCGRP_TMR_ELEM_CLNT    clnt;
+        struct MCGRP_TMR_ELEM_MBRSHP  mbrshp;
+        struct MCGRP_TMR_ELEM_QUERIER pport;
+        struct MCGRP_STATIC_ENTRY    *static_grp;
+        struct MCGRP_TMR_ELEM_QUERIER vport;
+        struct MCGRP_STATIC_ENTRY    *l2_static_grp;
+        struct MCGRP_TMR_ELEM_MROUTER mrtr_port;
+    } wte;
 } MCGRP_TIMER_ELEM;
-
 
 typedef struct s_MCGRP_SOURCE
 {
-	// Please retain the order of next, src_addr
-	// This enables us to use a IGMPV#_SOURCE as a SORTED_LINKLIST node
-	struct s_MCGRP_SOURCE* next;
-	MADDR_ST               src_addr;
-	UINT64                 src_timer; //RD:change it Uint 32.
-	UINT8                  retx_cnt;
-	UINT8                  include_in_query;
+    // Please retain the order of next, src_addr
+    // This enables us to use a IGMPV#_SOURCE as a SORTED_LINKLIST node
+    struct s_MCGRP_SOURCE *next;
+    MADDR_ST               src_addr;
+    UINT64                 src_timer; // RD:change it Uint 32.
+    UINT8                  retx_cnt;
+    UINT8                  include_in_query;
     UINT8                  is_remote;
-	// List of clients for this source
-	L2MCD_AVL_TREE            clnt_tree;
-	void                  *igmp_mld;   // This is used mainly by igmpv3/mldv2_src_destroy().
-	MCGRP_TIMER_ELEM 	pims_src_tmr;	/* SG timer */
-	UINT32 				pims_num_sg_joins_rcvd;
-	UINT32 				pims_num_sg_prunes_rcvd; /* This counter is incremented due to  S,G RptPrune received */
-	UINT16				hold_time;
-	UINT8				rpt_flag; /* This flag indicates that the S,G is created due to RptPrune message received */
-	UINT64              src_uptime;	// time the node got created
-	UINT8				sg_rpt_rx_flag;
+    // List of clients for this source
+    L2MCD_AVL_TREE   clnt_tree;
+    void            *igmp_mld;     // This is used mainly by igmpv3/mldv2_src_destroy().
+    MCGRP_TIMER_ELEM pims_src_tmr; /* SG timer */
+    UINT32           pims_num_sg_joins_rcvd;
+    UINT32           pims_num_sg_prunes_rcvd; /* This counter is incremented due to  S,G RptPrune received */
+    UINT16           hold_time;
+    UINT8            rpt_flag;   /* This flag indicates that the S,G is created due to RptPrune message received */
+    UINT64           src_uptime; // time the node got created
+    UINT8            sg_rpt_rx_flag;
 } MCGRP_SOURCE;
 
 /* This structure represents a physical port's membership in a group
@@ -443,276 +443,244 @@ typedef struct s_MCGRP_SOURCE
  * of an IP inrerface entry.
  * Typically, there shall be one structure per group per interface, except
  * where the interface is a VE, in which case, there shall be one such
- * structure for every physical port in the VE that is an active IGMP 
+ * structure for every physical port in the VE that is an active IGMP
  * participant in the group.
  */
 typedef struct MCGRP_MBRSHP
 {
-	UINT32            phy_port_id;
-	L2MCD_AVL_NODE    node;
-	UINT8             retx_cnt;
+    UINT32         phy_port_id;
+    L2MCD_AVL_NODE node;
+    UINT8          retx_cnt;
 
-	UINT8             static_mmbr     : 1;
-	UINT8             filter_mode     : 1;     // 0 - INCLUDE; 1 - EXCLUDE
-	UINT8             aging_enabled   : 1;     // aging enabled for this membership
-	UINT8             grp_compver     : 2;     // minimum host Version seen on this port
-	UINT8             is_remote       : 1;     //Remote Entry, eg: Synced from MCLAG peer
-	UINT8             spare           : 1;
+    UINT8 static_mmbr : 1;
+    UINT8 filter_mode : 1;   // 0 - INCLUDE; 1 - EXCLUDE
+    UINT8 aging_enabled : 1; // aging enabled for this membership
+    UINT8 grp_compver : 2;   // minimum host Version seen on this port
+    UINT8 is_remote : 1;     // Remote Entry, eg: Synced from MCLAG peer
+    UINT8 spare : 1;
 
+    UINT64 host_present[NUM_IGMP_VERSION + 1]; // RD:change it to UINT32.
 
-	UINT64            host_present[NUM_IGMP_VERSION+1];  //RD:change it to UINT32.
+    // INCLUDE/ EXCLUDE list of sources for this group on this port
+    MCGRP_SOURCE *src_list[2];
 
-	// INCLUDE/ EXCLUDE list of sources for this group on this port
-	MCGRP_SOURCE*     src_list[2];
+    // List of clients for this group on this port
+    L2MCD_AVL_TREE clnt_tree;
 
-	// List of clients for this group on this port
-	L2MCD_AVL_TREE    clnt_tree;
+    // Wheel timer element
+    MCGRP_TIMER_ELEM mbrshp_tmr;
+    MCGRP_TIMER_ELEM lmq_tmr;
+    UINT64           group_timer;
+    UINT64           lmq_timer; // timestamp for src list
+    // UINT64           group_uptime;
+    /* This is for sending client leave to mrouter  ports, if within expiry ,
+     *  switch does not recieve the response on this port */
 
-	// Wheel timer element
-	MCGRP_TIMER_ELEM  mbrshp_tmr;
-	MCGRP_TIMER_ELEM  lmq_tmr;
-	UINT64            group_timer; 
-	UINT64            lmq_timer; //timestamp for src list
-	UINT64            group_uptime;
-	/* This is for sending client leave to mrouter  ports, if within expiry , 
- 	*  switch does not recieve the response on this port */
-		
-	MADDR_ST        client_source_addr;
-	MADDR_ST        last_reporter_ip_addr;
-	/* PIM snoop specific */
-	MCGRP_SOURCE* 	pims_src_list;
-	UINT8 			pims_mbr_flags;	/* wg or sg  */
-	UINT16			hold_time;
+    MADDR_ST client_source_addr;
+    MADDR_ST last_reporter_ip_addr;
+    /* PIM snoop specific */
+    MCGRP_SOURCE *pims_src_list;
+    UINT8         pims_mbr_flags; /* wg or sg  */
+    UINT16        hold_time;
 } MCGRP_MBRSHP;
 
-typedef	struct MCGRP_STATIC_ENTRY
+typedef struct MCGRP_STATIC_ENTRY
 {
-	// WARNING: ****
-	//	
-	// Casted to LINKLIST_TYPE and hence next MUST be the first element
-	//
-	struct MCGRP_STATIC_ENTRY *next;
-	MADDR_ST                   group_address;
-	PORT_ID	                   port_num;                    /* port number in ve level */
-	UINT8                      flags;
-	UINT8                      spare;
-	L2MCD_AVL_TREE				    port_tree;
-	// Wheel timer element for l2 static group
-	MCGRP_TIMER_ELEM			l2_static_grp_tmr;	
-	// Wheel timer element
-	MCGRP_TIMER_ELEM    static_grp_tmr;
+    // WARNING: ****
+    //
+    // Casted to LINKLIST_TYPE and hence next MUST be the first element
+    //
+    struct MCGRP_STATIC_ENTRY *next;
+    MADDR_ST                   group_address;
+    PORT_ID                    port_num; /* port number in ve level */
+    UINT8                      flags;
+    UINT8                      spare;
+    L2MCD_AVL_TREE             port_tree;
+    // Wheel timer element for l2 static group
+    MCGRP_TIMER_ELEM l2_static_grp_tmr;
+    // Wheel timer element
+    MCGRP_TIMER_ELEM static_grp_tmr;
 } MCGRP_STATIC_ENTRY;
 
 /* This data structure represents IGMP/MLD's state on each IP interface */
 typedef struct MCGRP_PORT_ENTRY
 {
-	struct MCGRP_PORT_ENTRY*  next;   // For VE ports, this give the next elem
-	                                  // For physical ports it is NULL 
-	UINT32            phy_port_id;
-	UINT16            start_up_query_count;
+    struct MCGRP_PORT_ENTRY *next; // For VE ports, this give the next elem
+                                   // For physical ports it is NULL
+    UINT32 phy_port_id;
+    UINT16 is_up : 1;
 
-	/* IP address of the querier on this port;
-	 * If we are querier, it will be this port's IP address */
-	MADDR_ST          querier_router;
-
-	UINT16            querier           : 1;    // Are we querier on this port ?
-	UINT16            is_up             : 1;
-	UINT16            has_static_grps   : 1;
-
-	// Configured values
-	UINT16            cfg_mcast_disable : 1;
-	UINT16            cfg_version       : 2;    // configured version, if any (0,1,2 or 3 )
-	UINT16            oper_version      : 2;    // Version we are operating at (1,2 or 3)
-	UINT16            v1_rtr_present    : 1;    // Did we hear from a V1 router ?
-	UINT16            v2_rtr_present    : 1;    // Did we hear from a V2 router ?
-	UINT16            spare             : 6;
-	UINT32            verwarn_intvl_start;      // Can we add a syslog...msg for this????
-	UINT32            verwarn_count;
-	BOOLEAN           snooping_mrouter_detected;
-	BOOLEAN           tagged;
-} MCGRP_PORT_ENTRY ;
+    // Configured values
+    UINT16  cfg_version : 2;    // configured version, if any (0,1,2 or 3 )
+    UINT16  oper_version : 2;   // Version we are operating at (1,2 or 3)
+    BOOLEAN tagged;
+} MCGRP_PORT_ENTRY;
 
 /* This data structure represents IGMP/MLD's state on each IP interface */
 typedef struct MCGRP_ROUTER_ENTRY
 {
-    struct MCGRP_ROUTER_ENTRY*  next;   // For VE ports, this give the next elem
-                                      // For physical ports it is NULL
-    UINT32            phy_port_id;
-    UINT32            verwarn_intvl_start;      // Can we add a syslog...msg for this????
-    UINT32            verwarn_count;
-    UINT32            is_static : 1; //static or dynamic mrouter
-	UINT16            cfg_version       : 2;    // configured version, if any (0,1,2 ) 
-	UINT64            uptime;
-    MCGRP_TIMER_ELEM  mrtr_tmr;
-	UINT8           type;
-	UINT16			time;
-}MCGRP_ROUTER_ENTRY;
+    struct MCGRP_ROUTER_ENTRY *next; // For VE ports, this give the next elem
+                                     // For physical ports it is NULL
+    UINT32           phy_port_id;
+    UINT32           is_static : 1;   // static or dynamic mrouter
+    MCGRP_TIMER_ELEM mrtr_tmr;
+    UINT8            type;
+    UINT16           time;
+} MCGRP_ROUTER_ENTRY;
 
 typedef struct MCGRP_L3IF
 {
-	MCGRP_PORT_ENTRY*  phy_port_list;   // List of physical member ports
-	L2MCD_AVL_TREE     sptr_grp_tree;   //AVL Tree of MCGRP_ENTRY(per group)
+    MCGRP_PORT_ENTRY *phy_port_list; // List of physical member ports
+    L2MCD_AVL_TREE    sptr_grp_tree; // AVL Tree of MCGRP_ENTRY(per group)
 
-	UINT32             ngroups;
-	UINT32             phy_port_id;
-	UINT16             vir_port_id;
-	UINT8              type;
+    UINT32 ngroups;
+    UINT32 phy_port_id;
+    UINT16 vir_port_id;
+    UINT8  type;
 
-	UINT8              is_ve             : 1;    // Port part of a VE interface ?
-	UINT8              cfg_mcast_disable : 1;
-	UINT8              cfg_version       : 2;    // configured version, if any (0,1,2 or 3 )
-	UINT8              oper_version      : 2;    // Version we are operating at (1,2 or 3)
-	UINT8              tracking_enabled  : 1;
-	UINT8              is_up             : 1;
-    UINT16            start_up_query_interval;
-    UINT16            start_up_query_count;
-    UINT16            query_interval_time;    // actual query interval used
-    UINT16            cfg_query_interval_time;//query interval from usr cfg, init to dflt 125 
-    UINT16            max_response_time;
-    UINT32            group_membership_time;
-    UINT16            older_host_present_time;
-    UINT16            LMQ_interval;          // last_member_query_interval
-    UINT8             LMQ_count;         // last_member_query_count
-    UINT8             LMQ_100ms_enabled; // last_member_query_flag
-    UINT8             cfg_robustness_var;
-    UINT8             robustness_var;
+    UINT8  is_ve : 1; // Port part of a VE interface ?
+    UINT8  cfg_version : 2;  // configured version, if any (0,1,2 or 3 )
+    UINT8  oper_version : 2; // Version we are operating at (1,2 or 3)
+    UINT8  tracking_enabled : 1;
+    UINT8  is_up : 1;
+    UINT16 start_up_query_interval;
+    UINT16 start_up_query_count;
+    UINT16 query_interval_time;     // actual query interval used
+    UINT16 cfg_query_interval_time; // query interval from usr cfg, init to dflt 125
+    UINT16 max_response_time;
+    UINT32 group_membership_time;
+    UINT16 older_host_present_time;
+    UINT16 LMQ_interval;      // last_member_query_interval
+    UINT8  LMQ_count;         // last_member_query_count
+    UINT8  LMQ_100ms_enabled; // last_member_query_flag
+    UINT8  cfg_robustness_var;
+    UINT8  robustness_var;
 
     /* IP address of the querier on this port;
      * If we are querier, it will be this port's IP address */
-    MADDR_ST          querier_router;
-    UINT16            querier           : 1;    // Are we querier on this port ?
-    UINT64            querier_uptime;
+    MADDR_ST querier_router;
+    UINT16   querier : 1; // Are we querier on this port ?
+    UINT64   querier_uptime;
 
     // Wheel timer element
-    MCGRP_TIMER_ELEM  vport_tmr;
-    UINT16            v1_rtr_present    : 1;    // Did we hear from a V1 router ?
-    UINT16            v2_rtr_present    : 1;    // Did we hear from a V2 router ?
-	MLD_PORT_MASK*		ve_port_mask;	
-	MCGRP_STATIC_ENTRY* static_mcgrp_list_head;
-	MCGRP_ROUTER_ENTRY* rtr_port_list;
-    UINT32            verwarn_intvl_start;      // Can we add a syslog...msg for this????
-    UINT32            verwarn_count;
-	UINT32			   flags;
-	UINT8				is_l3_up;	/* For running protocol as part of l2 , doing is_up whenever vlan is added, 
-									*  to explicitly know about l3 up status, will be using this , in future 
-									*/	
-	BOOLEAN			pims_enable;	/* PIM snooping enabled flag */
-	UINT32 			pims_num_wg_entries;
-	UINT32          pims_num_sg_entries;
-    // Statistics   
-    UINT32               rx_bad_if;
-   
+    MCGRP_TIMER_ELEM    vport_tmr;
+    UINT16              v1_rtr_present : 1; // Did we hear from a V1 router ?
+    UINT16              v2_rtr_present : 1; // Did we hear from a V2 router ?
+    MLD_PORT_MASK      *ve_port_mask;
+    MCGRP_STATIC_ENTRY *static_mcgrp_list_head;
+    MCGRP_ROUTER_ENTRY *rtr_port_list;
+    UINT32              flags;
+
+    BOOLEAN pims_enable;          /* PIM snooping enabled flag */
+    UINT32  pims_num_wg_entries;
+    UINT32  pims_num_sg_entries;
+    // Statistics
+    UINT32 rx_bad_if;
 } MCGRP_L3IF;
 
 typedef struct MCGRP_CLASS
 {
-	struct MCGRP_CLASS	*inst_fwd;
-	struct MCGRP_CLASS	*inst_bwd;
-	VRF_INDEX            vrf_index;
+    struct MCGRP_CLASS *inst_fwd;
+    struct MCGRP_CLASS *inst_bwd;
+    VRF_INDEX           vrf_index;
 
-	UINT16               query_interval_time;    // actual query interval used
-	UINT16               cfg_query_interval_time;//query interval from usr cfg, init to dflt 125 
-	UINT16               max_response_time;
-	UINT16               group_membership_time;
-	UINT16               older_host_present_time;
-	UINT16               LMQ_interval;          // last_member_query_interval
-	UINT16               static_group_timer;
-	UINT8	             cfg_robustness_var;
-	UINT8                robustness_var;
-	UINT8                enabled;
-	UINT8                LMQ_count;         // last_member_query_count
-    UINT8                LMQ_100ms_enabled; // last_member_query_flag
-	UINT8                cfg_version;       // configured version, if any (0,1,2 or 3)
-	
-	UINT8                oper_version;      // version we are operating at (1,2 or 3)
-	UINT32               afi;               //v4 or v6 family
-	IGMP_STATS          *igmp_stats;  //RD: Make it common.
-	MLD_STATS           *mld_stats;
-	BOOLEAN				 router_alert_check_disable; /*Flag to disable checking the router alert option in IGMP packets*/
-	MCGRP_STATIC_ENTRY  *static_mcgrp_list_head;
+    UINT16 query_interval_time;     // actual query interval used
+    UINT16 cfg_query_interval_time; // query interval from usr cfg, init to dflt 125
+    UINT16 max_response_time;
+    UINT16 group_membership_time;
+    UINT16 older_host_present_time;
+    UINT16 LMQ_interval; // last_member_query_interval
+    UINT16 static_group_timer;
+    UINT8  cfg_robustness_var;
+    UINT8  robustness_var;
+    UINT8  enabled;
+    UINT8  LMQ_count;         // last_member_query_count
+    UINT8  LMQ_100ms_enabled; // last_member_query_flag
+    UINT8  cfg_version;       // configured version, if any (0,1,2 or 3)
 
-	UINT32               pim_prune_wait_interval; // Prune wait inetrval of pim.
-	UINT32	             max_groups;
-    UINT16               first_time_init;
+    UINT8               oper_version; // version we are operating at (1,2 or 3)
+    UINT32              afi;          // v4 or v6 family
+    IGMP_STATS         *igmp_stats;   // RD: Make it common.
+    MLD_STATS          *mld_stats;
+    BOOLEAN             router_alert_check_disable; /*Flag to disable checking the router alert option in IGMP packets*/
+    MCGRP_STATIC_ENTRY *static_mcgrp_list_head;
 
-	//Global Wheel Timer
-	WheelTimerId         mcgrp_wtid;
-	//Global Wheel Timer for LMQ Interval
-	WheelTimerId         mcgrp_wtid_lmq;
-	// Statistics	
-	UINT32               rx_bad_if;
+    UINT32 pim_prune_wait_interval; // Prune wait inetrval of pim.
+    UINT32 max_groups;
+    UINT16 first_time_init;
 
-	//IGMPv3 & SSM MAP
-	L2MCD_AVL_TREE			 group_tree;
-	UINT32				 ngroups;
-} MCGRP_CLASS;
+    // Global Wheel Timer
+    WheelTimerId mcgrp_wtid;
+    // Global Wheel Timer for LMQ Interval
+    WheelTimerId mcgrp_wtid_lmq;
+    // Statistics
+    UINT32 rx_bad_if;
 
+    // IGMPv3 & SSM MAP
+    L2MCD_AVL_TREE group_tree;
+    UINT32         ngroups;
+} MCGRP_CLASS; // Multicast Group Protocol
 
 typedef struct MCGRP_GLOBAL_CLASS
 {
-	MCGRP_CLASS    	        *instances[IPVRF_MAX_VRF_IDX+1];
-	MCGRP_CLASS             *instances_list; /*List of actual configured instances*/
-	MCGRP_L3IF             **port_list;
-   
-	SORTED_LINKLIST_KEYINFO *mcgrp_src_keyinfo;
-	// klin, change to growable pool
-	generic_pool_struct     *group_pool;
-	generic_pool_struct     *grp_mbrshp_pool;
-	generic_pool_struct     *src_specific_pool;
-	generic_pool_struct     *src_specific_client_pool;
-    BOOLEAN             g_snooping_enabled;
-	BOOLEAN				no_flood_enabled;
-    L2MCD_AVL_TREE         portdb_tree; //Mainly for ipv6 addresses and port_state
-	L2MCD_AVL_TREE         ve_portdb_tree; //Used for Ve port 
-	UINT8				mac[6];
-    UINT8                cfg_version;       // configured version, if any (0,1,2 or 3)
-    UINT8                oper_version;      // version we are operating at (1,2 or 3)
-	generic_pool_struct  *vlan_pool;
-    UINT32              mld_snp_vlan_count; /*Global Vlan count*/
-	BOOLEAN             g_pim_snoop_enabled;
-	UINT32              pims_snp_vlan_count;
+    MCGRP_CLASS *instances[IPVRF_MAX_VRF_IDX + 1];
+    MCGRP_CLASS *instances_list; /*List of actual configured instances*/
+    MCGRP_L3IF **port_list;
+
+    SORTED_LINKLIST_KEYINFO *mcgrp_src_keyinfo;
+    // change to growable pool
+    generic_pool_struct *group_pool;
+    generic_pool_struct *grp_mbrshp_pool;
+    generic_pool_struct *src_specific_pool;
+    generic_pool_struct *src_specific_client_pool;
+    // BOOLEAN              g_snooping_enabled;
+    // BOOLEAN              no_flood_enabled;
+    L2MCD_AVL_TREE       portdb_tree;    // Mainly for ipv6 addresses and port_state
+    L2MCD_AVL_TREE       ve_portdb_tree; // Used for Ve port
+    UINT8                mac[6];
+    UINT8                cfg_version;  // configured version, if any (0,1,2 or 3)
+    UINT8                oper_version; // version we are operating at (1,2 or 3)
+    // generic_pool_struct *vlan_pool;
+    UINT32               mld_snp_vlan_count; /*Global Vlan count*/
+    BOOLEAN              g_pim_snoop_enabled;
+    UINT32               pims_snp_vlan_count;
 } MCGRP_GLOBAL_CLASS;
 
 typedef struct MCAST_CLASS
 {
-    struct MCAST_CLASS  *inst_fwd;
-    struct MCAST_CLASS  *inst_bwd;
+    struct MCAST_CLASS *inst_fwd;
+    struct MCAST_CLASS *inst_bwd;
     VRF_INDEX           vrf_index;
 
-    UINT8               allocated;
-    generic_pool_struct     *sptr_tx_free_entry_pool;
-    generic_pool_struct *sptr_glb_mld_pool;
-    generic_pool_struct *sptr_mldv2_sorted_list_pool;
-    UINT16              source_virtual_port;
-    UINT32              source_port;
+    UINT8                allocated;
+    // generic_pool_struct *sptr_tx_free_entry_pool;
+    // generic_pool_struct *sptr_glb_mld_pool;
+    // generic_pool_struct *sptr_mldv2_sorted_list_pool;
+    // UINT16               source_virtual_port;
+    UINT32               source_port;
 
-    generic_pool_struct     *sptr_oif_info_pool;
-    generic_pool_struct *sptr_vlan_info_pool;
-    generic_pool_struct     *sptr_glb_grp_pool;
-    generic_pool_struct     *sptr_source_pool; // Used for storing source data for IGMPv3 groups
-    UINT32           ngroups;
-    L2MCD_AVL_TREE      group_tree;
-
-} MCAST_CLASS;
-
+    // generic_pool_struct *sptr_oif_info_pool;
+    // generic_pool_struct *sptr_vlan_info_pool;
+    // generic_pool_struct *sptr_glb_grp_pool;
+    // generic_pool_struct *sptr_source_pool;
+    UINT32               ngroups;
+    L2MCD_AVL_TREE       group_tree;
+} MCAST_CLASS; // Multicast Forwarding
 
 typedef struct MCAST_GLOBAL_CLASS
 {
-	MCAST_CLASS		*instances[IPVRF_MAX_VRF_IDX+1];
-	MCAST_CLASS		*instances_list; /* List of actual configured multicast instances */
-	MCAST_CLASS		*instances_list_end; /* pointer to the last element in the list */
+    MCAST_CLASS *instances[IPVRF_MAX_VRF_IDX + 1];
+    MCAST_CLASS *instances_list;     /* List of actual configured multicast instances */
+    MCAST_CLASS *instances_list_end; /* pointer to the last element in the list */
 } MCAST_GLOBAL_CLASS;
 
 typedef struct s_MCGRP_CLIENT
 {
-	L2MCD_AVL_NODE       node;
-	MADDR_ST          clnt_addr;
-
-	//Wheel Timer Elem
-	MCGRP_TIMER_ELEM  clnt_tmr;
-
+    L2MCD_AVL_NODE node;
+    MADDR_ST       clnt_addr;
+    // Wheel Timer Elem
+    MCGRP_TIMER_ELEM clnt_tmr;
 } MCGRP_CLIENT;
-
 
 #define MAX_PORT_NAME_LEN       32
 typedef struct VE_ENTRY_
@@ -1157,11 +1125,6 @@ typedef enum intf_type_new_s {
     INTF_MODE_OF
 } intf_type_new_t;
 
-//MLD versions
-#define MLD_VERSION_NONE							0
-#define MLD_VERSION_1								1 
-#define MLD_VERSION_2								2
-
 //response time range
 #define MLD_MIN_RESPONSE_TIME		1
 #define MLD_MAX_RESPONSE_TIME		64
@@ -1267,15 +1230,11 @@ void mcgrp_notify_vif_del(MCGRP_CLASS  *mcgrp,
 MCGRP_CLASS  *mcgrp_vrf_alloc (UINT32 afi, VRF_INDEX  vrf_index);
 MCGRP_L3IF* mcgrp_create_l3intf (MCGRP_CLASS  *mcgrp, UINT16        vir_port_id);
 MCGRP_MBRSHP* mcgrp_find_first_mbrshp (MCGRP_ENTRY *mcgrp_grp);
-MCGRP_MBRSHP* mcgrp_find_next_mbrshp (MCGRP_ENTRY   *mcgrp_grp,
-        MCGRP_MBRSHP  *mcgrp_mbrshp);
-MCGRP_ENTRY* mcgrp_find_group_address_entry (MCGRP_CLASS  *mcgrp, 
-        UINT16        vir_port_id, MADDR_ST     *group_address);
-MCGRP_SOURCE* mcgrp_find_source (MCGRP_MBRSHP      *mcgrp_mbrshp, 
-        MADDR_ST          *src_addr, MCGRP_FILTER_MODE  src_mode);
+MCGRP_MBRSHP *mcgrp_find_next_mbrshp(MCGRP_ENTRY *mcgrp_grp, MCGRP_MBRSHP *mcgrp_mbrshp);
+MCGRP_ENTRY *mcgrp_find_group_address_entry(MCGRP_CLASS *mcgrp, UINT16 vir_port_id, MADDR_ST *group_address);
+MCGRP_SOURCE *mcgrp_find_source(MCGRP_MBRSHP *mcgrp_mbrshp, MADDR_ST *src_addr, MCGRP_FILTER_MODE src_mode);
 MCGRP_L3IF *mcgrp_alloc_init_l3if_entry (MCGRP_CLASS   *mcgrp, UINT16         vir_port_id);
-MCGRP_ENTRY* mcgrp_alloc_group_entry (MCGRP_CLASS  *mcgrp,
-        MCGRP_L3IF   *mcgrp_l3if, MADDR_ST     *group_address);
+MCGRP_ENTRY *mcgrp_alloc_group_entry(MCGRP_CLASS *mcgrp, MCGRP_L3IF *mcgrp_l3if, MADDR_ST *group_address);
 MCGRP_MBRSHP* mcgrp_alloc_add_mbrshp_entry (MCGRP_CLASS  *mcgrp, 
         MCGRP_ENTRY  *grp_entry, MCGRP_L3IF   *mcgrp_vport, 
         UINT32        phy_port_id, BOOLEAN       is_static, 
@@ -1323,6 +1282,9 @@ IPV6_ADDRESS ip_get_lowest_ipv6_address_on_port(UINT16 port_number, uint8_t type
 BOOLEAN igmp_update_ssm_parameters(MCGRP_CLASS *mcgrp, MADDR_ST *group_addr, UINT8 *version,
         PORT_ID vir_port_id, UINT32 phy_port_id, UINT8 *igmp_action, UINT16 *num_srcs,
         UINT32 **src_list);
+BOOLEAN mld_update_ssm_parameters(MCGRP_CLASS *mcgrp, MADDR_ST *group_addr, UINT8 *version,
+        PORT_ID vir_port_id, UINT32 phy_port_id, UINT8 *mld_action, UINT16 *num_srcs,
+        UINT32 **src_list);
 MCGRP_MBRSHP* mcgrp_update_group_address_table (MCGRP_CLASS *mcgrp, UINT16 vir_port_id, 
         UINT32 phy_port_id, MADDR_ST *group_address, MADDR_ST *clnt_src_ip, 
         UINT8 action, UINT8 version, UINT16 num_srcs, void *src_array);
@@ -1334,6 +1296,7 @@ enum BOOLEAN igmp_check_valid_range(UINT32  group_address);
 enum BOOLEAN mld_check_valid_range(IPV6_ADDRESS  *group_address);
 unsigned short l3_get_port_from_bd_id(unsigned int bd_id);
 void igmp_reset_default_values(MCGRP_CLASS *igmp);
+void mld_reset_default_values(MCGRP_CLASS *mld);
 void mld_vport_state_notify (UINT16   vir_port_id, UINT32   phy_port_id, BOOLEAN  up, MCGRP_CLASS *mld);
 enum BOOLEAN is_physical_or_lag_port(int port);
 void mcgrp_notify_source_del_allowed (MCGRP_CLASS *mcgrp, MADDR_ST *group_address,
@@ -1377,10 +1340,8 @@ void igmpv3_sorted_linklist_free_list (MCGRP_CLASS *igmp, generic_pool_struct *p
         SORTED_LINKLIST_KEYINFO *key_info, SORTED_LINKLIST *src);
 void mldv2_sorted_linklist_free_list (MCGRP_CLASS *mld, generic_pool_struct *pool,
         SORTED_LINKLIST_KEYINFO *key_info, SORTED_LINKLIST *src);
-void mcgrp_mcast_change_vport_membership (MCGRP_CLASS  *mcgrp, MADDR_ST *source_address,
-        MADDR_ST *group_address, UINT16 router_port, UINT32 phy_port, UINT32 mcgrp_op);
 void mcgrp_add_update_client (MCGRP_CLASS *mcgrp, L2MCD_AVL_TREE *clnt_tree, MADDR_ST *clnt_addr);
-BOOL mcgrp_src_list_empty ( MCGRP_MBRSHP *mcgrp_mbrsh, MCGRP_FILTER_MODE src_mode, UINT8 version);
+BOOL mcgrp_src_list_empty ( MCGRP_MBRSHP *mcgrp_mbrsh, MCGRP_FILTER_MODE src_mode, UINT8 version, UINT32 afi);
 BOOLEAN mcgrp_send_group_source_query (MCGRP_CLASS *mcgrp, MCGRP_MBRSHP *mcgrp_mbrshp,
         UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST *group_address, SORTED_LINKLIST **p_src_list,
         BOOLEAN was_excl, MADDR_ST *clnt_ip_addr, enum BOOLEAN is_retx);
@@ -1417,15 +1378,13 @@ void mld_send_l2mcd_sync_group_upd (MADDR_ST *group_address,
         int num_del_port, UINT32 del_phy_port_id, MADDR_ST  *src_addr, 
         uint8_t is_remote_report);
 void mld_send_l2mcd_sync_group_clr (UINT16 ivid, BOOLEAN isGlobalClear, uint8_t afi);
-void mld_send_l2mcd_sync_group_add (MADDR_ST *group_address, 
-        UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST  *src_addr, UINT8  filter_mode) ;
-void igmpv3_send_l2mcd_sync_group_upd (MADDR_ST *group_address, 
+void mld_send_l2mcd_sync_group_add(MADDR_ST *group_address, UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST *src_addr, UINT8 filter_mode);
+void mld_send_l2mcd_sync_src_group_upd (MADDR_ST *group_address, 
         UINT16 vir_port_id, int num_add_port, UINT32 add_phy_port_id, 
         int num_del_port, UINT32 del_phy_port_id, MADDR_ST  *src_addr, 
         uint8_t is_remote_report, UINT8  filter_mode);
 
-void igmpv3_send_l2mcd_sync_group_add (MADDR_ST *group_address, 
-        UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST  *src_addr, UINT8  filter_mode);
+void mld_send_l2mcd_sync_src_group_add(MADDR_ST *group_address, UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST *src_addr, UINT8 filter_mode);
 
 void l2mcd_sync_inherit_xg_port_to_all_sg (MCGRP_ENTRY *mcgrp_entry, uint32_t phy_ifindex, uint32_t vid, int add);
 

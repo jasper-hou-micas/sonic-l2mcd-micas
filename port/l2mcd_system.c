@@ -51,7 +51,7 @@ MCAST_CLASS           Multicast2, *pMulticast2 = &Multicast2;
 
 /* use "tcpdump -i Ethernetxx -p igmp -dd" generate filter code
  * https://www.kernel.org/doc/Documentation/networking/filter.txt
- */
+ */ 
 struct sock_filter g_igmp_filter[] = {
     //1. Load Word @0
     BPF_STMT(BPF_LD |BPF_ABS|BPF_H, 0x0000000c),
@@ -124,7 +124,7 @@ int l2mcd_system_group_entry_notify(MADDR_ST *group_address, MADDR_ST *src_addre
     l2mcd_if_tree = l2mcd_if_to_kif(phy_port_id);
     if (l2mcd_if_tree)
     {
-        memcpy(msg.ports[0].pnames, l2mcd_if_tree->iname, sizeof(msg.ports[0].pnames));
+        memcpy(msg.port.pnames, l2mcd_if_tree->iname, sizeof(msg.port.pnames));
         msg.port_oper = l2mcd_if_tree->oper;
     }
 
@@ -134,29 +134,32 @@ int l2mcd_system_group_entry_notify(MADDR_ST *group_address, MADDR_ST *src_addre
         return 0;
     }
 
-    msg.is_static=is_static;
+    msg.is_static = is_static;
     mcgrp_mbrshp = mcgrp_find_mbrshp_entry_for_grpaddr(mcgrp, group_address, vir_port, phy_port_id);
     if (mcgrp_mbrshp) 
     {
         msg.is_remote = mcgrp_mbrshp->is_remote;
-        msg.is_static=  mcgrp_mbrshp->static_mmbr;
-        rmt1=mcgrp_mbrshp->is_remote;
-        if (src_address && !mcast_addr_any(src_address)) 
+        if (!mcgrp_mbrshp->static_mmbr)
         {
-            igmpv3_src = mcgrp_find_source(mcgrp_mbrshp, src_address,  FILT_INCL);
-            if (igmpv3_src) 
+            msg.is_static = mcgrp_mbrshp->static_mmbr;
+        }
+        rmt1 = mcgrp_mbrshp->is_remote;
+        if (src_address && !mcast_addr_any(src_address))
+        {
+            igmpv3_src = mcgrp_find_source(mcgrp_mbrshp, src_address, FILT_INCL);
+            if (igmpv3_src)
             {
                 msg.is_remote = igmpv3_src->is_remote;
-                rmt2=msg.is_remote;
+                rmt2 = msg.is_remote;
             }
         }
     }
 
     msg.op_code = insert;
-    msg.count=1;
-    L2MCD_VLAN_LOG_INFO(vir_port, "%s:%d:[vlan:%d] GA:%s S:%s %s Rmt:%d/%d/%d op:%d is_static:%d", 
-       FN,LN,vir_port, msg.gaddr, msg.saddr,  msg.ports[0].pnames, msg.is_remote,rmt1,rmt2, msg.op_code, is_static);
-    l2mcsync_add_l2mc_entry(&msg); 
+    msg.count   = 1;
+    L2MCD_VLAN_LOG_INFO(vir_port, "%s:%d:[vlan:%d] GA:%s S:%s %s Rmt:%d/%d/%d op:%d is_static:%d",
+                        FN, LN, vir_port, msg.gaddr, msg.saddr, msg.port.pnames, msg.is_remote, rmt1, rmt2, msg.op_code, is_static);
+    l2mcsync_add_l2mc_entry(&msg);
     return 0;
 }
 
@@ -170,7 +173,7 @@ int l2mcd_system_mrouter_notify(int vir_port, int phy_port_id, int is_static, in
 
     if (l2mcd_if_tree)
     {
-        memcpy(msg.ports[0].pnames, l2mcd_if_tree->iname, sizeof(msg.ports[0].pnames));
+        memcpy(msg.port.pnames, l2mcd_if_tree->iname, sizeof(msg.port.pnames));
         msg.port_oper = l2mcd_if_tree->oper;
     }
 
@@ -178,7 +181,7 @@ int l2mcd_system_mrouter_notify(int vir_port, int phy_port_id, int is_static, in
     msg.count=1;
     msg.is_static=is_static;
     msg.is_igmp = is_igmp;
-    L2MCD_VLAN_LOG_INFO(vir_port, "%s:%d:[vlan:%d] Mrouter %s op:%s", FN,LN,vir_port, msg.ports[0].pnames, msg.op_code?"ADD":"DEL");
+    L2MCD_VLAN_LOG_INFO(vir_port, "%s:%d:[vlan:%d] Mrouter %s op:%s", FN,LN,vir_port, msg.port.pnames, msg.op_code?"ADD":"DEL");
     l2mcsync_process_mrouterentry(&msg); 
     return 0;
 }
@@ -193,7 +196,7 @@ void l2mcd_igmp_process_sync_report (
 {
 
     MCGRP_L3IF     *mcgrp_vport = NULL;
-    MCGRP_PORT_ENTRY  *mcgrp_pport = NULL;  
+    MCGRP_PORT_ENTRY  *mcgrp_pport = NULL;
     MADDR_ST      src_addr;
     MADDR_ST      grp_addr;
     UINT32 src_list;
@@ -208,7 +211,7 @@ void l2mcd_igmp_process_sync_report (
     mcgrp_vport  = gIgmp.port_list[vir_port_id];
     if (mcgrp_vport == NULL)
     { 
-        L2MCD_LOG_NOTICE("%s:%d vlan:%d not found", __FUNCTION__, __LINE__, vir_port_id);
+        L2MCD_LOG_NOTICE("%s:%d vlan:%d not found", FN, LN, vir_port_id);
         return;
     }
     if (is_virtual_port(vir_port_id)) 
@@ -216,7 +219,7 @@ void l2mcd_igmp_process_sync_report (
         mcgrp_pport = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
         if (mcgrp_pport == NULL || !mcgrp_pport->is_up) 
         {
-            L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", __FUNCTION__, __LINE__, 
+            L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", FN, LN, 
                             mld_get_if_name_from_ifindex(phy_port_id), vir_port_id);
             return;
         }
@@ -226,13 +229,13 @@ void l2mcd_igmp_process_sync_report (
         mcgrp_pport = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
         if (mcgrp_pport == NULL)
         {
-            L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", __FUNCTION__, __LINE__, 
+            L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", FN, LN, 
                             mld_get_if_name_from_ifindex(phy_port_id), vir_port_id);
             return;
         }
 	} else 
     {
-        L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", __FUNCTION__, __LINE__, 
+        L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", FN, LN, 
                 mld_get_if_name_from_ifindex(phy_port_id), vir_port_id);
 		return;
 	}
@@ -269,7 +272,7 @@ void l2mcd_igmp_process_sync_report (
                     num_srcs, (void *)&src_list);
     
     L2MCD_VLAN_LOG_INFO(vir_port_id,"%s:%d: Processed version%d mclag remote entry (%s, %s, vlan%d): %s port:%s action:%d, #src:%d, vers:0x%x", 
-                        __FUNCTION__, __LINE__, mcgrp_pport->oper_version,
+                        FN, LN, mcgrp_pport->oper_version,
                         (src_addr.ip.v4addr?mcast_print_addr(&src_addr):"*"), mcast_print_addr(&grp_addr), vir_port_id, 
                         (insert?"Added":"Deleted"), mld_get_if_name_from_ifindex(phy_port_id),sync_action,num_srcs,sync_ver);
     return;
@@ -287,7 +290,7 @@ void l2mcd_igmp_process_remote_mrouter (
     mcgrp_vport  = gIgmp.port_list[vir_port_id];
     if (mcgrp_vport == NULL)
     { 
-        L2MCD_LOG_NOTICE("%s:%d vlan:%d not found", __FUNCTION__, __LINE__, vir_port_id);
+        L2MCD_LOG_NOTICE("%s:%d vlan:%d not found", FN, LN, vir_port_id);
         return;
     }
     if (is_virtual_port(vir_port_id)) 
@@ -295,7 +298,7 @@ void l2mcd_igmp_process_remote_mrouter (
         mcgrp_pport = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
         if (mcgrp_pport == NULL || !mcgrp_pport->is_up) 
         {
-            L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", __FUNCTION__, __LINE__, 
+            L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", FN, LN, 
                             mld_get_if_name_from_ifindex(phy_port_id), vir_port_id);
             return;
         }
@@ -305,13 +308,13 @@ void l2mcd_igmp_process_remote_mrouter (
         mcgrp_pport = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
         if (mcgrp_pport == NULL)
         {
-            L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", __FUNCTION__, __LINE__, 
+            L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", FN, LN, 
                             mld_get_if_name_from_ifindex(phy_port_id), vir_port_id);
             return;
         }
 	} else 
     {
-        L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", __FUNCTION__, __LINE__, 
+        L2MCD_LOG_NOTICE("%s:%d mcgrp pport:%s not found on vlan:%d", FN, LN, 
                 mld_get_if_name_from_ifindex(phy_port_id), vir_port_id);
 		return;
 	}
@@ -329,7 +332,7 @@ void l2mcd_igmp_process_remote_mrouter (
     }
 
     L2MCD_VLAN_LOG_INFO(vir_port_id,"%s:%d: Processed mclag remote mrouter entry on vlan%d: %s mrouter-port:%s ",
-                        __FUNCTION__, __LINE__, vir_port_id, 
+                        FN, LN, vir_port_id, 
                         (insert?"Added":"Deleted"), mld_get_if_name_from_ifindex(phy_port_id));
     return;
 }
@@ -367,36 +370,40 @@ void l2mcsyncd_send_notify(char *type, char *option, char *param)
  */
 static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_un client_addr)
 {
-    L2MCD_CONFIG_MSG *data=NULL;
-    L2MCD_CTL_MSG    *ctl_data=NULL;
-    int vlan_id=0;
-    int remote_version=0;
+    L2MCD_CONFIG_MSG *data = NULL;
+    L2MCD_CTL_MSG *ctl_data = NULL;
+    int vlan_id = 0;
+    int remote_version = 0;
     int afi = MLD_IP_IPV4_AFI;
-    //afi = ((L2MCD_CONFIG_MSG *) msg->data)->afi;
+    int warm_reboot = 0;
     uint8_t vlan_type = MLD_VLAN;
     mld_vlan_node_t *vlan_node = NULL;
-    int rc=0;
+    int rc = 0;
     mld_cfg_param_t *cfg;
-    int val=0;
-    mcast_grp_addr_t grpaddr,srcaddr;
+    int val = 0;
+    mcast_grp_addr_t grpaddr, srcaddr;
     struct in_addr ipaddr = {0};
-    int iftype=0;
+    int iftype = 0;
     int ifidx, ifidx2, kif;
-    int i=0;
-    int enableFlag=0;
+    int i = 0;
+    int enableFlag = 0;
     char ifname[L2MCD_IFNAME_SIZE];
-    IP_PARAMETERS  *ip_param, test_ip_param;
+    IP_PARAMETERS *ip_param, test_ip_param;
     l2mcd_if_tree_t *l2mcd_if_tree;
-    IGMP_PACKET  *igmp_pkt;
+    IGMP_PACKET *igmp_pkt;
     FILE *l2mcd_pkt_fp;
     char str[20];
     char param[20];
-    int j=0;
+    int j = 0;
     int lif_state = FALSE;
-    MCGRP_CLASS         *mcgrp = NULL; 
+    MCGRP_CLASS *mcgrp = NULL;
 
-
-    L2MCD_LOG_DEBUG("recieved IPC message type:%u ", msg->msg_type);
+    L2MCD_LOG_DEBUG("recieved IPC message type:%u mesg_len:%d data_len:%d", msg->msg_type, msg->msg_len, len);
+    if (len < msg->msg_len + sizeof(L2MCD_IPC_MSG))
+    {
+        L2MCD_LOG_NOTICE("recieved IPC message size invaild, type:%u mesg_len:%d data_len:%d", msg->msg_type, msg->msg_len, len);
+        return;
+    }
 
     switch(msg->msg_type)
     {
@@ -409,7 +416,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             l2mcd_if_tree = l2mcd_kif_to_rx_if(kif);
             if (!l2mcd_if_tree)
             {
-                L2MCD_LOG_NOTICE("%s unknown RX interface :kif:%d",__FUNCTION__, kif);
+                L2MCD_LOG_NOTICE("%s unknown RX interface :kif:%d",FN, kif);
                 return;
             }
             ifidx = l2mcd_if_tree->ifid;
@@ -430,15 +437,20 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
         }
         case L2MCD_SNOOP_PORT_LIST_MSG:
         {
-            data = (L2MCD_CONFIG_MSG *) msg->data;
-            g_port_init_done = TRUE;
-            if (!data)
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
             {
-                L2MCD_LOG_NOTICE(" No Data for recievd IPC message type:%u ", msg->msg_type);
+                L2MCD_LOG_NOTICE("recieved L2MCD_SNOOP_PORT_LIST_MSG message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
                 break;
             }
+            if (!data)
+            {
+                L2MCD_LOG_NOTICE(" No Data for recievd IPC message L2MCD_SNOOP_PORT_LIST_MSG type:%u ", msg->msg_type);
+                break;
+            }
+            g_port_init_done = TRUE;
             L2MCD_LOG_NOTICE("L2MCD_SNOOP_PORT_LIST_MSG count:%d",data->count);
-            for (i=0;i<data->count;i++)
+            for (i = 0; i < data->count; i++)
             {
                 l2mcd_port_list_update(data->ports[i].pnames, data->ports[i].oper_state, data->op_code);
             }
@@ -446,14 +458,19 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
         }
         case L2MCD_LAG_MEM_TABLE_UPDATE:
         {
-            data = (L2MCD_CONFIG_MSG *) msg->data;
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
+            {
+                L2MCD_LOG_NOTICE("recieved L2MCD_LAG_MEM_TABLE_UPDATE message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
+                break;
+            }
             if (!data)
             {
-                L2MCD_LOG_NOTICE("No Data for recievd IPC message L2MCD_VLAN_MEM_TABLE_UPDATE type:%u ", msg->msg_type);
+                L2MCD_LOG_NOTICE("No Data for recievd IPC message L2MCD_LAG_MEM_TABLE_UPDATE type:%u ", msg->msg_type);
                 break;
             }
             //afi = data->afi;
-            for (i=0;i<data->count;i+=2)
+            for (i = 0; i < data->count; i += 2)
             {
                 ifidx = data->op_code ? portdb_get_portindex_from_ifname(data->ports[i].pnames):0;
                 ifidx2 =  portdb_get_portindex_from_ifname(data->ports[i+1].pnames);
@@ -465,10 +482,16 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
         }
         case L2MCD_CONFIG_PARAMS_MSG:
         {
-            data = (L2MCD_CONFIG_MSG *) msg->data;
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            // log level = data->count 
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG))
+            {
+                L2MCD_LOG_NOTICE("recieved L2MCD_CONFIG_PARAMS_MSG message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
+                break;
+            }
             if (!data)
             {
-                L2MCD_LOG_NOTICE("No Data for recievd IPC message L2MCD_VLAN_MEM_TABLE_UPDATE type:%u ", msg->msg_type);
+                L2MCD_LOG_NOTICE("No Data for recievd IPC message L2MCD_CONFIG_PARAMS_MSG type:%u ", msg->msg_type);
                 break;
             }
             g_curr_dbg_level = data->count;
@@ -476,16 +499,21 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             memcpy((char *) gIgmp.mac, (const char *) g_l2mcd_global_mac, ETHER_ADDR_LEN);
             memcpy((char *) gMld.mac, (const char *) g_l2mcd_global_mac, ETHER_ADDR_LEN);
             APP_LOG_SET_LEVEL(g_curr_dbg_level);
-	        L2MCD_INIT_LOG("Global MAC set for IPV4  0x%x:0x%x:0x%x:0x%x:0x%x:0x%x: dbglevel:%d",
-                   gIgmp.mac[0],gIgmp.mac[1],gIgmp.mac[2],gIgmp.mac[3],gIgmp.mac[4],gIgmp.mac[5],
-                   g_curr_dbg_level);
+            L2MCD_INIT_LOG("Global MAC set for IPV4  0x%x:0x%x:0x%x:0x%x:0x%x:0x%x: dbglevel:%d",
+                           gIgmp.mac[0], gIgmp.mac[1], gIgmp.mac[2], gIgmp.mac[3], gIgmp.mac[4], gIgmp.mac[5],
+                           g_curr_dbg_level);
             /* Debug FM call back register is done delayed, to ensure fm is up by the time. */ 
             l2mcsync_init_debug_framework();
             break;
         }
         case L2MCD_VLAN_MEM_TABLE_UPDATE:
         {
-            data = (L2MCD_CONFIG_MSG *) msg->data;
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
+            {
+                L2MCD_LOG_NOTICE("recieved L2MCD_VLAN_MEM_TABLE_UPDATE message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
+                break;
+            }
             if (!data)
             {
                 L2MCD_LOG_NOTICE("No Data for recievd IPC message L2MCD_VLAN_MEM_TABLE_UPDATE type:%u ", msg->msg_type);
@@ -498,7 +526,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             {
                 return;
             }
-            for(i=0;i<data->count;i++)
+            for (i = 0; i < data->count; i++)
             {
                 ifidx = portdb_get_portindex_from_ifname(data->ports[i].pnames);
                 val = mld_is_port_member_of_vlan(vlan_node,ifidx);
@@ -506,7 +534,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 {
                     lif_state = is_interface_up(data->ports[i].pnames);
                     mld_map_port_vlan_state(vlan_id, ifidx, data->op_code, MLD_VLAN , TRUE, lif_state, data->ports[i].tagged);
-                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:VLAN_MEMBER port:%s ifindx:%d, op:%d", FN,LN, vlan_id, data->ports[i].pnames, ifidx,data->op_code);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:VLAN_MEMBER port:%s ifindx:%d, op:%d", FN, LN, vlan_id, data->ports[i].pnames, ifidx,data->op_code);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, data->op_code? 1:0, -1, L2MCD_IPV4_AFI);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, data->op_code? 1:0, -1, L2MCD_IPV6_AFI);
                     if (data->op_code) 
@@ -520,32 +548,39 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                     }
                     break;
                 }
-                L2MCD_VLAN_LOG_INFO(vlan_id,"%s:%d:[vlan:%d] val:%d vlan-member:%s ifindx:%d op:%d ignored",FN, LN, vlan_id, val,data->ports[i].pnames, ifidx,data->op_code);
+                L2MCD_VLAN_LOG_INFO(vlan_id,"%s:%d:[vlan:%d] val:%d vlan-member:%s ifindx:%d op:%d",FN, LN, vlan_id, val,data->ports[i].pnames, ifidx,data->op_code);
             }
             break;
         }
         case L2MCD_SNOOP_CONFIG_MSG:
         {
-            data = (L2MCD_CONFIG_MSG *) msg->data;
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
+            {
+                L2MCD_LOG_NOTICE("recieved L2MCD_SNOOP_CONFIG_MSG message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
+                break;
+            }
             if (!data)
             {
-                L2MCD_LOG_NOTICE("No Data for recievd IPC message type:%u ", msg->msg_type);
+                L2MCD_LOG_NOTICE("No Data for recievd IPC message L2MCD_SNOOP_CONFIG_MSG type:%u ", msg->msg_type);
                 break;
             }
             afi = data->afi;
             vlan_id = data->vlan_id;
+            warm_reboot = data->warm_reboot;
             vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
-            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:SNOOP ipc_rx type:%s, ver:%d,  querier:%s, fleave:%s , qtime:%d, lmq_time:%d, qmx_resp_time:%d, dyn_count:%d afi:%d", 
-               FN, LN,vlan_id, data->op_code?"Add":"Del", data->version, data->querier?"Y":"N", data->fast_leave?"Y":"N", 
-               data->query_interval, data->last_member_query_interval, data->query_max_response_time,data->count, afi);
+            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:SNOOP ipc_rx type:%s, ver:%d,  querier:%s, fleave:%s , qtime:%d, lmq_time:%d, qmx_resp_time:%d, dyn_count:%d afi:%d",
+                                FN, LN, vlan_id, data->op_code ? "Add" : "Del", data->version, data->querier ? "Y" : "N", data->fast_leave ? "Y" : "N",
+                                data->query_interval, data->last_member_query_interval, data->query_max_response_time, data->count, afi);
+            L2MCD_VLAN_LOG_INFO(vlan_id, "[vlan:%d] l2mcd-cfg: warm_reboot:%d port_count:%d", vlan_id, data->warm_reboot, data->count);
 
             if (!vlan_node || (vlan_node && !mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED)))
             {
-                snprintf(ifname, L2MCD_IFNAME_SIZE,"Vlan%d",vlan_id);
+                snprintf(ifname, L2MCD_IFNAME_SIZE, "Vlan%d", vlan_id);
                 l2mcd_add_kif_to_if(ifname, vlan_id, -1, NULL, -1, -1, -1, 1, afi);
                 rc = mld_if_snoop_set(afi, vlan_id, TRUE, MLD_VLAN);
 
-                if(rc != MLD_SUCCESS)
+                if (rc != MLD_SUCCESS)
                 {
                     L2MCD_VLAN_LOG_INFO(vlan_id, "failed to enable igmps on vlan %d ifcnt:%d rc:%d", vlan_id, data->count, rc);
                     return;
@@ -553,23 +588,27 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 L2MCD_VLAN_LOG_INFO(vlan_id, "igmps is enabled for vlan %d ifcnt:%d rc:%d", vlan_id, data->count, rc);
                 l2mcsync_add_vlan_entry(vlan_id);
                 vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
-                portdb_entry_t *port_entry=portdb_find_port_entry(&gMld.ve_portdb_tree, vlan_id);
-                if (vlan_node && port_entry && port_entry->opaque_data) 
+                portdb_entry_t *port_entry = portdb_find_port_entry(&gMld.ve_portdb_tree, vlan_id);
+                if (vlan_node && port_entry && (port_entry->ipv4_addr_data || listhead(port_entry->ip6->ip6_address_list)))
                 {
                     /* IP adress is already configured for the vlan */
                     vlan_node->ve_ifindex = vlan_node->ifindex;
-                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] VE enabled vlan", FN,LN, vlan_id);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] VE enabled vlan", FN, LN, vlan_id);
                 }
-
             }
 
-            if (vlan_node && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED)) 
+            if (vlan_node && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED))
             {
                 if (!data->op_code)
                 {
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"igmps/mld disable for vlan:%d", vlan_id);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "igmps/mld disable for vlan:%d", vlan_id);
                     mld_if_snoop_unset(afi, vlan_id, TRUE, MLD_VLAN);
-                    l2mcsync_del_vlan_entry(vlan_id);
+
+                    vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
+                    if (!vlan_node)
+                    {
+                        l2mcsync_del_vlan_entry(vlan_id);
+                    }
                     sprintf(param, "%s|%d", NOTIFY_PARAM_ACTION_DISABLE, vlan_id);
                     l2mcsync_notify_config_done(NOTIFY_PARAM_SNP, param);
                     break;
@@ -581,74 +620,215 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                     L2MCD_LOG_NOTICE("Unable to retrive cfg_param for vlan  %d", vlan_id);
                     return;
                 }
-                L2MCD_VLAN_LOG_INFO(vlan_id,"curr_cfg vlan:%d qi:%d,  qmr:%d lmqi:%d  ver:%d flags:0x%x",
-                                vlan_id, cfg->cfg_query_interval_time, cfg->max_response_time, cfg->LMQ_interval, 
-                                cfg->cfg_version, vlan_node->flags[afi-1]);
-                if (data->fast_leave && !mld_is_flag_set(vlan_node, afi,MLD_FAST_LEAVE_CONFIGURED))
+                L2MCD_VLAN_LOG_INFO(vlan_id, "curr_cfg vlan:%d qi:%d,  qmr:%d lmqi:%d  ver:%d flags:0x%x",
+                                    vlan_id, cfg->cfg_query_interval_time, cfg->max_response_time, cfg->LMQ_interval,
+                                    cfg->cfg_version, vlan_node->flags[afi - 1]);
+                if (data->fast_leave && !mld_is_flag_set(vlan_node, afi, MLD_FAST_LEAVE_CONFIGURED))
                 {
                     rc = mld_fastleave_set(afi, vlan_id, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"enabling fastleave for vlan :%d rc:%d", vlan_id, rc);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "enabling fastleave for vlan :%d rc:%d", vlan_id, rc);
                 }
-                if (!data->fast_leave && mld_is_flag_set(vlan_node, afi,MLD_FAST_LEAVE_CONFIGURED))
+                if (!data->fast_leave && mld_is_flag_set(vlan_node, afi, MLD_FAST_LEAVE_CONFIGURED))
                 {
                     rc = mld_fastleave_unset(afi, vlan_id, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"disabling fastleave for vlan :%d rc:%d", vlan_id, rc);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "disabling fastleave for vlan :%d rc:%d", vlan_id, rc);
                 }
 
-                if (data->querier && !mld_is_flag_set(vlan_node, afi,MLD_SNOOPING_QUERIER_ENABLED))
+                if (data->querier && !mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_QUERIER_ENABLED))
                 {
-                     rc = mld_snoop_querier_set(afi, vlan_id, vlan_type);
-                     L2MCD_VLAN_LOG_INFO(vlan_id,"enabling querier for vlan :%d rc:%d", vlan_id, rc);
+                    rc = mld_snoop_querier_set(afi, vlan_id, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "enabling querier for vlan :%d rc:%d", vlan_id, rc);
                 }
-                if (!data->querier && mld_is_flag_set(vlan_node, afi,MLD_SNOOPING_QUERIER_ENABLED))
+                if (!data->querier && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_QUERIER_ENABLED))
                 {
-                     rc = mld_snoop_querier_unset(afi, vlan_id, vlan_type);
-                     L2MCD_VLAN_LOG_INFO(vlan_id," disabling querier for vlan :%d rc:%d", vlan_id, rc);
+                    rc = mld_snoop_querier_unset(afi, vlan_id, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, " disabling querier for vlan :%d rc:%d", vlan_id, rc);
                 }
                 if (cfg->cfg_query_interval_time != data->query_interval)
                 {
                     val = cfg->cfg_query_interval_time;
-                    rc =  mld_query_interval_set(afi, vlan_id, data->query_interval, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"rc:%d changed QI for vlan %d from %d to %d", 
-                               rc, vlan_id, val, data->query_interval);
+                    rc = mld_query_interval_set(afi, vlan_id, data->query_interval, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "rc:%d changed QI for vlan %d from %d to %d",
+                                        rc, vlan_id, val, data->query_interval);
                 }
                 if (cfg->max_response_time != data->query_max_response_time)
                 {
                     val = cfg->max_response_time;
                     rc = mld_query_max_response_time_set(afi, vlan_id, data->query_max_response_time, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"rc:%d changed qmr of vlan %d from %d to %d", rc, vlan_id, val, data->query_max_response_time);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "rc:%d changed qmr of vlan %d from %d to %d", rc, vlan_id, val, data->query_max_response_time);
                 }
                 if (cfg->LMQ_interval != data->last_member_query_interval)
                 {
                     val = cfg->LMQ_interval;
-                    rc = mld_lmqi_set(afi, vlan_id,data->last_member_query_interval, vlan_type);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"rc:%d changed LMQI of vlan %d from %d to %d", rc, vlan_id, cfg->LMQ_interval, data->last_member_query_interval);
+                    rc = mld_lmqi_set(afi, vlan_id, data->last_member_query_interval, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "rc:%d changed LMQI of vlan %d from %d to %d", rc, vlan_id, cfg->LMQ_interval, data->last_member_query_interval);
                 }
                 if (cfg->cfg_version != data->version)
                 {
-                   rc = mld_if_set_version_api(MLD_DEFAULT_VRF_ID, vlan_id, data->version, afi, vlan_type);
-                   L2MCD_VLAN_LOG_INFO(vlan_id,"rc:%d changed version of vlan=%d from %d to %d", rc, vlan_id, cfg->cfg_version, data->version);
+                    rc = mld_if_set_version_api(MLD_DEFAULT_VRF_ID, vlan_id, data->version, afi, vlan_type);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "rc:%d changed version of vlan=%d from %d to %d", rc, vlan_id, cfg->cfg_version, data->version);
                 }
-                for(i=0;i<data->count;i++)
+                for (i = 0; i < data->count; i++)
                 {
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] [%d] vlan-member:%s oper:%d tagged:%d", FN, LN,
+                                        vlan_id, i, data->ports[i].pnames, data->ports[i].oper_state, data->ports[i].tagged);
+
                     ifidx = portdb_get_portindex_from_ifname(data->ports[i].pnames);
                     lif_state = is_interface_up(data->ports[i].pnames);
-                    L2MCD_VLAN_LOG_INFO(vlan_id,"%s:%d:[vlan:%d] vlan-member:%s ifindx:%d", __FUNCTION__, __LINE__, vlan_id, data->ports[i].pnames, ifidx);
-                    mld_map_port_vlan_state(vlan_id, ifidx, TRUE, MLD_VLAN , TRUE, lif_state, data->ports[i].tagged);
+                    L2MCD_VLAN_LOG_INFO(vlan_id, "[vlan:%d] vlan-member:%s ifindx:%d", vlan_id, data->ports[i].pnames, ifidx);
+                    mld_map_port_vlan_state(vlan_id, ifidx, TRUE, MLD_VLAN, TRUE, lif_state, data->ports[i].tagged);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, 1, -1, afi);
                 }
 
                 sprintf(param, "%s|%d", NOTIFY_PARAM_ACTION_ENABLE, vlan_id);
                 l2mcsync_notify_config_done(NOTIFY_PARAM_SNP, param);
             }
+
+            if (warm_reboot && vlan_node && mld_is_flag_set(vlan_node, afi, MLD_SNOOPING_ENABLED))
+            {
+                vlan_node->warm_reboot[afi - 1] = 1;
+                int count = l2mcsync_get_l2mc_info_count(vlan_id, afi);
+                L2MCD_LOG_NOTICE("[WARM][%s] vlan=%d afi=%d dump_count=%d", FN, vlan_id, afi, count);
+                if (count <= 0)
+                {
+                    L2MCD_LOG_NOTICE("[WARM][%s] vlan=%d afi=%d no entry, notify directly", FN, vlan_id, afi);
+                    L2MCD_LOG_NOTICE("%s warm-reboot notify  vlan_id %d afi %d", FN, vlan_id, afi);
+                    sprintf(param, "%d|%d", (afi == MCAST_IPV4_AFI) ? NOTIFY_PARAM_WARM_IGMP_SNP : NOTIFY_PARAM_WARM_MLD_SNP, vlan_id);
+                    l2mcsync_notify_config_done(NOTIFY_PARAM_WARM_STATUS, param);
+                    vlan_node->warm_reboot[afi - 1] = 0;
+                    break;
+                }
+                L2MCD_APP_TABLE_ENTRY *entries = calloc(count, sizeof(L2MCD_APP_TABLE_ENTRY));
+                if (!entries)
+                    break;
+
+                DUMP_L2MCD_APP_TABLE_ENTRY msg = {
+                    .vlan_id   = vlan_id,
+                    .afi       = afi,
+                    .max_count = count,
+                    .count     = 0,
+                    .data      = entries};
+
+                l2mcsync_dump_l2mc_info(&msg);
+
+                mcgrp                   = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, L2MCD_DEFAULT_VRF_IDX);
+                MCGRP_L3IF *mcgrp_vport = NULL;
+                uint16_t    port        = mld_l3_get_port_from_ifindex(vlan_node->ifindex, vlan_node->type);
+                mcgrp_vport             = (afi == MCAST_IPV4_AFI) ? gIgmp.port_list[port] : gMld.port_list[port];
+                for (int i = 0; i < count; i++)
+                {
+                    L2MCD_APP_TABLE_ENTRY *entry = &entries[i];
+                    MADDR_ST src_addr;
+                    MADDR_ST grp_addr;
+                    uint8_t  sync_action = IS_EXCL;
+                    uint8_t  num_srcs    = 1;
+                    grpaddr.afi = afi;
+                    srcaddr.afi = afi;
+                    if (afi == MCAST_IPV4_AFI)
+                    {
+                        inet_aton(entry->gaddr, &ipaddr);
+                        grpaddr.ip.ipv4_addr = htonl(ipaddr.s_addr);
+                        inet_aton(entry->saddr, &ipaddr);
+                        srcaddr.ip.ipv4_addr = htonl(ipaddr.s_addr);
+                    }
+                    else
+                    {
+                        inet_pton(AF_INET6, entry->gaddr, &grpaddr.ip.ipv6_addr);
+                        inet_pton(AF_INET6, entry->saddr, &srcaddr.ip.ipv6_addr);
+                    }
+                    mcast_set_ip_addr(&grp_addr, &grpaddr);
+                    mcast_set_ip_addr(&src_addr, &srcaddr);
+
+                    int is_mrouter = mcast_addr_any(&grp_addr);
+                    int has_src    = !mcast_addr_any(&src_addr);
+
+                    L2MCD_LOG_NOTICE(
+                        "[WARM][%s] entry[%u] vlan=%d afi=%d static=%d "
+                        "port='%s' gaddr='%s' saddr='%s'",
+                        FN, i, entry->vlan_id, afi, entry->is_static,
+                        entry->port.pnames,
+                        is_mrouter ? "<empty>": entry->gaddr,
+                        has_src ? entry->saddr : "<empty>");
+
+                    ifidx = portdb_get_portindex_from_ifname(entry->port.pnames);
+                    if (!mld_is_port_member_of_vlan(vlan_node, ifidx))
+                        continue;
+
+                    MCGRP_PORT_ENTRY *mcgrp_pport = NULL;
+                    mcgrp_pport                   = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, ifidx);
+                    if (mcgrp_pport == NULL || (!mcgrp_pport->is_up && !warm_reboot))
+                    {
+                        L2MCD_LOG_NOTICE("%s Port %d is not up", FN, ifidx);
+                        continue;
+                    }
+                    int version = mcgrp_pport->oper_version;
+
+                    /* ---- mrouter ---- */
+                    if (is_mrouter)
+                    {
+                        if (entry->is_static)
+                            mld_snooping_mrouter_if_set_api(
+                                vlan_id, L2MCD_IF_TYPE_PHYSICAL,
+                                entry->port.pnames, 1, afi, MLD_VLAN);
+                        else
+                            mcgrp_add_router_port(mcgrp, mcgrp_vport, ifidx,
+                                                  FALSE, MLD_PROTO_MROUTER,
+                                                  DEFAULT_MROUTER_AGING_TIME, FALSE);
+
+                        L2MCD_LOG_NOTICE("%s warm-reboot mrouter", FN);
+                        continue;
+                    }
+
+                    /* ---- static group ---- */
+                    if (entry->is_static)
+                    {
+                        L2MCD_LOG_INFO("%s warm-reboot static group", FN);
+                        mld_static_group_source_set(
+                            vlan_id, entry->port.pnames, iftype,
+                            &grpaddr, 1, FALSE, vlan_type);
+                        continue;
+                    }
+                    /* ---- dynamic Group ---- */
+                    L2MCD_LOG_NOTICE("%s:%d:[vlan:%d] group address %s src address %s", FN, LN, vlan_id, mcast_print_addr(&grp_addr), mcast_print_addr(&src_addr));
+
+                    sync_action = has_src ? ALLOW_NEW : IS_EXCL;
+                    num_srcs    = has_src ? 1 : 0;
+                    if (afi == MLD_IP_IPV4_AFI)
+                    {
+                        version = has_src ? IGMP_VERSION_3 : IGMP_VERSION_2;
+                    }
+                    else if (afi == MLD_IP_IPV6_AFI)
+                    {
+                        version = has_src ? MLD_VERSION_2 : MLD_VERSION_1;
+                    }
+
+                    L2MCD_LOG_NOTICE("%s warm-reboot dynamic group  sync_action %d num_srcs %d oper_version %d", FN, sync_action, num_srcs, mcgrp_pport->oper_version);
+                    mcgrp_update_group_address_table(
+                        mcgrp, vlan_id, ifidx,
+                        &grp_addr, &src_addr,
+                        sync_action, version,
+                        num_srcs, has_src ? (void *)&src_addr : NULL);
+                }
+
+                free(entries);
+                L2MCD_LOG_NOTICE("%s warm-reboot notify  vlan_id %d afi %d", FN, vlan_id, afi);
+                sprintf(param, "%d|%d", (afi == MCAST_IPV4_AFI) ? NOTIFY_PARAM_WARM_IGMP_SNP : NOTIFY_PARAM_WARM_MLD_SNP, vlan_id);
+                l2mcsync_notify_config_done(NOTIFY_PARAM_WARM_STATUS, param);
+                vlan_node->warm_reboot[afi - 1] = 0;
+            }
             break;
         }
         case L2MCD_SNOOP_MROUTER_CONFIG_MSG:
         {
-            data = (L2MCD_CONFIG_MSG *) msg->data;
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
+            {
+                L2MCD_LOG_NOTICE("recieved L2MCD_SNOOP_MROUTER_CONFIG_MSG message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
+                break;
+            }
             if (!data)
             {
-                L2MCD_LOG_ERR("%s:%d No Data for recievd IPC message type:%u ", msg->msg_type, __FUNCTION__, __LINE__);
+                L2MCD_LOG_ERR("%s:%d No Data for recievd IPC message L2MCD_SNOOP_MROUTER_CONFIG_MSG type:%u ", msg->msg_type, FN, LN);
                 break;
             }
             afi = data->afi;
@@ -661,17 +841,23 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 break;
             }
 
-            enableFlag=data->op_code;
+            enableFlag = data->op_code;
             rc = mld_snooping_mrouter_if_set_api(data->vlan_id, iftype, data->ports[0].pnames, enableFlag, afi, MLD_VLAN);
-            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:MROUTER op:%d cnt:%d port[0]:%s", FN,LN,vlan_id,data->op_code,data->count,data->ports[0].pnames);
+            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:MROUTER op:%d cnt:%d port[0]:%s", FN, LN, vlan_id, data->op_code, data->count, data->ports[0].pnames);
             break;
         }
         
         case L2MCD_SNOOP_REMOTE_CONFIG_MSG:
-            data = (L2MCD_CONFIG_MSG *) msg->data;
+        {
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
+            {
+                L2MCD_LOG_NOTICE("recieved L2MCD_SNOOP_REMOTE_CONFIG_MSG message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
+                break;
+            }
             if (!data)
             {
-                L2MCD_LOG_NOTICE("%s:%d No Data for recievd IPC message type:%u ", msg->msg_type, __FUNCTION__, __LINE__);
+                L2MCD_LOG_NOTICE("%s:%d No Data for recievd IPC message L2MCD_SNOOP_REMOTE_CONFIG_MSG type:%u ", msg->msg_type, FN, LN);
                 break;
             }
             afi = data->afi;
@@ -708,12 +894,18 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                     FN,LN,data->vlan_id, data->op_code,data->count,data->ports[0].pnames,ifidx, data->gaddr,data->saddr,srcaddr.ip.ipv4_addr, data->cmd_code);
             l2mcd_igmp_process_sync_report(&srcaddr, &grpaddr, vlan_id, ifidx, data->op_code, data->cmd_code);
             break;
-        
+        }
         case L2MCD_SNOOP_MROUTER_REMOTE_CONFIG_MSG:
-            data = (L2MCD_CONFIG_MSG *) msg->data;
+        {
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
+            {
+                L2MCD_LOG_NOTICE("recieved L2MCD_SNOOP_MROUTER_REMOTE_CONFIG_MSG message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
+                break;
+            }
             if (!data)
             {
-                L2MCD_LOG_NOTICE("%s:%d No Data for recievd IPC message type:%u ", msg->msg_type, __FUNCTION__, __LINE__);
+                L2MCD_LOG_NOTICE("%s:%d No Data for recievd IPC message L2MCD_SNOOP_MROUTER_REMOTE_CONFIG_MSG type:%u ", msg->msg_type, FN, LN);
                 break;
             }
             afi = data->afi;
@@ -722,13 +914,19 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             L2MCD_VLAN_LOG_INFO(data->vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:Mrouter REMOTE op:%d cnt:%d port[0]:%s (%d)",
                     FN,LN,data->vlan_id, data->op_code,data->count,data->ports[0].pnames,ifidx);
             l2mcd_igmp_process_remote_mrouter(vlan_id, ifidx, data->op_code);
-
+            break;
+        }
         case L2MCD_SNOOP_STATIC_CONFIG_MSG:
         {
-            data = (L2MCD_CONFIG_MSG *) msg->data;
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
+            {
+                L2MCD_LOG_NOTICE("recieved L2MCD_SNOOP_STATIC_CONFIG_MSG message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
+                break;
+            }
             if (!data)
             {
-                L2MCD_LOG_NOTICE("%s:%d No Data for recievd IPC message type:%u ", msg->msg_type, __FUNCTION__, __LINE__);
+                L2MCD_LOG_NOTICE("%s:%d No Data for recievd IPC message L2MCD_SNOOP_STATIC_CONFIG_MSG type:%u ", msg->msg_type, FN, LN);
                 break;
             }
             afi = data->afi;
@@ -764,44 +962,69 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 rc = mld_static_group_source_set(data->vlan_id, data->ports[0].pnames, iftype, &grpaddr, 1, FALSE, vlan_type);
             }
             L2MCD_VLAN_LOG_INFO(data->vlan_id, "%s:%d:[vlan:%d] l2mcd-cfg:%s op:%d cnt:%d port[0]:%s GA:%s SA:%s[0x%x]",
-                 FN,LN,data->vlan_id, (msg->msg_type==L2MCD_SNOOP_STATIC_CONFIG_MSG)?"STATIC":"REMOTE",
-                 data->op_code,data->count,data->ports[0].pnames,data->gaddr,data->saddr,srcaddr.ip.ipv4_addr);
+                                FN, LN, data->vlan_id, (msg->msg_type == L2MCD_SNOOP_STATIC_CONFIG_MSG) ? "STATIC" : "REMOTE",
+                                data->op_code, data->count, data->ports[0].pnames, data->gaddr, data->saddr, srcaddr.ip.ipv4_addr);
             break;
         }
         case L2MCD_INTERFACE_TABLE_UPDATE:
         {
-            data = (L2MCD_CONFIG_MSG *) msg->data;
-            if (!data)
+            data = (L2MCD_CONFIG_MSG *)msg->data;
+            if (msg->msg_len < sizeof(L2MCD_CONFIG_MSG) + sizeof(PORT_ATTR) * data->count)
             {
-                L2MCD_LOG_NOTICE(" No Data for recievd IPC message type:%u ", msg->msg_type);
+                L2MCD_LOG_NOTICE("recieved L2MCD_INTERFACE_TABLE_UPDATE message size invaild, mesg_len:%d port_count:%d", msg->msg_len, data->count);
                 break;
             }
-            //afi = data->afi;
-            inet_aton(data->gaddr, &ipaddr);
+            if (!data)
+            {
+                L2MCD_LOG_NOTICE(" No Data for recievd IPC message L2MCD_INTERFACE_TABLE_UPDATE type:%u ", msg->msg_type);
+                break;
+            }
+            afi     = data->afi;
             vlan_id = data->vlan_id;
-            val = data->prefix_length;
+            val     = data->prefix_length;
             if (data->op_code)
             {
-                rc = portdb_add_port_entry_to_tree(&gMld.ve_portdb_tree, vlan_id, L2MCD_DEFAULT_VRF_IDX,vlan_id);
-                portdb_insert_addr_ipv4_list(&gMld.ve_portdb_tree, vlan_id, htonl(ipaddr.s_addr),val, L2MCD_DEFAULT_VRF_IDX, 0);
+                rc = portdb_add_port_entry_to_tree(&gMld.ve_portdb_tree, vlan_id, L2MCD_DEFAULT_VRF_IDX, vlan_id);
+                if (afi == MCAST_IPV4_AFI)
+                {
+                    inet_aton(data->gaddr, &ipaddr);
+                    portdb_insert_addr_ipv4_list(&gMld.ve_portdb_tree, vlan_id, htonl(ipaddr.s_addr), val, L2MCD_DEFAULT_VRF_IDX, 0);
+                }
+                else
+                {
+                    grpaddr.afi = MCAST_IPV6_AFI;
+                    inet_pton(AF_INET6, data->gaddr, &grpaddr.ip.ipv6_addr);
+                    portdb_insert_addr_ipv6_list(&gMld.ve_portdb_tree, vlan_id, (IPV6_ADDRESS *)&grpaddr.ip.ipv6_addr, val, L2MCD_DEFAULT_VRF_IDX, 0);
+                }
             }
             else
             {
-                rc = portdb_remove_addr_ipv4_list(&gMld.ve_portdb_tree, vlan_id, htonl(ipaddr.s_addr));
-                portdb_remove_port_entry_from_tree(&gMld.ve_portdb_tree, vlan_id);
+                if (afi == MCAST_IPV4_AFI)
+                {
+                    inet_aton(data->gaddr, &ipaddr);
+                    rc = portdb_remove_addr_ipv4_list(&gMld.ve_portdb_tree, vlan_id, htonl(ipaddr.s_addr));
+                    // portdb_remove_port_entry_from_tree(&gMld.ve_portdb_tree, vlan_id);
+                }
+                else
+                {
+                    grpaddr.afi = MCAST_IPV6_AFI;
+                    inet_pton(AF_INET6, data->gaddr, &grpaddr.ip.ipv6_addr);
+                    rc = portdb_remove_addr_ipv6_list(&gMld.ve_portdb_tree, vlan_id, (IPV6_ADDRESS *)&grpaddr.ip.ipv6_addr);
+                    // portdb_remove_port_entry_from_tree(&gMld.ve_portdb_tree, vlan_id);
+                }
             }
-            vlan_node =  mld_vdb_vlan_get(vlan_id, MLD_VLAN);
-            if (!vlan_node)
-            {
-               vlan_node = mld_vlan_create_fwd_ref(vlan_id, MLD_ROUTE_PORT);
-               if (!vlan_node) 
-               {
-                   L2MCD_LOG_NOTICE("vlan:%d Interface Table Update IP:%s VDB create error",vlan_id, data->gaddr,val,data->op_code);
-                   return;
-               }
-            }
-            vlan_node->ve_ifindex = (!data->op_code & !rc)? vlan_id: vlan_node->ifindex;
-            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] Interface Table Update IP:%s  %d %d ",FN,LN,data->vlan_id, data->gaddr,val,data->op_code);
+            // vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
+            // if (!vlan_node)
+            // {
+            //     vlan_node = mld_vlan_create_fwd_ref(vlan_id, MLD_ROUTE_PORT);
+            //     if (!vlan_node)
+            //     {
+            //         L2MCD_LOG_NOTICE("vlan:%d Interface Table Update IP:%s VDB create error", vlan_id, data->gaddr, val, data->op_code);
+            //         return;
+            //     }
+            // }
+            vlan_node->ve_ifindex = (!data->op_code & !rc) ? vlan_id : vlan_node->ifindex;
+            L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] Interface Table Update IP:%s  %d %d ", FN, LN, data->vlan_id, data->gaddr, val, data->op_code);
             break;
         }
 
@@ -834,10 +1057,10 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                    g_l2mcd_test_buf1[i++] = fgetc(l2mcd_pkt_fp);
                    if (i >= 2000) break;
                 }
-                for (j=0;j<i;j+=2)
+                for (j = 0; j < i; j += 2)
                 {
-                    sprintf(str,"0x%c%c", g_l2mcd_test_buf1[j],g_l2mcd_test_buf1[j+1]);   
-                    g_l2mcd_test_buf2[j/2]= strtol(str, NULL, 0);
+                    sprintf(str, "0x%c%c", g_l2mcd_test_buf1[j], g_l2mcd_test_buf1[j + 1]);
+                    g_l2mcd_test_buf2[j / 2] = strtol(str, NULL, 0);
                 }
                 g_l2mcd_test_buf2[i]='\0';
                 fclose(l2mcd_pkt_fp);
@@ -847,7 +1070,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 l2mcd_if_tree = l2mcd_kif_to_if(kif);
                 if (!l2mcd_if_tree)
                 {
-                    L2MCD_CLI_PRINT("%s unknown RX interface :kif:%d",__FUNCTION__, kif);
+                    L2MCD_CLI_PRINT("%s unknown RX interface :kif:%d",FN, kif);
                     return;
                 }
                 else 
@@ -933,7 +1156,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 g_l2mcd_cmd_fp =  fopen(ctl_data->fname,"a+");
                 if (!g_l2mcd_cmd_fp)
                 {
-                    L2MCD_LOG_NOTICE("%s %s fopen failed ",__FUNCTION__, ctl_data->fname);
+                    L2MCD_LOG_NOTICE("%s %s fopen failed ",FN, ctl_data->fname);
                     break;
                 }
                 if (ctl_data->dbgLevel<APP_LOG_LEVEL_MAX) 
@@ -953,7 +1176,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 g_l2mcd_cmd_fp =  fopen(ctl_data->fname,"a+");
                 if (!g_l2mcd_cmd_fp)
                 {
-                    L2MCD_LOG_NOTICE("%s %s fopen failed ",__FUNCTION__, ctl_data->fname);
+                    L2MCD_LOG_NOTICE("%s %s fopen failed ",FN, ctl_data->fname);
                     break;
                 }
                 ctl_data = (L2MCD_CTL_MSG *) msg->data;
@@ -966,7 +1189,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 g_l2mcd_cmd_fp =  fopen(ctl_data->fname,"a+");
                 if (!g_l2mcd_cmd_fp)
                 {
-                    L2MCD_LOG_NOTICE("%s %s fopen failed ",__FUNCTION__, ctl_data->fname);
+                    L2MCD_LOG_NOTICE("%s %s fopen failed ",FN, ctl_data->fname);
                     break;
                 }
                 ctl_data = (L2MCD_CTL_MSG *) msg->data;
@@ -979,7 +1202,7 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 g_l2mcd_cmd_fp =  fopen(ctl_data->fname,"a+");
                 if (!g_l2mcd_cmd_fp)
                 {
-                    L2MCD_LOG_NOTICE("%s %s fopen failed ",__FUNCTION__, ctl_data->fname);
+                    L2MCD_LOG_NOTICE("%s %s fopen failed ",FN, ctl_data->fname);
                     break;
                 }
                 if (ctl_data->cmd & L2MCD_CTL_CMD_DUMP_ALL)
@@ -1002,11 +1225,28 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             break;
         }
 
-
         default:
             break;
     }
-  
+    // warm-reboot reload
+    if (data && vlan_node && data->warm_reboot)
+    {
+        // L2MCD_SNOOP_CONFIG_MSG
+        // L2MCD_VLAN_MEM_TABLE_UPDATE
+        // L2MCD_INTERFACE_TABLE_UPDATE
+
+        // static mroute
+
+        // static entry
+
+        // mroute
+
+        // entry
+
+        // notify if all vlan reload
+        // sprintf(param, "%s|%d", NOTIFY_PARAM_WARM_STATUS, vlan_id);
+        // l2mcsync_notify_warm_reboot_done(NOTIFY_PARAM_SNP, param);
+    }
 }
  
 void l2mcd_100ms_timer(evutil_socket_t fd, short what, void *arg)
@@ -1077,14 +1317,14 @@ struct event *l2mcd_libevent_create(struct event_base *base,
     return NULL;
 }
 
-/* 
+/*
  * l2mcd_recv_client_msg
  *
  * Process messages from client sockets
  */
 void l2mcd_recv_client_msg(evutil_socket_t fd, short what, void *arg)
 {
-    char buffer[4096];
+    char buffer[16384]; // sizeof(PORT_ATTR) * 512
     socklen_t len;
     struct sockaddr_un client_sock;
 
@@ -1103,7 +1343,7 @@ void l2mcd_recv_client_msg(evutil_socket_t fd, short what, void *arg)
         return;
     }
 
-    L2MCD_LOG_DEBUG("%s Rcvd message len %d", __FUNCTION__, len);
+    L2MCD_LOG_DEBUG("%s Rcvd message len %d", FN, len);
     l2mcd_process_ipc_msg((L2MCD_IPC_MSG *)buffer, len, client_sock);
 }
 
@@ -1183,7 +1423,7 @@ void l2mcd_nl_msg(evutil_socket_t fd, short what, void *arg)
     status = recvmsg(fd, &msg, 0);
     if (status <0) 
     {
-        L2MCD_VLAN_LOG_INFO(4095, "%s:%d  event Received status %li invalid", __FUNCTION__, __LINE__, status);
+        L2MCD_VLAN_LOG_INFO(4095, "%s:%d  event Received status %li invalid", FN, LN, status);
         return;
     }
     for (h = (struct nlmsghdr*)buf; status >= (ssize_t)sizeof(*h); ) 
@@ -1264,7 +1504,7 @@ void l2mcd_recv_igmp_msg(evutil_socket_t fd, short what, void *arg)
         msg.msg_control = &cmsgbuf[0];
         msg.msg_controllen = sizeof(ucmsgbuf);
         len = recvmsg(fd, &msg, 0);
-        L2MCD_LOG_INFO("%s sock_rx Received %d byte packets", __FUNCTION__, len);
+        L2MCD_LOG_INFO("%s sock_rx Received %d byte packets", FN, len);
         if (len == -1) return;
         num_pkts=1;
         iph  = (struct iphdr *) (buf[0] + sizeof(struct ether_header));
@@ -1282,12 +1522,11 @@ void l2mcd_recv_igmp_msg(evutil_socket_t fd, short what, void *arg)
             mmsg[i].msg_hdr.msg_controllen = sizeof(cmsgbuf[i]);
         }
         num_pkts = recvmmsg(fd, &mmsg[0], L2MCD_MM_SOCKET_BATCH_SIZE, 0, &timeout);
-        L2MCD_LOG_DEBUG("%s sock_rx Received %d packets", __FUNCTION__, num_pkts);
+        L2MCD_LOG_DEBUG("%s sock_rx Received %d packets", FN, num_pkts);
         if (num_pkts == -1) return;
     }
 
-
-    for (i=0;i<num_pkts;i++)
+    for (i = 0; i < num_pkts; i++)
     {
         struct ether_header *eth = (struct ether_header *) buf[i];
         if (l2mcd_pkt_rx_batch_proc)
@@ -1298,7 +1537,7 @@ void l2mcd_recv_igmp_msg(evutil_socket_t fd, short what, void *arg)
 
         if (msg_ptr->msg_flags & MSG_TRUNC) 
         {
-            L2MCD_LOG_NOTICE("%s message too large for buffer", __FUNCTION__); 
+            L2MCD_LOG_NOTICE("%s message too large for buffer", FN); 
             continue;
         }
         g_rx_stats_tot_pkts++;
@@ -1414,7 +1653,7 @@ void l2mcd_recv_igmp_msg(evutil_socket_t fd, short what, void *arg)
                 l2mcd_if_tree = l2mcd_kif_to_rx_if(rx_sa[i].sll_ifindex);
                 if (!l2mcd_if_tree)
                 {
-                    L2MCD_LOG_NOTICE("%s unknown RX interface :kif:%d iname:%d",__FUNCTION__, rx_sa[i].sll_ifindex,iname1);
+                    L2MCD_LOG_NOTICE("%s unknown RX interface :kif:%d iname:%d",FN, rx_sa[i].sll_ifindex,iname1);
                     continue;
                 }
                 ip_param->rx_phy_port_number = l2mcd_if_tree->ifid;// l2mcd_if_tree1->po_id ? l2mcd_if_tree1->po_id:l2mcd_if_tree->ifid;
@@ -1503,22 +1742,22 @@ struct event *l2mcd_igmprx_sock_init(int *fd, char *iname)
     on=1;
     if (setsockopt(*fd, sock_level, PACKET_AUXDATA, &on, sizeof(on)) <0) 
     {
-        L2MCD_INIT_LOG("%s sock_opt PACKET_AUXDATA set failed %s", __FUNCTION__,strerror(errno));
-        L2MCD_LOG_ERR("%s sock_opt PACKET_AUXDATA set failed", __FUNCTION__);
+        L2MCD_INIT_LOG("%s sock_opt PACKET_AUXDATA set failed %s", FN,strerror(errno));
+        L2MCD_LOG_ERR("%s sock_opt PACKET_AUXDATA set failed", FN);
         return NULL;
     }
 
     on=1;
     if (setsockopt(*fd, sock_level, IP_PKTINFO, &on, sizeof(on)) <0) 
     {
-        L2MCD_LOG_ERR("%s sock_opt IP_PKTINFO set failed", __FUNCTION__);
-        L2MCD_INIT_LOG("%s sock_opt IP_PKTINFO set failed %s",__FUNCTION__,strerror(errno));
+        L2MCD_LOG_ERR("%s sock_opt IP_PKTINFO set failed", FN);
+        L2MCD_INIT_LOG("%s sock_opt IP_PKTINFO set failed %s",FN,strerror(errno));
         return NULL;
     }
     skmem=8*1024*1024;
     if (setsockopt(*fd, SOL_SOCKET, SO_RCVBUF, &skmem, sizeof(int)) < 0) 
     {
-        L2MCD_INIT_LOG("%s sock_opt BUF set failed %s",__FUNCTION__,strerror(errno));
+        L2MCD_INIT_LOG("%s sock_opt BUF set failed %s",FN,strerror(errno));
     }
     int tlen=0;
     socklen_t tlen_size = {0};
@@ -1592,7 +1831,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
     }
 
     num_pkts = recvmmsg(fd, &mmsg6[0], L2MCD_MM_SOCKET_BATCH_SIZE, 0, &timeout);
-    L2MCD_LOG_INFO("%s mld sock_rx Received %d packets", __FUNCTION__, num_pkts);
+    L2MCD_LOG_INFO("%s mld sock_rx Received %d packets", FN, num_pkts);
 
     if (num_pkts <= 0)
     {
@@ -1614,17 +1853,20 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
             struct vlan_ethhdr *vhdr = (struct vlan_ethhdr *)buf6[i];
 
             uint16_t real_proto = ntohs(vhdr->h_vlan_encapsulated_proto);
-            uint16_t vid2 = ntohs(vhdr->h_vlan_TCI) & 0xFFF; // mask 0x0FFF
             if (real_proto == ETH_P_IPV6)
             {
                 ip6h = (IPV6_HEADER *)(buf6 + sizeof(struct vlan_ethhdr));
                 L2MCD_LOG_NOTICE("real_proto == ETH_P_IPV6: %d", real_proto);
             }
-            L2MCD_LOG_NOTICE("vid: %d", vid2);
+            else
+            {
+                L2MCD_LOG_INFO("ether_type %d, real_proto %d is not sopport", ether_type, real_proto);
+                continue;
+            }
         }
         else if (ether_type != ETH_P_IPV6)
         {
-            L2MCD_LOG_ERR("ether_type is mpt sopport  %d", ether_type);
+            L2MCD_LOG_INFO("ether_type is not sopport  %d", ether_type);
             continue;
         }
         else 
@@ -1636,7 +1878,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         msg_ptr = &mmsg6[i].msg_hdr;
         if (msg_ptr->msg_flags & MSG_TRUNC)
         {
-            L2MCD_LOG_NOTICE("%s message too large for buffer", __FUNCTION__);
+            L2MCD_LOG_NOTICE("%s message too large for buffer", FN);
             continue;
         }
         g_rx_stats_tot_pkts++;
@@ -1700,7 +1942,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         l2mcd_if_tree = l2mcd_kif_to_rx_if(rx_sa6[i].sll_ifindex);
         if (!l2mcd_if_tree)
         {
-            L2MCD_LOG_NOTICE("%s unknown RX interface :kif:%d iname:%d", __FUNCTION__, rx_sa6[i].sll_ifindex, ifname);
+            L2MCD_LOG_NOTICE("%s unknown RX interface :kif:%d iname:%d", FN, rx_sa6[i].sll_ifindex, ifname);
             continue;
         }
         if (vlan_id <= 0)
@@ -1798,8 +2040,8 @@ struct event *l2mcd_mldrx_sock_init(int *fd, char *iname)
 
     // if (setsockopt(*fd, SOL_PACKET, IPV6_PKTINFO, &on, sizeof(on)) <0) 
     // {
-    //     L2MCD_LOG_ERR("%s sock_opt IPV6_PKTINFO set failed", __FUNCTION__);
-    //     L2MCD_INIT_LOG("%s sock_opt IPV6_PKTINFO set failed %s",__FUNCTION__,strerror(errno));
+    //     L2MCD_LOG_ERR("%s sock_opt IPV6_PKTINFO set failed", FN);
+    //     L2MCD_INIT_LOG("%s sock_opt IPV6_PKTINFO set failed %s",FN,strerror(errno));
     //     return NULL;
     // }
 
@@ -1931,8 +2173,8 @@ int l2mcd_unix_sock_create(uint32_t *sock, char *sock_name, int levent)
     // create socket
     fd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (fd<0) {
-        L2MCD_LOG_ERR("%s  Sock %s create error", __FUNCTION__,sock_name);
-        L2MCD_INIT_LOG("%s Sock %s create error %s", __FUNCTION__,sock_name,strerror(errno));
+        L2MCD_LOG_ERR("%s  Sock %s create error", FN,sock_name);
+        L2MCD_INIT_LOG("%s Sock %s create error %s", FN,sock_name,strerror(errno));
 		return -1;
     }
     unlink(sock_name);
@@ -1941,14 +2183,14 @@ int l2mcd_unix_sock_create(uint32_t *sock, char *sock_name, int levent)
     strncpy(addr.sun_path, sock_name, sizeof(addr.sun_path)-1);
     if (bind(fd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un))<0)
     {
-        L2MCD_LOG_ERR("%s  Sock %s bind error", __FUNCTION__,sock_name);
-        L2MCD_INIT_LOG("%s Sock %s bind error %s", __FUNCTION__,sock_name,strerror(errno));
+        L2MCD_LOG_ERR("%s  Sock %s bind error", FN,sock_name);
+        L2MCD_INIT_LOG("%s Sock %s bind error %s", FN,sock_name,strerror(errno));
         close(fd);
         return -1;
     }
     *sock = fd;
-    L2MCD_INIT_LOG("Created socket %s  fd:%d",sock_name,*sock);
-    if (!levent) // 始终为0
+    L2MCD_INIT_LOG("Created socket %s fd:%d",sock_name,*sock);
+    if (!levent) // alaways 0
     {
         return 0;
     }
@@ -1969,7 +2211,7 @@ int port_ifname_db_init()
 {
     int i=0, rc=0;
     char ifname[20];
-    for (i=0;i<L2MCD_PORTDB_PHYIF_MAX_IDX;i++)
+    for (i = 0; i < L2MCD_PORTDB_PHYIF_MAX_IDX; i++)
     {
         snprintf(ifname, 20, "Ethernet%d",i);
         rc= portdb_add_ifname(ifname, strlen(ifname) + 1, i+L2MCD_PORTDB_PHYIF_START_IDX);
@@ -1981,7 +2223,7 @@ int port_ifname_db_init()
         rc= portdb_add_ifname(ifname, strlen(ifname) + 1, i+L2MCD_PORTDB_LAGIF_START_IDX);
     }
     #endif
-    L2MCD_INIT_LOG_INFO("%s Done", __FUNCTION__);
+    L2MCD_INIT_LOG_INFO("%s Done", FN);
     return rc;
 }
 
@@ -2028,7 +2270,7 @@ int l2mcd_nl_init()
 
 void mcast_global_init(UINT32 afi)
 {
-    L2MCD_INIT_LOG_INFO("Entering %s afi:%d", __FUNCTION__, afi);
+    L2MCD_INIT_LOG_INFO("Entering %s afi:%d", FN, afi);
     if (afi == IP_IPV4_AFI)
 	{
 		gMulticast.instances[IPVRF_DEFAULT_VRF_IDX] = pMulticast0;
@@ -2068,6 +2310,14 @@ int mcast_mld_init()
 	return (0);
 }
 
+void l2mcd_sigterm_cb(evutil_socket_t sig, short what, void *arg)
+{
+    struct event_base *base = (struct event_base *)arg;
+    L2MCD_INIT_LOG("Received SIGTERM (%d). Starting graceful shutdown...", sig);
+    l2mcsync_clear_l2mc_entry();
+    event_base_loopexit(base, NULL);
+}
+
 /*
  * l2mcd_system_init
  *
@@ -2075,12 +2325,13 @@ int mcast_mld_init()
  */
 int l2mcd_system_init(int flag)
 {
-    struct event_config *cfg  = NULL;
-    struct timeval l2mcd_ipc_msec_50 = { 0, 1*1000 };
+    struct event *l2mcd_ev_sigterm = NULL;
+    struct event_config *cfg = NULL;
+    struct timeval l2mcd_ipc_msec_50 = {0, 1 * 1000};
     struct timeval l2mcd_100ms_tv = {0, L2MCD_100MS_TIMEOUT};
-    struct event   *l2mcd_evtimer_100ms = 0;
-    int rc=0;
-    char *l2mcd_msg_sock= L2MCD_MSG_SOCK_NAME;
+    struct event *l2mcd_evtimer_100ms = 0;
+    int rc = 0;
+    char *l2mcd_msg_sock = L2MCD_MSG_SOCK_NAME;
 
     memset(&l2mcd_context, 0, sizeof(L2MCD_CONTEXT));
     g_l2mcd_vlan_dbg_to_sys_log = FALSE;
@@ -2090,22 +2341,22 @@ int l2mcd_system_init(int flag)
     g_curr_dbg_level = APP_LOG_LEVEL_DEBUG;
     g_l2mcd_rx_is_l2_sock = TRUE;
     /* Debug Log Files */
-   
-    APP_LOG_SET_LEVEL(g_curr_dbg_level);
-    L2MCD_INIT_LOG("Starting L2MCD Daemon with Loglevel::%d flag:0x%x logall_to_syslog:%d",g_curr_dbg_level, flag,g_l2mcd_vlan_dbg_to_sys_log);
 
-    if (flag & 0x1) 
+    APP_LOG_SET_LEVEL(g_curr_dbg_level);
+    L2MCD_INIT_LOG("Starting L2MCD Daemon with Loglevel::%d flag:0x%x logall_to_syslog:%d", g_curr_dbg_level, flag, g_l2mcd_vlan_dbg_to_sys_log);
+
+    if (flag & 0x1)
     {
-        g_l2mcd_vlan_dbg_to_sys_log= TRUE;
-        g_l2mcd_dbg_vlan_log_all=TRUE;
-        memset(&g_l2mcd_pkt_log[0],1, L2MCD_VLAN_MAX);
-        g_l2mcd_vlan_log_mask =L2MCD_LOG_MASK_INFO|L2MCD_LOG_MASK_DEBUG;
+        g_l2mcd_vlan_dbg_to_sys_log = TRUE;
+        g_l2mcd_dbg_vlan_log_all = TRUE;
+        memset(&g_l2mcd_pkt_log[0], 1, L2MCD_VLAN_MAX);
+        g_l2mcd_vlan_log_mask = L2MCD_LOG_MASK_INFO | L2MCD_LOG_MASK_DEBUG;
         L2MCD_INIT_LOG("Enabing vlan debug all on init");
     }
-   
+
     /* IGMP Vlan Database Init */
     rc = mld_vdb_init();
-    if (rc <0)
+    if (rc < 0)
     {
         L2MCD_LOG_ERR(" L2MCD VLAN DB Init failed (error %d)", rc);
         return -1;
@@ -2124,13 +2375,13 @@ int l2mcd_system_init(int flag)
     cfg = event_config_new();
     if (!cfg)
     {
-        L2MCD_LOG_INFO("%s event_config_new failed", __FUNCTION__);
-        L2MCD_INIT_LOG("%s event_config_new failed", __FUNCTION__);
+        L2MCD_LOG_INFO("%s event_config_new failed", FN);
+        L2MCD_INIT_LOG("%s event_config_new failed", FN);
         return -1;
     }
     L2MCD_LOG_INFO("LIBEVENT VER : 0x%x", event_get_version_number());
     L2MCD_INIT_LOG("LIBEVENT VER : 0x%x", event_get_version_number());
-    event_config_set_max_dispatch_interval(cfg, &l2mcd_ipc_msec_50/*max_interval*/, -1/*max_callbacks*/, 1/*min-prio*/);
+    event_config_set_max_dispatch_interval(cfg, &l2mcd_ipc_msec_50 /*max_interval*/, -1 /*max_callbacks*/, 1 /*min-prio*/);
 
     /* Create event base to attach a event */
     g_l2mcd_evbase = event_base_new_with_config(cfg);
@@ -2161,8 +2412,8 @@ int l2mcd_system_init(int flag)
     }
     L2MCD_INIT_LOG_INFO("MLD TX Sock Initialized");
     /*Create a Timer Libevent*/
-    l2mcd_evtimer_100ms= l2mcd_libevent_create(g_l2mcd_evbase, -1,
-            EV_PERSIST, l2mcd_100ms_timer, (char *)"L2MCD 100MS Timer", &l2mcd_100ms_tv, -1);
+    l2mcd_evtimer_100ms = l2mcd_libevent_create(g_l2mcd_evbase, -1,
+                                                EV_PERSIST, l2mcd_100ms_timer, (char *)"L2MCD 100MS Timer", &l2mcd_100ms_tv, -1);
     if (!l2mcd_evtimer_100ms)
     {
         L2MCD_LOG_ERR("l2mcd_evtimer_100ms create Failed");
@@ -2170,23 +2421,44 @@ int l2mcd_system_init(int flag)
         return -1;
     }
 
-    if (l2mcd_unix_sock_create(&g_l2mcd_igmp_msg_handle, l2mcd_msg_sock, 0)<0) // 未调用
+    if (l2mcd_unix_sock_create(&g_l2mcd_igmp_msg_handle, l2mcd_msg_sock, 0) < 0) // 未调用
     {
         L2MCD_INIT_LOG("igmp_msg_handle sock create failed");
         return -1;
     }
-    L2MCD_INIT_LOG("igmp_msg_handle:%d sock:%s created ",g_l2mcd_igmp_msg_handle, l2mcd_msg_sock);
+    L2MCD_INIT_LOG("igmp_msg_handle:%d sock:%s created ", g_l2mcd_igmp_msg_handle, l2mcd_msg_sock);
 
     /*IPC Messaging Socket with L2MC Config Manager*/
     rc = l2mcd_ipc_init();
-    if (rc <0)
+    if (rc < 0)
     {
         L2MCD_LOG_ERR("l2mc ipc init failed :%d", rc);
         L2MCD_INIT_LOG("l2mc ipc init failed :%d", rc);
         return -1;
     }
+
+    /* Add SIGTERM event */
+    l2mcd_ev_sigterm = evsignal_new(g_l2mcd_evbase, SIGTERM, l2mcd_sigterm_cb, g_l2mcd_evbase);
+    if (!l2mcd_ev_sigterm || event_add(l2mcd_ev_sigterm, NULL) < 0)
+    {
+        L2MCD_LOG_ERR("l2mc could not create/add SIGTERM event!");
+        L2MCD_INIT_LOG("l2mc could not create/add SIGTERM event!");
+        return -1;
+    }
+
     l2mcd_nl_init();
     L2MCD_INIT_LOG("system init done");
     event_base_dispatch(g_l2mcd_evbase);
+
+    if (l2mcd_ev_sigterm)
+    {
+        event_free(l2mcd_ev_sigterm);
+    }
+
+    /* free event_base */
+    if (g_l2mcd_evbase)
+    {
+        event_base_free(g_l2mcd_evbase);
+    }
     return 0;
 }

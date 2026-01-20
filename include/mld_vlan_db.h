@@ -71,16 +71,16 @@ typedef struct mld_vlan_node_s {
 	uint16_t ivid;
     uint32_t flags[2];
 	uint32_t vlan_flags;
-	uint32_t    multi_access_ntwrk_flag; /* Member set to 1 only if nbr count on vlan is more than 1 else 0*/
+	uint32_t multi_access_ntwrk_flag; /* Member set to 1 only if nbr count on vlan is more than 1 else 0*/
 	uint8_t	 type;	/* ve or vlan or ve & vlan both */
 	uint8_t	 rcvd_nsm_add;
-	uint8_t	 cfg_version; // IGMPv1/v2/v3
 	char	name[INTERFACE_NAMSIZ + 1];
 	uint8_t	bmap_size;	
 	/* These fields are maintaned for forward referencing case */
 	mld_cfg_t	*mld_cfg[2];
 	uint8_t mld_snp_by_usr[2];  /* mld/igmp snoop cfg by CLI */
 	uint8_t pim_snp_by_usr[2]; /* PIMv4/v6 snoop cfg by CLI */
+    uint8_t warm_reboot[2];
 	L2MCD_AVL_TREE port_tree; /* Having ports as tree */
 } mld_vlan_node_t;
 

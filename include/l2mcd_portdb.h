@@ -46,7 +46,7 @@
  } PORTDB_IP6;
 
 typedef struct portdb_entry_s {
-    L2MCD_AVL_NODE         node;
+    L2MCD_AVL_NODE      node;
     unsigned int        port_index;
     unsigned long       ifindex;
     VRF_INDEX           vrf_id;
@@ -54,27 +54,14 @@ typedef struct portdb_entry_s {
     unsigned int        ipv6_mtu;
     unsigned long       ivid;
     unsigned long       gvid;        
-    float               bandwidth;
-    float               bw_configured; /* Configured bw value; (when not configured) overloaded with full trunk bw irrespective of active portlist */
-	UINT8               hwAddr[6];
     UINT16              port_state:1;
-    UINT16              ip6_enabled:1; /* Current Enabled/Disabled state for processing IP6 packet */
-    UINT16              ip4_enabled:1; /* Current Enabled/Disabled state for processing IP4 packet */
     UINT16              type:3;        /* interface type : NSM_INTF_MODE_UNK/NSM_INTF_MODE_L2/NSM_INTF_MODE_L3 */
                                        /* this follows nsm_intf_type_new_s
                                         * ENUM which will take upto a value of
                                         * '4'; hence 3 bits are needed.*/
-    UINT16              netdev_state:1; /* Indicates the interface got netdevice is created or not */
-    UINT16              admin_state:1;
-    UINT16              unnumbered:1;  /* Indicates if the interface is unnumbered interface*/
-    UINT16              neighbor_up:1; /* Indicates if neighbor is discovered on the unnumbered interface */
-    UINT16              spare:6; 
-
     PORTDB_IP6          *ip6;
-    struct list			*ip4;
-	// Fusion ISIS: Store MAC for easier SYNC to standby
-	u_char              mac_addr[MAC_ADDR_LEN];
-    void                *opaque_data; 
+    struct list         *ip4;
+    void                *ipv4_addr_data; 
 } portdb_entry_t;
 
 typedef struct PORTDB_IP4_S {
@@ -93,18 +80,10 @@ typedef struct port_link_list_s
     PORTDB_IP4 value;
 }port_link_list_t;
 
-
 typedef struct PORTDB_VRF_S {
     char            *vrf_name;
     unsigned char   afi;
 } portdb_vrf_t;
-
-static int ip6_addr_cmp(void *val1, void *val2) {
-    PORTDB_IP6_ADDRESS_ENTRY *p1 = (PORTDB_IP6_ADDRESS_ENTRY *)val1;
-    PORTDB_IP6_ADDRESS_ENTRY *p2 = (PORTDB_IP6_ADDRESS_ENTRY *)val2;
-
-    return memcmp(&p1->ipaddress, &p2->ipaddress, sizeof(IP6_IPV6_ADDRESS));
-}
 
 char *portdb_get_ifname_from_portindex(unsigned long port_index);
 unsigned int portdb_get_portindex_from_ifname(char *ifname);
@@ -119,8 +98,7 @@ int portdb_vrf_hash_init(void);
 portdb_entry_t *portdb_find_port_entry(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index);
 unsigned char portdb_get_port_type(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index);
 int portdb_set_port_state(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index, unsigned char port_state);
-port_link_list_t *
-portdb_get_port_lowest_ipv4_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index);
+port_link_list_t *portdb_get_port_lowest_ipv4_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index);
 unsigned char portdb_get_port_state(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index);
 struct list *portdb_get_port_ipv6_addr_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index);
 PORTDB_IP6_ADDRESS_ENTRY *portdb_get_port_lowest_ipv6_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index);
@@ -128,9 +106,7 @@ int portdb_delete_ifname(char *ifname);
 int portdb_remove_port_entry_from_tree(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index);
 int portdb_add_port_entry_to_tree(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index, 
             VRF_INDEX vrf_id, unsigned long ifindex);
-int portdb_remove_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
-                           UINT32 ipaddress);
 int portdb_remove_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, UINT32 ipaddress);
-int portdb_remove_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, IPV6_ADDRESS ip6address);
+int portdb_remove_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, IPV6_ADDRESS *ip6address);
 unsigned long portdb_get_port_ifindex(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index);
 #endif //__L2MCD_PORTDB__

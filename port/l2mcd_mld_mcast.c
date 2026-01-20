@@ -120,7 +120,7 @@ void mld_send_l2mcd_sync_group_add (MADDR_ST *group_address, UINT16 vir_port_id,
     l2mcd_sync_inherit_xg_port_to_all_sg (mcgrp_entry, phy_ifindex, vid, TRUE);
 }
 
-void igmpv3_send_l2mcd_sync_group_upd (MADDR_ST *group_address, UINT16 vir_port_id, 
+void mld_send_l2mcd_sync_src_group_upd (MADDR_ST *group_address, UINT16 vir_port_id, 
 	int num_add_port, UINT32 add_phy_port_id, int num_del_port, UINT32 del_phy_port_id,
 	MADDR_ST  *src_addr, uint8_t is_remote_report, UINT8  filter_mode)
 {
@@ -152,26 +152,25 @@ void igmpv3_send_l2mcd_sync_group_upd (MADDR_ST *group_address, UINT16 vir_port_
 	l2mcd_sync_inherit_xg_ports_to_this_sg (mcgrp_entry, src_addr, filter_mode, vid, add);
 }
 
-void igmpv3_send_l2mcd_sync_group_add (MADDR_ST *group_address, UINT16 vir_port_id,
-	UINT32 phy_port_id, MADDR_ST  *src_addr, UINT8  filter_mode)
+void mld_send_l2mcd_sync_src_group_add(MADDR_ST *group_address, UINT16 vir_port_id, UINT32 phy_port_id, MADDR_ST *src_addr, UINT8 filter_mode)
 {
-	MCGRP_ENTRY *mcgrp_entry = NULL;
-	MCGRP_CLASS	*mcgrp       = NULL;
-	uint32_t     vid, phy_ifindex = phy_port_id;
-	
-	vid = mld_get_ivid_vport (vir_port_id,group_address->afi);
+    MCGRP_ENTRY *mcgrp_entry = NULL;
+    MCGRP_CLASS *mcgrp       = NULL;
+    uint32_t     vid, phy_ifindex = phy_port_id;
+
+    vid = mld_get_ivid_vport(vir_port_id, group_address->afi);
     L2MCD_VLAN_LOG_INFO(vid, "%s:%d:[vlan:%d] vir_port_id:%d, phy_ifindex:%d", __FUNCTION__, __LINE__, vid, vir_port_id, phy_ifindex);
     l2mcd_system_group_entry_notify(group_address, src_addr, vid, phy_ifindex, 0, 1);
 
-	mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(group_address->afi, MLD_DEFAULT_VRF_ID);
-	mcgrp_entry = mcgrp_find_group_address_entry(mcgrp, vir_port_id, group_address);
+    mcgrp       = MCGRP_GET_INSTANCE_FROM_VRFINDEX(group_address->afi, MLD_DEFAULT_VRF_ID);
+    mcgrp_entry = mcgrp_find_group_address_entry(mcgrp, vir_port_id, group_address);
 
-	if (!mcgrp_entry)
-	{
-		L2MCD_VLAN_LOG_ERR(vid, "%s:%d vid:%d vir_port_id:%d", __FUNCTION__, __LINE__, vid, vir_port_id);
-		return;
-	}
-	l2mcd_sync_inherit_xg_ports_to_this_sg (mcgrp_entry, src_addr, filter_mode, vid, TRUE);
+    if (!mcgrp_entry)
+    {
+        L2MCD_VLAN_LOG_ERR(vid, "%s:%d vid:%d vir_port_id:%d", __FUNCTION__, __LINE__, vid, vir_port_id);
+        return;
+    }
+    l2mcd_sync_inherit_xg_ports_to_this_sg(mcgrp_entry, src_addr, filter_mode, vid, TRUE);
 }
 
 void l2mcd_sync_inherit_xg_port_to_all_sg (MCGRP_ENTRY *mcgrp_entry, uint32_t phy_ifindex, uint32_t vid, int add)

@@ -339,15 +339,14 @@ extern SORTED_LINKLIST_KEYINFO mldv2_clnt_keyinfo;
 
 enum MLD_VERSION
 {
-	MLD_NONE             = 0,
-	MLD_VER_1	         = 1,
-	MLD_VER_2	         = 2,
-	NUM_MLD_VERSION      = 2,
-	MLD_STATIC_FLAG      = 0x80,
-	MLD_STATIC_VER1      = MLD_STATIC_FLAG | MLD_VER_1,
-	MLD_STATIC_VER2      = MLD_STATIC_FLAG | MLD_VER_2,
-	MLD_VERSION_DEFAULT  = MLD_VER_1
-
+    MLD_VERSION_NONE    = 0,
+    MLD_VERSION_1       = 1,
+    MLD_VERSION_2       = 2,
+    NUM_MLD_VERSION     = 2,
+    MLD_STATIC_FLAG     = 0x80,
+    MLD_STATIC_VER1     = MLD_STATIC_FLAG | MLD_VERSION_1,
+    MLD_STATIC_VER2     = MLD_STATIC_FLAG | MLD_VERSION_2,
+    MLD_VERSION_DEFAULT = MLD_VERSION_1
 };
 void igmp_enable (VRF_INDEX  vrf_index, UINT8      protocol);
 BOOLEAN mcgrp_initialize_port_db_array(UINT32 afi);

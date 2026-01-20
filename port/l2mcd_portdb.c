@@ -50,6 +50,13 @@ unsigned int portdb_get_portindex_from_ifname(char *ifname)
     return NO_SUCH_PORT; //invalid port_index;
 }
 
+int ip6_addr_cmp(void *val1, void *val2) {
+    PORTDB_IP6_ADDRESS_ENTRY *p1 = (PORTDB_IP6_ADDRESS_ENTRY *)val1;
+    PORTDB_IP6_ADDRESS_ENTRY *p2 = (PORTDB_IP6_ADDRESS_ENTRY *)val2;
+
+    return memcmp(&p1->ipaddress, &p2->ipaddress, sizeof(IP6_IPV6_ADDRESS));
+}
+
 int portdb_add_ifname(char *ifname, int name_len, unsigned int port_index)
 {
     int ret;
@@ -282,16 +289,15 @@ int portdb_set_port_state(L2MCD_AVL_TREE *portdb_tree, unsigned int port_index, 
     return 0;
 }
 
-port_link_list_t *
-portdb_get_port_lowest_ipv4_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index)
+port_link_list_t *portdb_get_port_lowest_ipv4_addr_from_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index)
 {
     //UINT32 retcode;
     portdb_entry_t *port_entry;
 
     port_entry  = portdb_find_port_entry(portdb_tree, port_index);
     if(port_entry) {
-        if(port_entry->opaque_data)
-            return port_entry->opaque_data; 
+        if(port_entry->ipv4_addr_data)
+            return port_entry->ipv4_addr_data; 
     }
 
 	return (0);
@@ -334,11 +340,7 @@ int portdb_remove_port_entry_from_tree(L2MCD_AVL_TREE *portdb_tree, unsigned int
     portdb_entry_t *port_entry;
 
     port_entry = portdb_find_port_entry(portdb_tree, port_index);
-    if (!port_entry || port_entry->opaque_data) {
-        return -1;
-    }
-    
-    if (port_entry->ip6_enabled && port_entry->ip6->number_of_ip6_addresses) {
+    if (!port_entry || port_entry->ipv4_addr_data || listhead(port_entry->ip6->ip6_address_list)) {
         return -1;
     }
 
@@ -442,7 +444,7 @@ portdb_insert_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
     ipv4_entry->vrf_index = vrf_index;
     ipv4_entry->flags = flags;
 
-    head = (port_link_list_t *)port_entry->opaque_data;
+    head = (port_link_list_t *)port_entry->ipv4_addr_data;
 
     while(head && head->value.ipaddress < ipaddress)
     {
@@ -454,9 +456,9 @@ portdb_insert_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
         temp_entry->next = prev->next;
         prev->next = temp_entry;
     } else {
-        temp = port_entry->opaque_data;
+        temp = port_entry->ipv4_addr_data;
         temp_entry->next = temp;
-        port_entry->opaque_data = temp_entry;
+        port_entry->ipv4_addr_data = temp_entry;
     }
 }
 
@@ -470,7 +472,7 @@ portdb_remove_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, UIN
     if(!port_entry)
         return 1;
 
-    head = (port_link_list_t *)port_entry->opaque_data;
+    head = (port_link_list_t *)port_entry->ipv4_addr_data;
 
     while(head && head->value.ipaddress != ipaddress)
     {
@@ -482,11 +484,11 @@ portdb_remove_addr_ipv4_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, UIN
         if(prev) {
             prev->next = head->next;
         } else
-            port_entry->opaque_data = head->next;
+            port_entry->ipv4_addr_data = head->next;
         free(head);
         head=NULL;
     }
-    if (!port_entry->opaque_data) return 0;
+    if (!port_entry->ipv4_addr_data) return 0;
     return 1;
 }
 
@@ -495,14 +497,13 @@ struct list *portdb_get_port_ipv6_addr_list(L2MCD_AVL_TREE *portdb_tree, UINT32 
     portdb_entry_t *port_entry;
 
     port_entry = portdb_find_port_entry(portdb_tree, port_index);
-    if (port_entry)
-    {
-        if (port_entry->ip6)
-            if (port_entry->ip6->ip6_link_local_address)
-                return port_entry->ip6->ip6_link_local_address;
-            else if (port_entry->ip6->ip6_address_list)
-                return port_entry->ip6->ip6_address_list;
-    }
+    if (!port_entry) return NULL;
+    if (!port_entry->ip6) return NULL;
+
+    if (port_entry->ip6->ip6_link_local_address)
+        return port_entry->ip6->ip6_link_local_address;
+    else if (port_entry->ip6->ip6_address_list)
+        return port_entry->ip6->ip6_address_list;
 
     return NULL;
 }
@@ -535,7 +536,7 @@ PORTDB_IP6_ADDRESS_ENTRY* portdb_get_port_lowest_ipv6_addr_from_list(L2MCD_AVL_T
 }
 
 void portdb_insert_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
-                                IPV6_ADDRESS ipaddress, UINT8 prefix_length, VRF_INDEX vrf_index, UINT32 flags)
+                                IPV6_ADDRESS *ipaddress, UINT8 prefix_length, VRF_INDEX vrf_index, UINT32 flags)
 {
     portdb_entry_t *port_entry;
     PORTDB_IP6_ADDRESS_ENTRY* ipv6_entry;
@@ -549,15 +550,14 @@ void portdb_insert_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index
         return;
     }
 
-    struct list *list_to_use = IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)&ipaddress)
+    struct list *list_to_use = IN6_IS_ADDR_LINKLOCAL(ipaddress)
                                ? port_entry->ip6->ip6_link_local_address
                                : port_entry->ip6->ip6_address_list;
 
     for (ALL_LIST_ELEMENTS_RO(list_to_use, node, exist))
     {
-        if (memcmp(exist->ipaddress.address.address8,
-                   ipaddress.address.address8, 16) == 0)
-        {
+        if (memcmp(&exist->ipaddress, ipaddress, sizeof(IPV6_ADDRESS)) == 0) {
+
             L2MCD_LOG_INFO("%s IPv6 already exists for port %d, skip",
                            __FUNCTION__, port_index);
             return;
@@ -567,11 +567,11 @@ void portdb_insert_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index
     
     ipv6_entry = (PORTDB_IP6_ADDRESS_ENTRY *)calloc(1, sizeof(PORTDB_IP6_ADDRESS_ENTRY));
     ipv6_entry->port_index = port_index;
-    ipv6_entry->ipaddress = ipaddress;
+    ipv6_entry->ipaddress = *ipaddress;
     ipv6_entry->prefix_length = prefix_length;
     ipv6_entry->vrf_index = vrf_index;
     ipv6_entry->flags = flags;
-    if (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)&ipaddress))
+    if (IN6_IS_ADDR_LINKLOCAL(ipaddress))
         listnode_add_sort(port_entry->ip6->ip6_link_local_address, ipv6_entry);
     else
         listnode_add_sort(port_entry->ip6->ip6_address_list, ipv6_entry);
@@ -579,7 +579,7 @@ void portdb_insert_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index
     port_entry->ip6->number_of_ip6_addresses++;
 }
 
-int portdb_remove_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, IPV6_ADDRESS ip6address)
+int portdb_remove_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index, IPV6_ADDRESS *ip6address)
 {
     portdb_entry_t *port_entry;
     struct list *target_list = NULL;
@@ -590,7 +590,7 @@ int portdb_remove_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
     if (!port_entry)
         return 1;
 
-    if (IN6_IS_ADDR_LINKLOCAL(&ip6address)) {
+    if (IN6_IS_ADDR_LINKLOCAL(ip6address)) {
         target_list = port_entry->ip6->ip6_link_local_address;
     } else {
         target_list = port_entry->ip6->ip6_address_list;
@@ -599,8 +599,9 @@ int portdb_remove_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index,
         return -1;
     }
 
-    for(ALL_LIST_ELEMENTS(target_list, node, nnode, data)) {
-        if (memcmp(&data->ipaddress, &ip6address, sizeof(IPV6_ADDRESS)) == 0) {
+    for(ALL_LIST_ELEMENTS(target_list, node, nnode, data))
+    {
+        if (memcmp(&data->ipaddress, ip6address, sizeof(IPV6_ADDRESS)) == 0) {
 
             listnode_delete(target_list, data);
             free(data);

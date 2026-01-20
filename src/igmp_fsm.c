@@ -120,7 +120,7 @@ void mcgrp_notify_vif_add (MCGRP_CLASS   *mcgrp,
                 L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] Sending to AppDb (%s, %s) mode:%d %s", 
                         FN, LN, vir_port_id, mcast_print_addr(&p_src->src_addr), mcast_print_addr(group_address), 
                         mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port_id));
-                igmpv3_send_l2mcd_sync_group_add(group_address, vir_port_id, phy_port_id, 
+                mld_send_l2mcd_sync_src_group_add(group_address, vir_port_id, phy_port_id, 
                         &p_src->src_addr, mcgrp_mbrshp->filter_mode);
             }
         }
@@ -150,7 +150,7 @@ void mcgrp_notify_vif_add (MCGRP_CLASS   *mcgrp,
                 L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] Sending to AppDb (%s, %s) mode:%d %s", 
                         FN, LN, vir_port_id, mcast_print_addr(&p_src->src_addr), mcast_print_addr(group_address), 
                         mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port_id));
-                igmpv3_send_l2mcd_sync_group_add(group_address, vir_port_id, phy_port_id, 
+                mld_send_l2mcd_sync_src_group_add(group_address, vir_port_id, phy_port_id, 
                         &p_src->src_addr, mcgrp_mbrshp->filter_mode);
 
             }
@@ -377,7 +377,7 @@ void mcgrp_notify_source_list_add_allowed (MCGRP_CLASS   *mcgrp,
                     FN, LN, mcast_print_addr(&p_src->src_addr), mcast_print_addr(group_address), 
                     mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port_id));
 
-            igmpv3_send_l2mcd_sync_group_add(group_address, vir_port_id, phy_port_id, 
+            mld_send_l2mcd_sync_src_group_add(group_address, vir_port_id, phy_port_id, 
                     &p_src->src_addr, mcgrp_mbrshp->filter_mode);
         }
     }
@@ -410,7 +410,7 @@ void mcgrp_notify_source_list_add_blocked (MCGRP_CLASS   *mcgrp,
             L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] Sending to write AppDB (%s, %s) mode:%d %s", 
                     FN, LN, vir_port_id, mcast_print_addr(&p_src->src_addr), mcast_print_addr(group_address), 
                     mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port_id));
-            igmpv3_send_l2mcd_sync_group_add(group_address, vir_port_id, phy_port_id, 
+            mld_send_l2mcd_sync_src_group_add(group_address, vir_port_id, phy_port_id, 
                     &p_src->src_addr, mcgrp_mbrshp->filter_mode);
         }
 
@@ -449,7 +449,7 @@ void mcgrp_notify_source_list_del_allowed (MCGRP_CLASS   *mcgrp,
                     FN, LN, vir_port_id, mcast_print_addr(&p_src->src_addr), mcast_print_addr(group_address), 
                     mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port_id));
 
-            igmpv3_send_l2mcd_sync_group_upd(group_address, vir_port_id, 0, 0, 1, 
+            mld_send_l2mcd_sync_src_group_upd(group_address, vir_port_id, 0, 0, 1, 
                     phy_port_id, &p_src->src_addr, 0, mcgrp_mbrshp->filter_mode);
         }
     }
@@ -479,7 +479,7 @@ void mcgrp_notify_source_list_del_blocked (MCGRP_CLASS   *mcgrp,
                 FN, LN, mcast_print_addr(&p_src->src_addr), mcast_print_addr(group_address), 
                 mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port_id));
 
-        igmpv3_send_l2mcd_sync_group_upd(group_address, vir_port_id, 1,phy_port_id, 0, 
+        mld_send_l2mcd_sync_src_group_upd(group_address, vir_port_id, 1,phy_port_id, 0, 
                 0, &p_src->src_addr, 0, mcgrp_mbrshp->filter_mode);   
         L2MCD_VLAN_LOG_INFO(vir_port_id,"%s:%d:[vlan:%d] [ Port %s,%s. Grp %s ] Blked-Source %s deleted to port in mode %d. Chg %d",
                 FN,LN,vir_port_id,
@@ -522,7 +522,7 @@ void mcgrp_notify_source_del_allowed (MCGRP_CLASS   *mcgrp,
                     FN, LN, mcast_print_addr(source_addr), mcast_print_addr(group_address), 
                     mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port_id));
 
-            igmpv3_send_l2mcd_sync_group_upd(group_address, vir_port_id, 0, 0, 1, 
+            mld_send_l2mcd_sync_src_group_upd(group_address, vir_port_id, 0, 0, 1, 
                     phy_port_id,source_addr, 0,mcgrp_mbrshp->filter_mode);
         }
     }
@@ -555,13 +555,13 @@ void mcgrp_notify_source_add_blocked (MCGRP_CLASS   *mcgrp,
             L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] Sending add to AppDb (%s, %s) mode:%d %s", 
                     FN, LN, vir_port_id, mcast_print_addr(src_addr), mcast_print_addr(group_address), 
                     mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port_id));
-            igmpv3_send_l2mcd_sync_group_upd(group_address, vir_port_id, 1, phy_port_id, 0, 0, src_addr, 0, mcgrp_mbrshp->filter_mode);
+            mld_send_l2mcd_sync_src_group_upd(group_address, vir_port_id, 1, phy_port_id, 0, 0, src_addr, 0, mcgrp_mbrshp->filter_mode);
 
         }else  {
             L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] Sending delete to AppDb (%s, %s) mode:%d %s",
                     FN, LN, vir_port_id, mcast_print_addr(src_addr), mcast_print_addr(group_address), 
                     mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port_id));
-            igmpv3_send_l2mcd_sync_group_upd(group_address, vir_port_id, 0, 0, 1, phy_port_id, src_addr, 0, mcgrp_mbrshp->filter_mode);
+            mld_send_l2mcd_sync_src_group_upd(group_address, vir_port_id, 0, 0, 1, phy_port_id, src_addr, 0, mcgrp_mbrshp->filter_mode);
         }
     }
 }
@@ -838,10 +838,9 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
     is_remote = IGMP_IS_REMOTE_MMBR(version);
     version    = MCGRP_GET_VERSION(version);
 
-
-    L2MCD_VLAN_LOG_DEBUG(vir_port_id,"%s:%d:[vlan:%d] %s port:%s(%d) GA:%s is_static:%d SSM:%d  ver:%d Action:%s num_srcs:%d ",
-            FN,LN, vir_port_id, portdb_get_ifname_from_portindex(vir_port_id), portdb_get_ifname_from_portindex(phy_port_id),phy_port_id,
-            mcast_print_addr(group_address),is_static, is_ssm_grp, version,mcgrp_action_label[action],num_srcs);
+    L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] %s port:%s(%d) GA:%s is_static:%d SSM:%d  ver:%d Action:%s num_srcs:%d ",
+                         FN, LN, vir_port_id, portdb_get_ifname_from_portindex(vir_port_id), portdb_get_ifname_from_portindex(phy_port_id), phy_port_id,
+                         mcast_print_addr(group_address), is_static, is_ssm_grp, version, mcgrp_action_label[action], num_srcs);
     if (IS_IGMP_CLASS(mcgrp))
     {
         int *srcarray = (int *)src_array;
@@ -1103,7 +1102,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
             mcgrp_glb->mcgrp_src_keyinfo,
             num_srcs, src_array);
 
-    incl_src_list_empty = mcgrp_src_list_empty (mcgrp_mbrshp, FILT_INCL, mcgrp_pport->oper_version);
+    incl_src_list_empty = mcgrp_src_list_empty(mcgrp_mbrshp, FILT_INCL, mcgrp_pport->oper_version, mcgrp->afi);
 
     p_X = (SORTED_LINKLIST**) &mcgrp_mbrshp->src_list[FILT_INCL];
     X = (*p_X);
@@ -1342,7 +1341,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                         {
                             L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] SrcAddr:%s", FN, LN, vir_port_id, mcast_print_addr(&p_src->src_addr));
 
-                            igmpv3_send_l2mcd_sync_group_upd (&mcgrp_entry->group_address, mcgrp_vport->vir_port_id,
+                            mld_send_l2mcd_sync_src_group_upd (&mcgrp_entry->group_address, mcgrp_vport->vir_port_id,
                                     0, 0, 1, mcgrp_mbrshp->phy_port_id, &p_src->src_addr, 0, mcgrp_mbrshp->filter_mode);
                         }
 
@@ -1614,6 +1613,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                         {
                             mcgrp_mbrshp->aging_enabled = TRUE;
                             mcgrp_mbrshp->static_mmbr   = FALSE;
+                            mcgrp_mbrshp->filter_mode   = FILT_INCL;
                         }
 
                         if (IS_IGMP_CLASS(mcgrp))
@@ -1697,10 +1697,9 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                         //mode v3, same applicable MLD operational mode MLDv2 and received MLDv1 report.
                         //This condition hit upon group refresh as first report Filter is INCL and
                         //Subsequent report filter mode changed to Fitler EXCL, skip updating below for (*,G)
-                        if ( ((IS_IGMP_CLASS(mcgrp) && mcgrp_pport->oper_version == IGMP_VERSION_3) || 
-                                    (IS_MLD_CLASS(mcgrp) && mcgrp_pport->oper_version == MLD_VERSION_2)) && 
-                                ( (IS_IGMP_CLASS(mcgrp) && version == IGMP_VERSION_3) || 
-                                  (IS_MLD_CLASS(mcgrp) && version == MLD_VERSION_2)) ) {
+                        if (((IS_IGMP_CLASS(mcgrp) && mcgrp_pport->oper_version == IGMP_VERSION_3) || (IS_MLD_CLASS(mcgrp) && mcgrp_pport->oper_version == MLD_VERSION_2)) &&
+                            ((IS_IGMP_CLASS(mcgrp) && version == IGMP_VERSION_3) || (IS_MLD_CLASS(mcgrp) && version == MLD_VERSION_2)))
+                        {
                             mcgrp_notify_source_list_del_blocked(mcgrp, 
                                     group_address, mcgrp_vport,
                                     mcgrp_mbrshp,
@@ -1711,11 +1710,12 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                                     mcgrp_vport, mcgrp_mbrshp,
                                     (MCGRP_SOURCE*) Y_minus_A, 
                                     TRUE);
-                        } else {
+                        }
+                        else
+                        {
                             L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] Skip soure_del version:%d oper_version:%d ", 
                                     FN, LN, vir_port_id, version, mcgrp_pport->oper_version);
                         }
-
                     }
 
                     if ((num_srcs == 0) && (mcgrp_vport->tracking_enabled) && 
@@ -1919,7 +1919,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                 mcast_print_addr(clnt_src_ip));
 
         temp_mbrshp = mcgrp_find_mbrshp_entry(mcgrp_entry, phy_port_id);
-        if(temp_mbrshp && mcgrp_src_list_empty(mcgrp_mbrshp,FILT_INCL,mcgrp_pport->oper_version))
+        if (temp_mbrshp && mcgrp_src_list_empty(mcgrp_mbrshp, FILT_INCL, mcgrp_pport->oper_version, mcgrp->afi))
         {
             /* PIM snp member just RESET the IGMP snp flags for the member */
             //Note: Below flags are set irrespective of pim snoop enabled. RESET if IGMP membership is cleaned up.
@@ -2021,7 +2021,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                  */ 
                 if (!src_cnt) 
                 {
-                    if (mcgrp_mbrshp && (mcgrp_mbrshp->is_remote!= is_remote))
+                    if (mcgrp_mbrshp && (mcgrp_mbrshp->is_remote != is_remote))
                     {
                         if (IS_IGMP_CLASS(mcgrp))
                         {
@@ -2032,7 +2032,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                             mcast_set_ipv6_addr(&src_temp, &ip6_unspecified_address);
                         }
                         mcgrp_mbrshp->is_remote = is_remote;
-                        L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] rmt:%d", FN,LN,vir_port_id, is_remote);
+                        L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] rmt:%d", FN, LN, vir_port_id, is_remote);
                         l2mcd_system_group_entry_notify(group_address, &src_temp, vir_port_id, phy_port_id, TRUE, TRUE);
                     }
                 }
@@ -2050,7 +2050,7 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
                             IPV6_ADDRESS *mld_src_array =  (IPV6_ADDRESS *)src_array;
                             mcast_set_ipv6_addr(&src_temp, &mld_src_array[i]);
                         }
-                        igmpv3_src_temp = mcgrp_find_source(mcgrp_mbrshp, &src_temp, i);
+                        igmpv3_src_temp = mcgrp_find_source(mcgrp_mbrshp, &src_temp, j);
                         if (igmpv3_src_temp && (igmpv3_src_temp->is_remote !=is_remote))
                         {
                             igmpv3_src_temp->is_remote = is_remote;

@@ -67,9 +67,9 @@ void mld_update_ve_member_ports (MCGRP_CLASS *mld,
     (mld->mld_stats[mld_vport->vir_port_id]).mld_wrong_ver_query = 0;
 }
 
-void mld_set_global_version (VRF_INDEX  vrf_index, 
-        UINT32     version, 
-        BOOL       force)
+void mld_set_global_version(VRF_INDEX vrf_index,
+        UINT32    version,
+        BOOL      force)
 {
     MCGRP_CLASS       *mld= MLD_GET_INSTANCE_FROM_VRFINDEX(vrf_index);
     IP_PORT_DB_ENTRY  *portP;

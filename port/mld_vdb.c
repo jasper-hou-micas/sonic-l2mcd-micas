@@ -31,43 +31,35 @@ struct list *
 mld_vdb_vlan_get_mrtr_list(mld_vlan_node_t *vlan_node, int create, uint8_t afi);
 extern BOOLEAN pim_enabled (UINT32 afi, UINT16 port);
 extern int mld_set_vlan_dcm_flag(uint32_t gvid,uint8_t type);
-uint32_t
-mld_is_flag_set(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
+uint32_t mld_is_flag_set(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
 {
-	return (vlan_p->flags[afi -1] & flag);
-
+    return (vlan_p->flags[afi - 1] & flag);
 }
 
-void
-mld_set_vlan_flag(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
+void mld_set_vlan_flag(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
 {
-	vlan_p->flags[afi -1] |= flag; 
+    vlan_p->flags[afi - 1] |= flag;
 }
 
-void
-mld_unset_vlan_flag(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
+void mld_unset_vlan_flag(mld_vlan_node_t *vlan_p, uint8_t afi, uint32_t flag)
 {
-    vlan_p->flags[afi -1] &= ~flag;
+    vlan_p->flags[afi - 1] &= ~flag;
 }
 
-void
-mld_vlan_add_list(mld_vlan_node_t *vlan_p, uint8_t afi)
+void mld_vlan_add_list(mld_vlan_node_t *vlan_p, uint8_t afi)
 {
-	if(listnode_lookup(snooping_enabled_vlans[afi - 1], vlan_p)!= NULL)
+    if (listnode_lookup(snooping_enabled_vlans[afi - 1], vlan_p) != NULL)
     {
-		return ;
+        return;
     }
-	
-	listnode_add(snooping_enabled_vlans[afi - 1], vlan_p);
+    listnode_add(snooping_enabled_vlans[afi - 1], vlan_p);
 }
 
-
-void
-mld_vlan_del_list(mld_vlan_node_t *vlan_p, uint8_t afi)
+void mld_vlan_del_list(mld_vlan_node_t *vlan_p, uint8_t afi)
 {
-    if(listnode_lookup(snooping_enabled_vlans[afi - 1], vlan_p) == NULL)
+    if (listnode_lookup(snooping_enabled_vlans[afi - 1], vlan_p) == NULL)
     {
-        return ;
+        return;
     }
     listnode_delete(snooping_enabled_vlans[afi - 1], vlan_p);
 }
@@ -90,7 +82,7 @@ int mld_vdb_init( )
 
 
 /* See mld_vlan_db.h for description */
-mld_vlan_node_t *mld_vdb_vlan_get(uint32_t vlan_id,uint8_t type )
+mld_vlan_node_t *mld_vdb_vlan_get(uint32_t vlan_id, uint8_t type)
 {
 	mld_vlan_node_t *vlan_node = NULL;
     vlan_node = M_AVLL_FIND(mld_vlan_db.vdb_tree, &vlan_id);
@@ -241,10 +233,9 @@ int mld_vlan_port_cmp_cb (void *keya,void *keyb)
 }
 
 /* See mld_vlan_db.h for description */
-mld_vlan_node_t *
-mld_vdb_vlan_create(mld_vlan_db_t *vlan_db, uint32_t vlan_id, uint8_t type,
-							uint32_t flags, uint32_t vlan_flags, uint16_t ivid, 
-							char *name, int vlan_creation_type)
+mld_vlan_node_t *mld_vdb_vlan_create(mld_vlan_db_t *vlan_db, uint32_t vlan_id, uint8_t type,
+                                     uint32_t flags, uint32_t vlan_flags, uint16_t ivid,
+                                     char *name, int vlan_creation_type)
 {
     mld_vlan_node_t *vlan_node = NULL;
     int bmap_size = 0;
@@ -358,14 +349,14 @@ mld_vdb_vlan_create(mld_vlan_db_t *vlan_db, uint32_t vlan_id, uint8_t type,
     vdb_port_offset=M_AVLL_OFFSETOF(mld_vlan_port_t, ifindex);
     vlan_node->port_tree= L2MCD_AVL_CREATE(l2mcd_avl_compare_u32, (void *) &vdb_port_offset, NULL);
 
-	SET_FLAG(vlan_node->rcvd_nsm_add, vlan_creation_type);
+    SET_FLAG(vlan_node->rcvd_nsm_add, vlan_creation_type);
 
     M_AVLL_INSERT(vlan_db->vdb_tree, vlan_node);
-	L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] Created vlan_node %p gvid:0x%x ivid:0x%x ifidx:0x%x bmap_size:0x%x igmpver:%d", 
-		 __FUNCTION__, __LINE__, vlan_id, vlan_node, vlan_node->gvid, vlan_node->ivid, vlan_node->ifindex, bmap_size, vlan_node->cfg_version);
+    L2MCD_VLAN_LOG_INFO(vlan_id, "%s:%d:[vlan:%d] Created vlan_node %p gvid:0x%x ivid:0x%x ifidx:0x%x bmap_size:0x%x",
+                        FN, LN, vlan_id, vlan_node, vlan_node->gvid, vlan_node->ivid, vlan_node->ifindex, bmap_size);
 
-	if(vlan_node->rcvd_nsm_add & MLD_VLAN_NSM)
-		mld_portdb_add_gvid( vlan_node->ivid, vlan_node->gvid);
+    if (vlan_node->rcvd_nsm_add & MLD_VLAN_NSM)
+        mld_portdb_add_gvid(vlan_node->ivid, vlan_node->gvid);
 
 vdb_vid_create_done:
     return vlan_node;
@@ -403,7 +394,7 @@ vdb_vid_del_done:
 }
 
 /* See mld_vlan_db.h for description */
-int mld_vdb_add_port_to_vlan(mld_vlan_db_t *vlan_db, uint32_t vlan_id,uint32_t port_num,uint8_t type)
+int mld_vdb_add_port_to_vlan(mld_vlan_db_t *vlan_db, uint32_t vlan_id, uint32_t port_num, uint8_t type)
 {
     mld_vlan_node_t *vlan_node = NULL;
     int rc = MLD_VLAN_DB_SUCCESS;
@@ -414,14 +405,13 @@ int mld_vdb_add_port_to_vlan(mld_vlan_db_t *vlan_db, uint32_t vlan_id,uint32_t p
     memcpy(&key[MLD_VLAN_KEY_ID_OFFSET],&vlan_id,sizeof(uint32_t));
 
     vlan_node = mld_vdb_vlan_get(vlan_id, type);
-    if(!vlan_node)
-		{
-			L2MCD_LOG_INFO(" %s vlan does not exist %d", __FUNCTION__, vlan_id);
-			goto vdb_apv_done;
+    if (!vlan_node)
+    {
+        L2MCD_LOG_INFO(" %s vlan does not exist %d", __FUNCTION__, vlan_id);
+        goto vdb_apv_done;
     }
 
-
-   	vlan_port = calloc(1,sizeof(mld_vlan_port_t));
+    vlan_port = calloc(1,sizeof(mld_vlan_port_t));
    	if(vlan_port == NULL)
        	return (MLD_VLAN_DB_ENOMEM);
 	M_AVLL_INIT_NODE(vlan_port->node); 
@@ -437,8 +427,7 @@ vdb_apv_done:
 }
 
 /* See mld_vlan_db.h for description */
-int
-mld_vdb_del_port_frm_vlan(mld_vlan_db_t *vlan_db, uint32_t vlan_id,uint32_t  port_num, uint8_t type)
+int mld_vdb_del_port_frm_vlan(mld_vlan_db_t *vlan_db, uint32_t vlan_id,uint32_t  port_num, uint8_t type)
 {
     mld_vlan_node_t *vlan_node = NULL;
     int rc = MLD_VLAN_DB_SUCCESS;
@@ -472,8 +461,7 @@ vdb_dpv_done:
 }
 
 
-int
-mld_lookup_gvid_by_ivid(mld_vlan_node_t *vlan_node, uint16_t vlan_id, unsigned long *gvid)
+int mld_lookup_gvid_by_ivid(mld_vlan_node_t *vlan_node, uint16_t vlan_id, unsigned long *gvid)
 {
 
     int ret;
@@ -679,8 +667,7 @@ struct list *mld_vdb_vlan_get_mrtr_list(mld_vlan_node_t *vlan_node, int create, 
     return (cfg->mrtr_list);
 }
 
-struct list *
-mld_vdb_vlan_get_static_grp_list(mld_vlan_node_t *vlan_node, int create, uint8_t afi, BOOLEAN is_ve)
+struct list *mld_vdb_vlan_get_static_grp_list(mld_vlan_node_t *vlan_node, int create, uint8_t afi, BOOLEAN is_ve)
 {
 	mld_cfg_t *cfg = NULL;
 
@@ -760,14 +747,9 @@ int mld_portdb_add_gvid(unsigned long gvid, unsigned long ivid)
 int mld_portdb_delete_gvid(unsigned long gvid)
 {
 	return 0;
-    #if 0
-    unsigned int ivid_ptr = 0;
-    ret = hashGrowGenericGetAndDelete(mld_portdb_gvid_to_ivid_hash, gvid, (unsigned long *)&ivid_ptr, NULL);
-	L2MCD_LOG_INFO("%s(%d) ret :%d ", FN, LN, ret);
-    #endif
 }
 
-unsigned int mld_portdb_get_ivid_from_gvid(uint32_t vlan_id,uint8_t type)
+unsigned int mld_portdb_get_ivid_from_gvid(uint32_t vlan_id, uint8_t type)
 {
    
     mld_vlan_node_t *vlan_node = NULL;
@@ -782,8 +764,7 @@ vdb_dpv_done:
     return 0;
 }
 
-void
-print_mrtr_list(mld_vlan_node_t *vlan_node, uint8_t afi)
+void print_mrtr_list(mld_vlan_node_t *vlan_node, uint8_t afi)
 {
 
 	struct list *mrtr_list = NULL;
@@ -798,8 +779,7 @@ print_mrtr_list(mld_vlan_node_t *vlan_node, uint8_t afi)
 	}
 }
 
-mld_vlan_node_t *
-mld_vlan_create_fwd_ref(uint32_t gvid,uint8_t type)
+mld_vlan_node_t *mld_vlan_create_fwd_ref(uint32_t gvid,uint8_t type)
 {
     mld_vlan_node_t *vlan_node = NULL;
     char  tmp_if_name[INTERFACE_NAMSIZ];
@@ -831,8 +811,7 @@ mld_vlan_create_fwd_ref(uint32_t gvid,uint8_t type)
 		}
 	}
 
-    vlan_node = mld_vdb_vlan_create(mld_vlan_get_db(), gvid, type, 0,
-                                            0, 0, tmp_if_name, MLD_VLAN_DCM);
+    vlan_node = mld_vdb_vlan_create(mld_vlan_get_db(), gvid, type, 0, 0, 0, tmp_if_name, MLD_VLAN_DCM);
     L2MCD_LOG_INFO("%s(%d) new vlan_node created for gvid : 0x%x ", __FUNCTION__, __LINE__, gvid);
 	return (vlan_node);
 }
@@ -842,24 +821,23 @@ int mld_unset_vlan_dcm_flag(uint32_t gvid,uint8_t type)
     mld_vlan_node_t *vlan_node = NULL;
     vlan_node = mld_vdb_vlan_get(gvid,type);
     if (vlan_node) UNSET_FLAG(vlan_node->rcvd_nsm_add, MLD_VLAN_DCM);
-	return (0);
+    return (0);
 }
 
 int mld_set_vlan_dcm_flag(uint32_t gvid,uint8_t type)
 {
     mld_vlan_node_t *vlan_node = NULL;
 
-    vlan_node = mld_vdb_vlan_get(gvid,type);
-    if(vlan_node)
+    vlan_node = mld_vdb_vlan_get(gvid, type);
+    if (vlan_node)
         SET_FLAG(vlan_node->rcvd_nsm_add, MLD_VLAN_DCM);
-	return 0;
+    return 0;
 }
 
 void mld_vlan_delete_confg(mld_vlan_node_t *vlan_node)
 {
     struct list * list;
-    uint8_t afi;
-    for( afi = 1; afi <= MCAST_AFI_MAX; afi++) {
+    for(uint8_t afi = 1; afi <= MCAST_AFI_MAX; afi++) {
         list = mld_vdb_vlan_get_mrtr_list(vlan_node, FALSE, afi);
         if(list) list_delete(list);
 		/* Delete static group list of L2, L3 interface */

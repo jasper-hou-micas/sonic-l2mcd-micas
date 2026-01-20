@@ -68,7 +68,7 @@ MCGRP_CLASS  *mcgrp_vrf_alloc (UINT32 afi, VRF_INDEX  vrf_index)
     MCGRP_CLASS         *sptr_next, *sptr_prev;
     MCGRP_GLOBAL_CLASS  *mcgrp_glb = NULL;
 
-    L2MCD_INIT_LOG_INFO("%s mcgrp alloc for afi:%d vrf:%d",__FUNCTION__, afi,vrf_index);
+    L2MCD_INIT_LOG_INFO("%s mcgrp alloc for afi:%d vrf:%d", FN, afi, vrf_index);
     if (vrf_index == IPVRF_DEFAULT_VRF_IDX)
     {
         mcgrp = (IP_IPV4_AFI == afi) ? pIgmp0 : pMld0;
@@ -76,8 +76,8 @@ MCGRP_CLASS  *mcgrp_vrf_alloc (UINT32 afi, VRF_INDEX  vrf_index)
     else if (vrf_index < IPVRF_INVALID_VRF_IDX)
     {
         mcgrp = os_malloc_zero(sizeof(MCGRP_CLASS));
-        L2MCD_LOG_DEBUG("%s %d %p vrf:%d",__FUNCTION__, __LINE__,mcgrp,vrf_index);
-        L2MCD_INIT_LOG("%s %d %p vrf:%d",__FUNCTION__, __LINE__,mcgrp,vrf_index);
+        L2MCD_LOG_DEBUG("%s %d %p vrf:%d", FN, LN, mcgrp, vrf_index);
+        L2MCD_INIT_LOG("%s %d %p vrf:%d", FN, LN, mcgrp, vrf_index);
     }
     else
     {
@@ -279,14 +279,13 @@ BOOL mcgrp_initialize (UINT32 afi, MCGRP_CLASS *mcgrp)
     return TRUE;
 }
 
-
 BOOLEAN mcgrp_initialize_port_db_array(UINT32 afi)
 {
     if (afi == IP_IPV4_AFI)
     {
         gIgmp.port_list = (MCGRP_L3IF**) dy_malloc_zero(sizeof(MCGRP_L3IF *) * (MAX_MC_INTFS));
         gIgmp.mcgrp_src_keyinfo = &igmpv3_src_keyinfo;
-        L2MCD_INIT_LOG("%s port_list_size:%d",__FUNCTION__,MAX_MC_INTFS);
+        L2MCD_INIT_LOG("%s port_list_size:%d", FN, MAX_MC_INTFS);
     }
     else
     {
@@ -336,8 +335,7 @@ MCGRP_L3IF *mcgrp_alloc_init_l3if_entry (MCGRP_CLASS   *mcgrp,
             // If this is virtual port, alloc a port-mask for the member ports of this VE
             if (is_virtual_port(vir_port_id))
             {
-                mcgrp_vport->ve_port_mask = 
-                    dy_malloc_zero(mld_get_port_bitmap_size()); 
+                mcgrp_vport->ve_port_mask = dy_malloc_zero(mld_get_port_bitmap_size()); 
             }
         }
 
@@ -529,7 +527,6 @@ void mcgrp_update_static_groups (MCGRP_CLASS         *mcgrp,
 //v4/v6 compliant
 void mcgrp_activate_static_groups (MCGRP_CLASS  *mcgrp, 
         UINT16        vir_port_id, 
-        //UINT16        target_port)
         UINT32        target_port)
 {
     if (!mcgrp)
@@ -711,10 +708,8 @@ void mcgrp_stop_vir_port (MCGRP_CLASS  *mcgrp,
         mcgrp_stop_phy_port(mcgrp, mcgrp_vport, mcgrp_pport);
         mcgrp_pport = mcgrp_pport->next;
     }
-    if (WheelTimerSuccess ==
-            WheelTimer_IsElementEnqueued(&mcgrp_vport->vport_tmr.mcgrp_wte))
-        WheelTimer_DelElement(mcgrp->mcgrp_wtid,
-                &mcgrp_vport->vport_tmr.mcgrp_wte);
+    if (WheelTimerSuccess == WheelTimer_IsElementEnqueued(&mcgrp_vport->vport_tmr.mcgrp_wte))
+        WheelTimer_DelElement(mcgrp->mcgrp_wtid, &mcgrp_vport->vport_tmr.mcgrp_wte);
 
     // Stop/Reset the querier process and any other timers
     mcgrp_vport->querier = FALSE;
@@ -827,8 +822,7 @@ MCGRP_SOURCE* mcgrp_find_source (MCGRP_MBRSHP      *mcgrp_mbrshp,
         mcgrp_src = mcgrp_mbrshp->pims_src_list;
     else    //IGMPv3 source
         mcgrp_src = mcgrp_mbrshp->src_list[src_mode];
-    while (mcgrp_src &&
-            (mcast_cmp_addr(&mcgrp_src->src_addr, src_addr) != 0))
+    while (mcgrp_src && mcast_cmp_addr(&mcgrp_src->src_addr, src_addr) != 0)
         mcgrp_src = mcgrp_src->next;
 
     return mcgrp_src;
@@ -1024,27 +1018,26 @@ void mcgrp_delete_static_groups_on_if (MCGRP_CLASS  *mcgrp,
 //
 // Delete all group entries on this port and then delete the port entry itself
 //v4/v6 compliant
-void mcgrp_delete_l3intf (MCGRP_CLASS  *mcgrp, 
-        UINT16        vir_port_id)
+void mcgrp_delete_l3intf(MCGRP_CLASS *mcgrp, UINT16 vir_port_id)
 {
 
     MCGRP_GLOBAL_CLASS  *mcgrp_glb  = (IS_IGMP_CLASS(mcgrp) ? &gIgmp : & gMld);
     MCGRP_ENTRY         *grp_entry, *next_grp_entry;
     MCGRP_L3IF          *mcgrp_vport;
 
-    if (! MCGRP_IS_VALID_INTF(vir_port_id))
+    if (!MCGRP_IS_VALID_INTF(vir_port_id))
     {
         L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] Port %s. Ignoring Delete on invalid intf",
-                  FN, LN, vir_port_id,mld_get_if_name_from_port(vir_port_id));
+                            FN, LN, vir_port_id, mld_get_if_name_from_port(vir_port_id));
         return;
     }
-    L2MCD_VLAN_LOG_DEBUG(vir_port_id,"%s:%d:[vlan:%d] Port %s: Delete event",
-            FN,LN,vir_port_id,  mld_get_if_name_from_port(vir_port_id));
+    L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] Port %s: Delete event",
+                         FN, LN, vir_port_id, mld_get_if_name_from_port(vir_port_id));
     mcgrp_vport = mcgrp_glb->port_list[vir_port_id];
     if (!mcgrp_vport)
     {
-        L2MCD_VLAN_LOG_DEBUG(vir_port_id,"%s:%d:[vlan:%d].ERR: Port %s: Port already deleted; skipping member port delete",
-                FN,LN,vir_port_id,  mld_get_if_name_from_port(vir_port_id));
+        L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d].ERR: Port %s: Port already deleted; skipping member port delete",
+                             FN, LN, vir_port_id, mld_get_if_name_from_port(vir_port_id));
         return;
     }
 
@@ -1055,9 +1048,7 @@ void mcgrp_delete_l3intf (MCGRP_CLASS  *mcgrp,
     while (grp_entry)
     {
         next_grp_entry = M_AVLL_NEXT(mcgrp_vport->sptr_grp_tree, grp_entry->node);
-
         mcgrp_destroy_group_addr(mcgrp, mcgrp_vport, grp_entry);
-
         grp_entry = next_grp_entry;
 
     } /* while (grp_entry) */
@@ -1090,13 +1081,11 @@ void mcgrp_delete_l3intf (MCGRP_CLASS  *mcgrp,
     // Free the port-entry itself
     dy_free(mcgrp_vport);
     mcgrp_glb->port_list[vir_port_id] = NULL;
-    
 }
 
 
 //v4/v6 compliant
-MCGRP_L3IF* mcgrp_create_l3intf (MCGRP_CLASS  *mcgrp,
-        UINT16        vir_port_id)
+MCGRP_L3IF *mcgrp_create_l3intf(MCGRP_CLASS *mcgrp, UINT16 vir_port_id)
 {
     MCGRP_L3IF          *mcgrp_vport;
     MCGRP_GLOBAL_CLASS  *mcgrp_glb;
@@ -1121,16 +1110,14 @@ MCGRP_L3IF* mcgrp_create_l3intf (MCGRP_CLASS  *mcgrp,
     mcgrp_vport = mcgrp_glb->port_list[vir_port_id];
     // If an entry for this port already exists, verify, it is what we need
     if (mcgrp_vport != NULL)
-    {   
-        if ((mcgrp_vport->vir_port_id != vir_port_id) ||
-                ((mcgrp_vport->phy_port_id != vir_port_id) &&
-                 !is_ip_tnnl_port(vir_port_id)))
+    {
+        if (mcgrp_vport->vir_port_id != vir_port_id || (mcgrp_vport->phy_port_id != vir_port_id && !is_ip_tnnl_port(vir_port_id)))
         {
             L2MCD_VLAN_LOG_ERR(vir_port_id,"%s:%d:[vlan:%d] [Port %s ] BUG!!!  invalid port configuration %s/%s",
                     FN, LN, vir_port_id,
                     mld_get_if_name_from_port(vir_port_id), mld_get_if_name_from_ifindex(mcgrp_vport->phy_port_id), 
                     mld_get_if_name_from_port(mcgrp_vport->vir_port_id));
-            //RD: Need to check if any phy port has been allocated and free them up
+            // RD: Need to check if any phy port has been allocated and free them up
             // Before freeing the l3 interface.
             mcgrp_glb->port_list[vir_port_id] = NULL;
             dy_free(mcgrp_vport);
@@ -2150,21 +2137,21 @@ MCGRP_ENTRY* mcgrp_find_group_address_entry (MCGRP_CLASS  *mcgrp,
  * virtual interface is still up and runing 
  */
 //v4/v6 compliant 
-void mcgrp_mcast_change_vport_membership (MCGRP_CLASS  *mcgrp, 
+void mcgrp_mcast_change_vport_membership(MCGRP_CLASS  *mcgrp, 
         MADDR_ST     *source_address,
         MADDR_ST     *group_address,
         UINT16        router_port, 
         UINT32        phy_port,
         UINT32        mcgrp_op)
 {
-    uint32_t            afi = (IS_IGMP_CLASS(mcgrp) ? MCAST_IPV4_AFI:MCAST_IPV6_AFI);
-    MCGRP_L3IF          *mcgrp_vport    = NULL;
-    mcast_grp_addr_t    grp_addr, src_addr;
-    MCGRP_PORT_ENTRY    *mcgrp_pport    = NULL;
-    MCGRP_ENTRY         *mcgrp_entry    = NULL;
-    MCGRP_MBRSHP        *mcgrp_mbrshp   = NULL;
-    BOOLEAN             is_pim_snp_mbr  = FALSE;
-    MADDR_ST            addr_any;
+    uint32_t          afi            = (IS_IGMP_CLASS(mcgrp) ? MCAST_IPV4_AFI : MCAST_IPV6_AFI);
+    MCGRP_L3IF       *mcgrp_vport    = NULL;
+    MCGRP_PORT_ENTRY *mcgrp_pport    = NULL;
+    MCGRP_ENTRY      *mcgrp_entry    = NULL;
+    MCGRP_MBRSHP     *mcgrp_mbrshp   = NULL;
+    BOOLEAN           is_pim_snp_mbr = FALSE;
+    mcast_grp_addr_t  grp_addr, src_addr;
+    MADDR_ST          addr_any;
 
     if (afi == MCAST_IPV4_AFI)
         mcgrp_vport = gIgmp.port_list[router_port];
@@ -2190,11 +2177,15 @@ void mcgrp_mcast_change_vport_membership (MCGRP_CLASS  *mcgrp,
 
     is_pim_snp_mbr = pims_is_pim_snoop_mbrship(mcgrp_mbrshp);
     if(mcgrp_op == MCGRP_ADD_GROUP) {
-        if (mcgrp_pport && mcgrp_pport->oper_version == IGMP_VERSION_3) {
+        if (mcgrp_pport &&
+            ((afi == MCAST_IPV4_AFI && mcgrp_pport->oper_version == IGMP_VERSION_3) || (afi == MCAST_IPV6_AFI && mcgrp_pport->oper_version == MLD_VERSION_2)))
+        {
             MLD_LOG(MLD_LOGLEVEL6, MCGRP_AFI(mcgrp), "%s(%d) Sending to l2mcsync (%s, %s) mode:%d ", FN, LN,
                     mcast_print_addr(source_address), mcast_print_addr(group_address), mcgrp_mbrshp->filter_mode);
-            igmpv3_send_l2mcd_sync_group_upd(group_address, router_port, 1, phy_port, 0, 0, source_address, 0, 0);
-        } else {
+            mld_send_l2mcd_sync_src_group_upd(group_address, router_port, 1, phy_port, 0, 0, source_address, 0, 0);
+        }
+        else
+        {
             mld_send_l2mcd_sync_group_upd(group_address, router_port, 1, phy_port, 0, 0, source_address, 0);
         }
     } else {
@@ -2203,27 +2194,25 @@ void mcgrp_mcast_change_vport_membership (MCGRP_CLASS  *mcgrp,
          */
 
         mcgrp_entry = mcgrp_find_group_address_entry(mcgrp, router_port, group_address);
-        if(mcast_is_valid_unicast(source_address))
+        if (mcast_is_valid_unicast(source_address))
         {
-            if (mcgrp_pport && (mcgrp_pport->oper_version == IGMP_VERSION_3) &&
-                    (!mcast_addr_any(source_address))) 
+            if (mcgrp_pport && (!mcast_addr_any(source_address)) &&
+                ((afi == MCAST_IPV4_AFI && mcgrp_pport->oper_version == IGMP_VERSION_3) || (afi == MCAST_IPV6_AFI && mcgrp_pport->oper_version == MLD_VERSION_2)))
             {
 
-                L2MCD_VLAN_LOG_INFO(router_port, "%s:%d:[vlan:%d] Sending delete to l2mcd_sync (%s, %s) mode:%d %s", 
-                        FN, LN, router_port, mcast_print_addr(source_address), mcast_print_addr(group_address), 
-                        mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port));
+                L2MCD_VLAN_LOG_INFO(router_port, "%s:%d:[vlan:%d] Sending delete to l2mcd_sync (%s, %s) mode:%d %s",
+                                    FN, LN, router_port, mcast_print_addr(source_address), mcast_print_addr(group_address),
+                                    mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port));
 
-                igmpv3_send_l2mcd_sync_group_upd(group_address, router_port,
-                        0, 0 , 1 , phy_port, source_address, 0, 0);
+                mld_send_l2mcd_sync_src_group_upd(group_address, router_port, 0, 0, 1, phy_port, source_address, 0, 0);
             }
-            else 
+            else
             {
-                L2MCD_VLAN_LOG_INFO(router_port, "%s:%d:[vlan:%d]Sending delete to l2mcd_sync (%s, %s) mode:%d %s", 
-                        FN, LN, router_port, mcast_print_addr(source_address), mcast_print_addr(group_address), 
-                        mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port));
+                L2MCD_VLAN_LOG_INFO(router_port, "%s:%d:[vlan:%d]Sending delete to l2mcd_sync (%s, %s) mode:%d %s",
+                                    FN, LN, router_port, mcast_print_addr(source_address), mcast_print_addr(group_address),
+                                    mcgrp_mbrshp->filter_mode, mld_get_if_name_from_ifindex(phy_port));
 
-                mld_send_l2mcd_sync_group_upd(group_address, router_port, 
-                        0, 0 , 1 , phy_port, source_address, 0);
+                mld_send_l2mcd_sync_group_upd(group_address, router_port, 0, 0, 1, phy_port, source_address, 0);
             }
         }
         else {
@@ -2429,7 +2418,7 @@ MCGRP_MBRSHP* mcgrp_alloc_add_mbrshp_entry (MCGRP_CLASS  *mcgrp,
         }
     }
 
-    new_mbrshp->group_uptime =  mld_get_current_monotime();
+    // new_mbrshp->group_uptime =  mld_get_current_monotime();
     new_mbrshp->group_timer = 0; 
 
     grp_entry->num_mbr_ports++;
@@ -2553,24 +2542,23 @@ void mcgrp_destroy_mbrshp_entry (MCGRP_CLASS  *mcgrp,
     mcgrp_free_mbrshp_entry(mcgrp, mcgrp_mbrshp);
 }
 
-
-BOOL mcgrp_src_list_empty ( MCGRP_MBRSHP      *mcgrp_mbrsh,
-        MCGRP_FILTER_MODE  src_mode,
-        UINT8 version)
+BOOL mcgrp_src_list_empty(MCGRP_MBRSHP     *mcgrp_mbrsh,
+                          MCGRP_FILTER_MODE src_mode,
+                          UINT8             version,
+                          UINT32            afi)
 {
-    if(version == IGMP_VERSION_3)
+    if ((version == IGMP_VERSION_3 && afi == IP_IPV4_AFI) || (version == MLD_VERSION_2 && afi == IP_IPV6_AFI))
     {
-        if(mcgrp_mbrsh->src_list[src_mode])
+        if (mcgrp_mbrsh->src_list[src_mode])
             return FALSE;
         else
             return TRUE;
     }
-    else// For igmp ver 2 operating , just return true.
+    else // For igmp ver 2 operating , just return true.
     {
         return TRUE;
     }
 }
-
 
 // Find and delink an MCGRP_SOURCE from the mode-specific source list
 // anchored in a MCGRP_MBRSHP
@@ -2650,7 +2638,7 @@ void mcgrp_refresh_static_group (MCGRP_CLASS         *mcgrp,
     MADDR_ST            *group_address;
     MADDR_ST             addr;
     UINT8                version = 0;
-    UINT8                igmp_action = 0;
+    UINT8                action = 0;
     UINT16               num_srcs = 0;
     UINT32              *src_list = NULL;
     sg_port_t           *sg_port;
@@ -2711,18 +2699,18 @@ void mcgrp_refresh_static_group (MCGRP_CLASS         *mcgrp,
         if (IS_IGMP_CLASS(mcgrp))
         {
             mcast_set_ipv4_addr(&addr, ip_get_lowest_ip_address_on_port(vir_port_id, mcgrp_vport->type));
-            igmp_action = IS_EXCL ;
+            action = IS_EXCL;
             if(igmp_update_ssm_parameters(mcgrp, group_address, &version, vir_port_id,
-                        phy_port_id, &igmp_action, &num_srcs, &src_list) == FALSE)
+                        phy_port_id, &action, &num_srcs, &src_list) == FALSE)
                 continue;
         }
         else
         {
             IPV6_ADDRESS lowest_v6_addr = ip_get_lowest_ipv6_address_on_port(vir_port_id, mcgrp_vport->type);
             mcast_set_ipv6_addr(&addr, &lowest_v6_addr);
-            UINT mld_action = IS_EXCL ;
+            action = IS_EXCL;
             if(mld_update_ssm_parameters(mcgrp, group_address, &version, vir_port_id,
-                        phy_port_id, &mld_action, &num_srcs, &src_list) == FALSE)
+                        phy_port_id, &action, &num_srcs, &src_list) == FALSE)
                 continue;
             //MLD
         }               
@@ -2730,7 +2718,7 @@ void mcgrp_refresh_static_group (MCGRP_CLASS         *mcgrp,
         mcgrp_update_group_address_table(mcgrp, vir_port_id, phy_port_id,
                 group_address, 
                 &addr,    // use intf's addr as client source
-                igmp_action,
+                action,
                 version,
                 num_srcs, (void *)src_list /* No sources */);
 
@@ -2784,10 +2772,10 @@ BOOLEAN mcgrp_send_group_source_query (MCGRP_CLASS        *mcgrp,
 
 // This function is invoked to signal change in state of an IP interface
 //v4/v6 compliant
-void mcgrp_port_state_notify (UINT32        afi, 
-        VRF_INDEX     vrf_index, 
-        UINT16        port_id, 
-        enum BOOLEAN  up)
+void mcgrp_port_state_notify(UINT32       afi,
+        VRF_INDEX    vrf_index,
+        UINT16       port_id,
+        enum BOOLEAN up)
 {
     MCGRP_CLASS         *mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(afi, vrf_index); 
     MCGRP_L3IF          *mcgrp_vport;
@@ -2846,10 +2834,8 @@ void mcgrp_port_state_notify (UINT32        afi,
         else
         {
             mcgrp_stop_phy_port(mcgrp, mcgrp_vport, mcgrp_vport->phy_port_list);
-            if (WheelTimerSuccess ==
-                    WheelTimer_IsElementEnqueued(&mcgrp_vport->vport_tmr.mcgrp_wte))
-                WheelTimer_DelElement(mcgrp->mcgrp_wtid,
-                        &mcgrp_vport->vport_tmr.mcgrp_wte);
+            if (WheelTimerSuccess == WheelTimer_IsElementEnqueued(&mcgrp_vport->vport_tmr.mcgrp_wte))
+                WheelTimer_DelElement(mcgrp->mcgrp_wtid, &mcgrp_vport->vport_tmr.mcgrp_wte);
             // Stop/Reset the querier process and any other timers
             mcgrp_vport->querier = TRUE;
             mcgrp_vport->v1_rtr_present = FALSE;

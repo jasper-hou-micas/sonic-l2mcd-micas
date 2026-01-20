@@ -205,9 +205,9 @@ int l2mcd_portstate_update(int kif, int state, char *iname)
     return -1;
 
 }
-int l2mcd_port_list_update(char *pnames, int oper_state, int is_add) 
+int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
 {
-    int ifidx, kif, rc;
+    int ifidx, kif, rc = 0;
     l2mcd_if_tree_t *if_tree = NULL;
     struct event *igmp_rx_event = NULL;
     struct event *mld_rx_event = NULL;
@@ -263,6 +263,7 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
         return -1;
     }
 
+    // breakout
     if (if_tree && if_tree->kif != kif) {
         if (if_tree->igmp_sock_fd)
             l2mcd_igmprx_sock_close(pnames, if_tree->igmp_sock_fd, if_tree->igmp_rx_event);
@@ -275,23 +276,41 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
         if_tree = NULL;
     }
 
-    if (if_tree && if_tree->igmp_sock_fd && if_tree->mld_sock_fd) {
-        L2MCD_INIT_LOG("%s if:%s(%d) IGMP/MLD sockets already exist", __FUNCTION__, pnames, ifidx);
-        return 0;
+    if (if_tree && if_tree->sock_fd)
+    {
+        L2MCD_INIT_LOG("IGMP socket already exists for %s, if:%d, fd:%d", pnames, kif, if_tree->mld_sock_fd);
+    }
+    else
+    {
+        igmp_rx_event = l2mcd_igmprx_sock_init(&sock_fd, pnames);
+        if (igmp_rx_event)
+        {
+            rc = l2mcd_add_kif_to_if(pnames, ifidx, sock_fd, igmp_rx_event, -1, -1, -1, oper_state, L2MCD_PROTO_IGMP);
+        }
+        else
+        {
+            L2MCD_INIT_LOG("IGMP socket create failed for RX %s, if:%d", pnames, kif);
+        }
     }
 
-    igmp_rx_event = l2mcd_igmprx_sock_init(&sock_fd, pnames);
-    if (igmp_rx_event) {
-        rc = l2mcd_add_kif_to_if(pnames, ifidx, sock_fd, igmp_rx_event, -1, -1, -1, oper_state, L2MCD_PROTO_IGMP);
-    } else {
-        L2MCD_INIT_LOG("IGMP socket create failed for %s, if:%d", pnames, kif);
+    if (if_tree && if_tree->mld_sock_fd)
+    {
+        L2MCD_INIT_LOG("MLD socket already exists for %s, if:%d, fd:%d", pnames, kif, if_tree->mld_sock_fd);
     }
+    else
+    {
+        // Initialize MLD RX socket
+        mld_rx_event = l2mcd_mldrx_sock_init(&mld_sock_fd, pnames);
 
-    mld_rx_event = l2mcd_mldrx_sock_init(&mld_sock_fd, pnames);
-    if (mld_rx_event) {
-        rc = l2mcd_add_kif_to_if(pnames, ifidx, mld_sock_fd, mld_rx_event,-1, -1, -1, oper_state, L2MCD_PROTO_MLD);
-    } else {
-        L2MCD_INIT_LOG("MLD socket create failed for %s, if:%d", pnames, kif);
+        if (mld_rx_event)
+        {
+            // Create tree node (if needed) and bind socket
+            rc = l2mcd_add_kif_to_if(pnames, ifidx, mld_sock_fd, mld_rx_event, -1, -1, -1, oper_state, L2MCD_PROTO_MLD);
+        }
+        else
+        {
+            L2MCD_INIT_LOG("MLD socket create failed for %s, if:%d", pnames, kif);
+        }
     }
 
     return rc;
@@ -299,7 +318,6 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
 
 int l2mcd_del_if_tree(uint32_t ifid)
 {
-
     l2mcd_if_tree_t *l2mcd_if_tree = M_AVLL_FIND(g_l2mcd_if_to_kif_tree, &ifid);
     l2mcd_if_tree_t *l2mcd_if_tree2;
     uint32_t kif;

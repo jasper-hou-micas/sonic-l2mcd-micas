@@ -26,23 +26,22 @@
 
 #define L2MCD_IPC_SOCK_NAME "/var/run/l2mcd_ipc.sock"
 
-#define L2MCD_IFNAME_SIZE       20
+#define L2MCD_IFNAME_SIZE       16
 #define L2MCD_IP_ADDR_STR_SIZE  46
-#define L2MCD_IPC_MAX_PORTS         1544 //ap max 1024, port brk 1x4 max 520
-#define L2MCD_OP_ENABLE             1
-#define L2MCD_OP_DISABLE            0
+#define L2MCD_OP_ENABLE         1
+#define L2MCD_OP_DISABLE        0
 
 typedef enum L2MCD_MSG_TYPE {
     L2MCD_INVALID_MSG,
     L2MCD_SNOOP_CONFIG_MSG,
-    L2MCD_SNOOP_STATIC_CONFIG_MSG,
-    L2MCD_SNOOP_MROUTER_CONFIG_MSG,
-    L2MCD_SNOOP_MROUTER_REMOTE_CONFIG_MSG,
-    L2MCD_SNOOP_REMOTE_CONFIG_MSG,
-    L2MCD_SNOOP_PORT_LIST_MSG,
-    L2MCD_CONFIG_PARAMS_MSG,
+    L2MCD_SNOOP_STATIC_CONFIG_MSG,         // static entry
+    L2MCD_SNOOP_MROUTER_CONFIG_MSG,        // static mroute
+    L2MCD_SNOOP_MROUTER_REMOTE_CONFIG_MSG, // mclag
+    L2MCD_SNOOP_REMOTE_CONFIG_MSG,         // mclag
+    L2MCD_SNOOP_PORT_LIST_MSG,             // port list + oper
+    L2MCD_CONFIG_PARAMS_MSG,               // sys mac + log
     L2MCD_VLAN_MEM_TABLE_UPDATE,
-    L2MCD_INTERFACE_TABLE_UPDATE,
+    L2MCD_INTERFACE_TABLE_UPDATE,          // vlan ip
     L2MCD_LAG_MEM_TABLE_UPDATE,
     L2MCD_SNOOP_CTL_MSG,
     L2MCD_IGMP_PKT_MSG,
@@ -57,23 +56,24 @@ typedef struct PORT_ATTR_ {
 } PORT_ATTR;
 
 typedef struct L2MCD_CONFIG_MSG {
-    uint8_t     op_code;  
+    uint8_t     op_code;
     uint8_t     enabled;
     uint8_t     querier;
     uint8_t     fast_leave;
     int         afi;
+    int         warm_reboot;
     int         cmd_code;
     int         version;
     int         query_interval;
     int         last_member_query_interval;
     int         query_max_response_time;
     int         vlan_id;
-    uint32_t    count;
     int         prefix_length;
     uint8_t     mac_addr[ETHER_ADDR_LEN];
     char        gaddr[L2MCD_IP_ADDR_STR_SIZE];
     char        saddr[L2MCD_IP_ADDR_STR_SIZE];
-    PORT_ATTR   ports[L2MCD_IPC_MAX_PORTS];
+    uint32_t    count;
+    PORT_ATTR   ports[0];
 } L2MCD_CONFIG_MSG;
 
 typedef struct L2MCD_IPC_MSG {
