@@ -1175,8 +1175,6 @@ BOOLEAN igmp_send_igmp_message (MCGRP_CLASS *igmp,
             }
 
         default:
-            free(sptr_igmp_packet);
-            sptr_igmp_packet = NULL;
             break;
     } /* switch (version) */
 
@@ -1205,6 +1203,11 @@ BOOLEAN igmp_send_igmp_message (MCGRP_CLASS *igmp,
     if (cmsg == NULL)
     {
         L2MCD_VLAN_LOG_ERR(tx_port_number, "IGMP:%s()%d IGMP.VRF%d.ERR: Failed to allocate cmsg.\n", FN, LN, igmp->vrf_index);
+        if (version == IGMP_VERSION_3)
+            free(sptr_igmpv3_packet);
+        else
+            free(sptr_igmp_packet);
+
         return FALSE;
     }
 
@@ -1368,7 +1371,10 @@ BOOLEAN igmp_send_igmp_message (MCGRP_CLASS *igmp,
             source_address,vlan_id);
 
 
-    free(sptr_igmp_packet);
+    if (version == IGMP_VERSION_3)
+        free(sptr_igmpv3_packet);
+    else
+        free(sptr_igmp_packet);
     free(cmsg);
 
     return TRUE;
