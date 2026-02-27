@@ -743,18 +743,22 @@ void quick_sort_generic_no_index2(int start_index, int end_index,
     }
 }
 
+static int wrapper_compare_2args(unsigned long a, unsigned long b, unsigned long cb_context)
+{
+	// Safely cast the callback context back to the original 2-argument function pointer type
+    int (*orig_compare)(unsigned long, unsigned long) = 
+        (int (*)(unsigned long, unsigned long))cb_context;
+    
+    // Call the original function safely with exactly 2 arguments.
+    return orig_compare(a, b);
+}
+
 void quick_sort_generic_no_index(int start_index, int end_index,
                                 unsigned long * val_ary,
-                                                        int compare_func(unsigned long, unsigned long))
+                                int compare_func(unsigned long, unsigned long))
 {
-    /* HACK ALERT: Note that here we are casting the callback function
-     * pointer into one with one more parameter.  This may not be
-     * completely portable, but seems to be the simplest and most
-     * efficient way to provide the support for both types of callback
-     * functions. - mlavine
-     */
     quick_sort_generic_no_index2(start_index, end_index, val_ary,
-            (int (*)(unsigned long, unsigned long, unsigned long)) compare_func, 0);
+            wrapper_compare_2args, (unsigned long)compare_func);
 }
 
 /* The following string_key_compare(), string_key_hash_function(), and

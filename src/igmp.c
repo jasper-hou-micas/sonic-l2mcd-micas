@@ -666,19 +666,6 @@ void mcgrp_stop_phy_port (MCGRP_CLASS       *mcgrp,
 
         mcgrp_destroy_mbrshp_entry(mcgrp, mcgrp_entry, mcgrp_mbrshp);
 
-        if(pims_is_pim_snoop_mbrship(mcgrp_mbrshp))
-        {
-            if(mcgrp_entry->pims_num_wg_join_ports > 0)
-                mcgrp_entry->pims_num_wg_join_ports--;
-            if(mcgrp_entry->pims_num_sg_join_ports > 0)
-                mcgrp_entry->pims_num_sg_join_ports--;
-            MLD_LOG(MLD_LOGLEVEL8, mcgrp->afi, "%s(%d) wg_join_ports:%d sg_join_ports:%d ",
-                    FN, LN, mcgrp_entry->pims_num_wg_join_ports,
-                    mcgrp_entry->pims_num_sg_join_ports);
-        }
-        //else
-        mcgrp_mbrshp->pims_mbr_flags &= ~MLD_OR_IGMP_JOIN_PORT;
-
         // If no member ports left in this group, remove this group from this virtual port
         if (mcgrp_entry->num_mbr_ports == 0)
         {

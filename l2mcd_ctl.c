@@ -190,70 +190,86 @@ int main(int argc, char **argv)
         switch (opt) 
         {
         case 'r':
-           cfg_msg.vlan_id = atoi(argv[optind-1]);
-           memcpy(cfg_msg.saddr,argv[optind], L2MCD_IP_ADDR_STR_SIZE);
-           memcpy(cfg_msg.gaddr,argv[optind+1], L2MCD_IP_ADDR_STR_SIZE);
-           memcpy(cfg_msg.ports[0].pnames, argv[optind+2], L2MCD_IFNAME_SIZE);
-           cfg_msg.op_code = atoi(argv[optind+3]);
-           printf("Test Group : vlan:%d %s %s %s %d\n",cfg_msg.vlan_id,cfg_msg.saddr,cfg_msg.gaddr,cfg_msg.ports[0].pnames,cfg_msg.op_code);
-           l2mcd_ctl_send(L2MCD_SNOOP_REMOTE_CONFIG_MSG, sizeof(cfg_msg), (void *)&cfg_msg);
-           goto l2mcd_ctl_end;
-           break;
+            if (optind + 3 >= argc)
+            {
+                printf("Error: Missing arguments for option 'r'\n");
+                break;
+            }
+
+            cfg_msg.vlan_id = atoi(argv[optind - 1]);
+            strncpy((char *)cfg_msg.saddr, argv[optind], L2MCD_IP_ADDR_STR_SIZE - 1);
+            cfg_msg.saddr[L2MCD_IP_ADDR_STR_SIZE - 1] = '\0';
+            strncpy((char *)cfg_msg.gaddr, argv[optind + 1], L2MCD_IP_ADDR_STR_SIZE - 1);
+            cfg_msg.gaddr[L2MCD_IP_ADDR_STR_SIZE - 1] = '\0';
+            strncpy((char *)cfg_msg.ports[0].pnames, argv[optind + 2], L2MCD_IFNAME_SIZE - 1);
+            cfg_msg.ports[0].pnames[L2MCD_IFNAME_SIZE - 1] = '\0';
+            cfg_msg.op_code                                = atoi(argv[optind + 3]);
+            printf("Test Group : vlan:%d %s %s %s %d\n", cfg_msg.vlan_id, cfg_msg.saddr, cfg_msg.gaddr, cfg_msg.ports[0].pnames, cfg_msg.op_code);
+            l2mcd_ctl_send(L2MCD_SNOOP_REMOTE_CONFIG_MSG, sizeof(cfg_msg), (void *)&cfg_msg);
+            goto l2mcd_ctl_end;
+            break;
         case 'd':
-           dbg_Level=atoi(optarg);
-           msg.cmd |=L2MCD_CTL_CMD_DB_LEVEL;
-           msg.dbgLevel=dbg_Level;
-           break;
+            dbg_Level = atoi(optarg);
+            msg.cmd |= L2MCD_CTL_CMD_DB_LEVEL;
+            msg.dbgLevel = dbg_Level;
+            break;
         case 'v':
-           msg.cmd |=L2MCD_CTL_CMD_SESS_VID;
-           msg.vid = atoi(optarg);
-           if (!msg.vid || (msg.vid>4095))
-           {
-               msg.vid=0;
-           }
-           break;
-       case 's':
-           memcpy(msg.fname, optarg, 100);
-           msg.cmd|=L2MCD_CTL_CMD_SESS_NAME;
-           break;
-       case 'p':
-           memcpy(msg.fname, optarg, 100);
-           msg.cmd|=L2MCD_CTL_CMD_PLOG_NAME;
-           break;
+            msg.cmd |= L2MCD_CTL_CMD_SESS_VID;
+            msg.vid = atoi(optarg);
+            if (!msg.vid || (msg.vid > 4095))
+            {
+                msg.vid = 0;
+            }
+            break;
+        case 's':
+            strncpy((char *)msg.fname, optarg, 100 - 1);
+            msg.fname[100 - 1] = '\0';
+            msg.cmd |= L2MCD_CTL_CMD_SESS_NAME;
+            break;
+        case 'p':
+            strncpy((char *)msg.fname, optarg, 100 - 1);
+            msg.fname[100 - 1] = '\0';
+            msg.cmd |= L2MCD_CTL_CMD_PLOG_NAME;
+            break;
         case 'a':
-           msg.cmd |=L2MCD_CTL_CMD_DUMP_ALL;
-           break;
+            msg.cmd |= L2MCD_CTL_CMD_DUMP_ALL;
+            break;
         case 'c':
-           msg.cmd |=L2MCD_CTL_CMD_CUSTOM;
-           msg.cmd_id = atoi(optarg);
-           break;
+            msg.cmd |= L2MCD_CTL_CMD_CUSTOM;
+            msg.cmd_id = atoi(optarg);
+            break;
         case 'i':
-           msg.cmd |= L2MCD_CTL_CMD_PKT;
-           msg.cmd_id = atoi(optarg);
-           break;
+            msg.cmd |= L2MCD_CTL_CMD_PKT;
+            msg.cmd_id = atoi(optarg);
+            break;
         case 'X':
-           msg.cmd |= L2MCD_CTL_VLAN_CLEAR;
-           msg.vid = atoi(optarg);
-           if (!msg.vid || (msg.vid>4095))
-           {
-               msg.vid=0;
-           }
-           break;
+            msg.cmd |= L2MCD_CTL_VLAN_CLEAR;
+            msg.vid = atoi(optarg);
+            if (!msg.vid || (msg.vid > 4095))
+            {
+                msg.vid = 0;
+            }
+            break;
         case 'S':
-           msg.cmd |= L2MCD_CTL_VLAN_STATS_CLEAR;
-           msg.vid = atoi(optarg);
-           if (!msg.vid || (msg.vid>4095))
-           {
-               msg.vid=0;
-           }
-           break;
+            msg.cmd |= L2MCD_CTL_VLAN_STATS_CLEAR;
+            msg.vid = atoi(optarg);
+            if (!msg.vid || (msg.vid > 4095))
+            {
+                msg.vid = 0;
+            }
+            break;
         case 'L':
-           l2mcd_ctl_send_pkt(argv[optind], argv[optind+1]);
-           return 0;
+            if (optind + 2 >= argc)
+            {
+                printf("Error: Missing arguments for option 'L'\n");
+                break;
+            }
+            l2mcd_ctl_send_pkt(argv[optind], argv[optind + 1]);
+            return 0;
         default: /*?*/
-           print_usage();
-           exit(0);
-           break;
+            print_usage();
+            exit(0);
+            break;
         }
 
     }

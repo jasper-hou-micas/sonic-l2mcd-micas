@@ -39,9 +39,6 @@
 
 typedef unsigned char   u_char;
 typedef unsigned char   u_int8_t;
-typedef unsigned char   uint8_t;
-typedef unsigned short  uint16_t;
-typedef unsigned int uint32_t;
 typedef unsigned short  UINT16;
 typedef UINT16 PORT_ID;
 typedef int bool_t;
