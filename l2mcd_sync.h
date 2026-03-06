@@ -23,7 +23,6 @@
 #include "producerstatetable.h"
 #include "l2mcd.h"
 #include "l2mcd_dbsync.h"
-#include "debugframework.h"
 #include "notificationproducer.h"
 
 namespace swss {
@@ -37,7 +36,6 @@ namespace swss {
             void addL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg);
             void delL2mcTableEntry(L2MCD_APP_TABLE_ENTRY *msg);
             void processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg);
-            void initDebugFrameWork(void);
             int getL2mcMgrDebugPrio(void);
             bool isPortPeerLink(std::string portname);
             void notify_config_done(std::string option, std::string paraname);

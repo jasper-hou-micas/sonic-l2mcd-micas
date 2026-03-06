@@ -511,8 +511,6 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             L2MCD_INIT_LOG("Global MAC set for IPV4  0x%x:0x%x:0x%x:0x%x:0x%x:0x%x: dbglevel:%d",
                            gIgmp.mac[0], gIgmp.mac[1], gIgmp.mac[2], gIgmp.mac[3], gIgmp.mac[4], gIgmp.mac[5],
                            g_curr_dbg_level);
-            /* Debug FM call back register is done delayed, to ensure fm is up by the time. */ 
-            l2mcsync_init_debug_framework();
             break;
         }
         case L2MCD_VLAN_MEM_TABLE_UPDATE:

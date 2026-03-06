@@ -19,7 +19,6 @@
 #include <errno.h>
 #include <system_error>
 #include <sys/socket.h>
-//#include <linux/if.h>
 #include <chrono>
 #include <string>
 #include "dbconnector.h"
@@ -27,7 +26,6 @@
 #include "l2mcd.h"
 #include "l2mcd_sync.h"
 #include <algorithm> 
-#include "debugframework.h"
 #include "notificationproducer.h"
 #include "tokenize.h"
 
@@ -102,10 +100,6 @@ extern "C" void l2mcd_clr_snooping(int vid);
 extern "C" void l2mcd_clr_snooping_stats(int vid);
 extern "C" {
 
-    void l2mcsync_init_debug_framework()
-    {
-        l2mcsync.initDebugFrameWork();
-    }
     void l2mcsync_add_vlan_entry(uint16_t vlan_id)
     {
         l2mcsync.addL2mcVlanEntry(vlan_id);
@@ -137,7 +131,7 @@ extern "C" {
         va_start(args,fmt);
         vsnprintf(dump_str, 200, fmt, args);
         va_end(args);
-        SWSS_DEBUG_PRINT(g_L2McdCompstring,"%s", dump_str );
+        SWSS_LOG_DEBUG("%s", dump_str);
     }
     int l2mcd_is_peerlink(char *portname)
     {
@@ -425,129 +419,120 @@ void L2mcSync::processL2mcMrouterTableEntry(L2MCD_APP_TABLE_ENTRY *msg)
     }
 }
 
-void L2mcSync::initDebugFrameWork(void)
-{
-    DebugFramework::linkWithFramework(g_L2McdCompstring, l2mcd_debugCLI);
-    SWSS_LOG_NOTICE("Initialized Debug Frame work for L2MCD");    
-}
-
 void l2mcd_debugCLI(std::string s, KeyOpFieldsValuesTuple t)
 {
-     string group = "dumpall";
-     string keywd = kfvKey(t);
-     string vid;
-     string levelString;
-     int vlan_id=0,level=0;
-     int i=0;
-     SWSS_LOG_NOTICE("L2MCD: Debug CLI key-%s",keywd.c_str());
-    
-     if (keywd != g_L2McdCompstring)
-     {
-         SWSS_LOG_NOTICE("Keywd wrong %s", keywd.c_str());
-         return;
-     }
+    string group = "dumpall";
+    string keywd = kfvKey(t);
+    string vid;
+    string levelString;
+    int vlan_id=0,level=0;
+    int i=0;
+    SWSS_LOG_NOTICE("L2MCD: Debug CLI key-%s",keywd.c_str());
+
+    if (keywd != g_L2McdCompstring)
+    {
+        SWSS_LOG_NOTICE("Keywd wrong %s", keywd.c_str());
+        return;
+    }
     g_l2mcd_fwk_dbg_mode = 1;
-    SWSS_DEBUG_PRINT_BEGIN(g_L2McdCompstring);
 
     for (auto i : kfvFieldsValues(t))
-     {
-         if (fvField(i) == "group")
-         {
+    {
+        if (fvField(i) == "group")
+        {
             group = fvValue(i);
-         }
-         else if (fvField(i) == "vid")
-         {
+        }
+        else if (fvField(i) == "vid")
+        {
             vid = fvValue(i);
             vlan_id = stoi(vid.c_str());
-         }
-         else if (fvField(i) == "level")
-         {
+        }
+        else if (fvField(i) == "level")
+        {
             levelString = fvValue(i);
             level = stoi(levelString.c_str());
-         }
-         else
-         {
+        }
+        else
+        {
             string field = fvField(i);
             string value = fvValue(i);
-            SWSS_DEBUG_PRINT(g_L2McdCompstring, "L2MCD: Rcvd field %s, Value %s", field.c_str(),value.c_str());
-         }
-     
-     }
+            SWSS_LOG_DEBUG("L2MCD: Rcvd field %s, Value %s", field.c_str(), value.c_str());
+        }
+    }
 
-     if (group =="vdb")
-     {
-         l2mcd_dump_vdb_brief(vlan_id);
-     }
-     else if (group =="vdb_stats")
-     {
-         l2mcd_dump_vdb_stats(vlan_id);
-     }
-     else if (group =="igmp_groups")
-     {
-         l2mcd_dump_groups(vlan_id, 0);
-     }
-     else if (group =="clear_groups")
-     {
-        l2mcd_clr_snooping(vlan_id);
-     }
-     else if (group =="clear_stats")
-     {
-        l2mcd_clr_snooping_stats(vlan_id);
-     }
-     else if (group == "ports")
-     {
-         l2mcd_dump_portdb();
-     }
-     else if (group == "global")
-     {
-         l2mcd_print_vars();
-     }
-     else if (group == "dumpall")
-     {
-         l2mcd_print_vars();
-         l2mcd_dump_portdb();
-         l2mcd_dump_vdb_brief(0);
-         l2mcd_dump_vdb_stats(0);
-         l2mcd_dump_groups(0,1);
-         l2mcd_dump_vdb_ports(0);
-         l2mcd_dump_ve_portdb_tree();
-         l2mcd_dump_port_vlan_bm();
-     }
-     else if (group == "vlanLog")
-     {
-        g_l2mcd_vlan_dbg_to_sys_log=TRUE;
+    if (group =="vdb")
+    {
+        l2mcd_dump_vdb_brief(vlan_id);
+    }
+    else if (group =="vdb_stats")
+    {
+        l2mcd_dump_vdb_stats(vlan_id);
+    }
+    else if (group =="igmp_groups")
+    {
+        l2mcd_dump_groups(vlan_id, 0);
+    }
+    else if (group =="clear_groups")
+    {
+    l2mcd_clr_snooping(vlan_id);
+    }
+    else if (group =="clear_stats")
+    {
+    l2mcd_clr_snooping_stats(vlan_id);
+    }
+    else if (group == "ports")
+    {
+        l2mcd_dump_portdb();
+    }
+    else if (group == "global")
+    {
+        l2mcd_print_vars();
+    }
+    else if (group == "dumpall")
+    {
+        l2mcd_print_vars();
+        l2mcd_dump_portdb();
+        l2mcd_dump_vdb_brief(0);
+        l2mcd_dump_vdb_stats(0);
+        l2mcd_dump_groups(0,1);
+        l2mcd_dump_vdb_ports(0);
+        l2mcd_dump_ve_portdb_tree();
+        l2mcd_dump_port_vlan_bm();
+    }
+    else if (group == "vlanLog")
+    {
+        g_l2mcd_vlan_dbg_to_sys_log = TRUE;
         if (level)
         {
-            g_l2mcd_vlan_log_mask=level;
+            g_l2mcd_vlan_log_mask = level;
         }
-        if (!vlan_id) 
+        if (!vlan_id)
         {
             memset(&g_l2mcd_pkt_log[0], 0, L2MCD_VLAN_MAX);
             g_l2mcd_vlan_dbg_to_sys_log = FALSE;
-            L2MCD_CLI_PRINT("Disable Vlan sys logging for all tags global_level_mask:%x",g_l2mcd_vlan_log_mask);
+            L2MCD_CLI_PRINT("Disable Vlan sys logging for all tags global_level_mask:%x", g_l2mcd_vlan_log_mask);
         }
-        else if (vlan_id==L2MCD_VLAN_MAX)
+        else if (vlan_id == L2MCD_VLAN_MAX)
         {
-            memset(&g_l2mcd_pkt_log[0],1, L2MCD_VLAN_MAX);
-            L2MCD_CLI_PRINT("Enable Vlan sys logging for all tags global_level_maskk:%x",g_l2mcd_vlan_log_mask);
-            g_l2mcd_dbg_vlan_log_all=TRUE;
+            memset(&g_l2mcd_pkt_log[0], 1, L2MCD_VLAN_MAX);
+            L2MCD_CLI_PRINT("Enable Vlan sys logging for all tags global_level_maskk:%x", g_l2mcd_vlan_log_mask);
+            g_l2mcd_dbg_vlan_log_all = TRUE;
         }
-        else 
+        else
         {
-            g_l2mcd_pkt_log[vlan_id&0xFFF]= level?1:0;
-            L2MCD_CLI_PRINT("vlan logging %s for vid:%d global_level_mask:0x%x",level?"Enabled":"Disabled",vlan_id,g_l2mcd_vlan_log_mask);
+            g_l2mcd_pkt_log[vlan_id & 0xFFF] = level ? 1 : 0;
+            L2MCD_CLI_PRINT("vlan logging %s for vid:%d global_level_mask:0x%x", level ? "Enabled" : "Disabled", vlan_id, g_l2mcd_vlan_log_mask);
         }
-        g_l2mcd_dbg_vlan_log_all=TRUE;
-        for (i=0;i<L2MCD_VLAN_MAX;i++) g_l2mcd_dbg_vlan_log_all &= g_l2mcd_pkt_log[i];
-     }
-     else if (group == "dbgLevel")
-     {
+        g_l2mcd_dbg_vlan_log_all = TRUE;
+        for (i = 0; i < L2MCD_VLAN_MAX; i++)
+            g_l2mcd_dbg_vlan_log_all &= g_l2mcd_pkt_log[i];
+    }
+    else if (group == "dbgLevel")
+    {
         l2mcd_set_loglevel_w(level);
-
-     }
-     SWSS_LOG_NOTICE(" l2mcd debug command:  group:%s vid %s(%d) global_level_mask:%d, g_l2mcd_dbg_vlan_log_all:%d", group.c_str(), vid.c_str(), vlan_id,g_l2mcd_vlan_log_mask,g_l2mcd_dbg_vlan_log_all);
-     SWSS_DEBUG_PRINT_END(g_L2McdCompstring);
-     g_l2mcd_fwk_dbg_mode=0;
+    }
+    SWSS_LOG_NOTICE(" l2mcd debug command:  group:%s vid %s(%d) global_level_mask:%d, g_l2mcd_dbg_vlan_log_all:%d", group.c_str(), vid.c_str(), vlan_id,g_l2mcd_vlan_log_mask,g_l2mcd_dbg_vlan_log_all);
+    g_l2mcd_fwk_dbg_mode=0;
 }
 
 bool L2mcSync::isPortPeerLink(std::string portname)
