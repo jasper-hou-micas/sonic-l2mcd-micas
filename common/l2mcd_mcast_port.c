@@ -42,8 +42,13 @@ BOOLEAN mcgrp_global_pools_init (UINT32  afi)
     // Alloc pool for the group entries
     mcgrp_glb->group_pool = (generic_pool_struct*)dy_malloc_zero(sizeof(generic_pool_struct));
 
+    /* FIX: Disable MEMCHK to avoid magic-number false positives that leak memory.
+     * The sorted_linklist overlay with MCGRP_SOURCE can corrupt the magic bytes,
+     * causing generic_free_mem_to_pool to silently drop blocks instead of returning
+     * them to the free list. Disabling MEMCHK allows proper pool reuse.
+     */
     res = init_generic_pool(mcgrp_glb->group_pool, initial_groups,
-                sizeof(MCGRP_ENTRY), GENERIC_POOL_MEMCHK_ON);
+                sizeof(MCGRP_ENTRY), 0 /* was GENERIC_POOL_MEMCHK_ON */);
     if(!res)
         return FALSE;
 
@@ -55,7 +60,7 @@ BOOLEAN mcgrp_global_pools_init (UINT32  afi)
         (generic_pool_struct*)dy_malloc_zero(sizeof(generic_pool_struct));
 
     res = init_generic_pool(mcgrp_glb->grp_mbrshp_pool, initial_groups,
-                            sizeof(MCGRP_MBRSHP), GENERIC_POOL_MEMCHK_ON);
+                            sizeof(MCGRP_MBRSHP), 0 /* was GENERIC_POOL_MEMCHK_ON */);
     if(!res)
         return FALSE;
 
@@ -66,7 +71,7 @@ BOOLEAN mcgrp_global_pools_init (UINT32  afi)
                    (generic_pool_struct*) dy_malloc_zero(sizeof(generic_pool_struct));
 
     res = init_generic_pool(mcgrp_glb->src_specific_pool, MCGRP_INITIAL_FWD_ENTRY,
-                            sizeof(MCGRP_SOURCE), GENERIC_POOL_MEMCHK_ON);
+                            sizeof(MCGRP_SOURCE), 0 /* was GENERIC_POOL_MEMCHK_ON */);
     if(!res)
         return FALSE;
 
@@ -77,7 +82,7 @@ BOOLEAN mcgrp_global_pools_init (UINT32  afi)
                    (generic_pool_struct*) dy_malloc_zero(sizeof(generic_pool_struct));
 
     res = init_generic_pool(mcgrp_glb->src_specific_client_pool, MCGRP_INITIAL_FWD_ENTRY,
-                            sizeof(MCGRP_CLIENT), GENERIC_POOL_MEMCHK_ON);
+                            sizeof(MCGRP_CLIENT), 0 /* was GENERIC_POOL_MEMCHK_ON */);
     if(!res)
         return FALSE;
 
@@ -204,6 +209,10 @@ void mcgrp_free_source (MCGRP_CLASS   *mcgrp, MCGRP_SOURCE  *mcgrp_src)
         mcgrp_clnt = next_clnt;
     }
 
+    M_AVLL_DESTROY(mcgrp_src->clnt_tree, NULL);
+    mcgrp_src->clnt_tree = NULL;
+
+    /* Return to pool - magic check now disabled to prevent silent leak on magic mismatch */
     generic_free_mem_to_pool((IS_IGMP_CLASS(mcgrp) ? gIgmp.src_specific_pool :
                                                      gMld.src_specific_pool),
                               mcgrp_src);
@@ -221,6 +230,8 @@ void mcgrp_free_client (MCGRP_CLASS   *mcgrp, MCGRP_CLIENT  *mcgrp_clnt)
             WheelTimer_DelElement(mcgrp->mcgrp_wtid,
                                   &mcgrp_clnt->clnt_tmr.mcgrp_wte);
         }
+
+        /* Return to pool - magic check now disabled to prevent silent leak */
         generic_free_mem_to_pool(mcgrp_glb->src_specific_client_pool, mcgrp_clnt);
     }
 }

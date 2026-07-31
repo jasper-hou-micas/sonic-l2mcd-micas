@@ -666,6 +666,19 @@ void mcgrp_stop_phy_port (MCGRP_CLASS       *mcgrp,
 
         mcgrp_destroy_mbrshp_entry(mcgrp, mcgrp_entry, mcgrp_mbrshp);
 
+        if(pims_is_pim_snoop_mbrship(mcgrp_mbrshp))
+        {
+            if(mcgrp_entry->pims_num_wg_join_ports > 0)
+                mcgrp_entry->pims_num_wg_join_ports--;
+            if(mcgrp_entry->pims_num_sg_join_ports > 0)
+                mcgrp_entry->pims_num_sg_join_ports--;
+            MLD_LOG(MLD_LOGLEVEL8, mcgrp->afi, "%s(%d) wg_join_ports:%d sg_join_ports:%d ",
+                    FN, LN, mcgrp_entry->pims_num_wg_join_ports,
+                    mcgrp_entry->pims_num_sg_join_ports);
+        }
+        //else
+        mcgrp_mbrshp->pims_mbr_flags &= ~MLD_OR_IGMP_JOIN_PORT;
+
         // If no member ports left in this group, remove this group from this virtual port
         if (mcgrp_entry->num_mbr_ports == 0)
         {
@@ -2308,6 +2321,13 @@ MCGRP_ENTRY* mcgrp_alloc_group_entry (MCGRP_CLASS  *mcgrp,
 
     static int phy_port_id_offset= M_AVLL_OFFSETOF(MCGRP_MBRSHP, phy_port_id);
     new_grp_entry->mbr_ports_tree=L2MCD_AVL_CREATE(l2mcd_avl_compare_u32, (void *) &phy_port_id_offset, NULL);
+    if (new_grp_entry->mbr_ports_tree == NULL)
+    {
+        M_AVLL_DELETE(mcgrp_l3if->sptr_grp_tree, new_grp_entry);
+        mcgrp_l3if->ngroups--;
+        free(new_grp_entry);
+        return NULL;
+    }
     return new_grp_entry;
 }
 
@@ -2317,6 +2337,8 @@ void mcgrp_free_group_entry (MCGRP_CLASS  *mcgrp,
 {
     if (grp_entry)
     {
+        M_AVLL_DESTROY(grp_entry->mbr_ports_tree, NULL);
+        grp_entry->mbr_ports_tree = NULL;
         free(grp_entry);
     }
 }
@@ -2391,6 +2413,11 @@ MCGRP_MBRSHP* mcgrp_alloc_add_mbrshp_entry (MCGRP_CLASS  *mcgrp,
     static int clnt_addr_offset= M_AVLL_OFFSETOF(MCGRP_CLIENT, clnt_addr);
     new_mbrshp->clnt_tree= L2MCD_AVL_CREATE(mcgrp_addr_cmp_cb_param, (void *) &clnt_addr_offset, NULL);
 
+    if (new_mbrshp->clnt_tree == NULL)
+    {
+        free(new_mbrshp);
+        return NULL;
+    }
 
     if (!mcgrp_vport->is_ve) {
         grp_entry->mbr_port = new_mbrshp;
@@ -2400,6 +2427,7 @@ MCGRP_MBRSHP* mcgrp_alloc_add_mbrshp_entry (MCGRP_CLASS  *mcgrp,
         M_AVLL_INIT_NODE(new_mbrshp->node);
         if (!M_AVLL_INSERT(grp_entry->mbr_ports_tree, new_mbrshp))
         {
+            M_AVLL_DESTROY(new_mbrshp->clnt_tree, NULL);
             free(new_mbrshp);
             return NULL;
         }
@@ -2516,6 +2544,8 @@ void mcgrp_destroy_mbrshp_entry (MCGRP_CLASS  *mcgrp,
     mcgrp_destroy_source_list(mcgrp, mcgrp_mbrshp);
     //TODO: destroy PIM snooping source list as weel here
     mcgrp_destroy_tracking_list(mcgrp, &mcgrp_mbrshp->clnt_tree);
+    M_AVLL_DESTROY(mcgrp_mbrshp->clnt_tree, NULL);
+    mcgrp_mbrshp->clnt_tree = NULL;
 
     /* Destroy PIM snooping source list as well */
     mcgrp_pims_destroy_src_list(mcgrp, mcgrp_mbrshp);
@@ -3114,3 +3144,4 @@ is_physical_or_lag_port(int port)
 {
 	return TRUE;
 }
+

@@ -57,8 +57,8 @@
 #define L2MCD_PORTDB_LAGIF_LAST_INDEX (L2MCD_PORTDB_LAGIF_START_IDX+L2MCD_PORTDB_LAGIF_MAX_IDX-1)
 #define L2MCD_100MS_TIMEOUT      100000
 
-#define L2MCD_IFINDEX_IS_PHY(x) (((x) >= L2MCD_PORTDB_PHYIF_START_IDX) && ((x) <= L2MCD_PORTDB_PHYIF_LAST_IDX))
-#define L2MCD_IFINDEX_IS_LAG(x) (((x) >= L2MCD_PORTDB_LAGIF_START_IDX) && ((x) <= L2MCD_PORTDB_LAGIF_LAST_INDEX))
+#define L2MCD_IFINDEX_IS_PHY(x) ((x>=L2MCD_PORTDB_PHYIF_START_IDX) && x<=L2MCD_PORTDB_PHYIF_LAST_IDX)
+#define L2MCD_IFINDEX_IS_LAG(x) ((x>=L2MCD_PORTDB_LAGIF_START_IDX) && x<=L2MCD_PORTDB_LAGIF_LAST_INDEX)
 #define L2MCD_PORTDB_HASH_SIZE     8192
 #define L2MCD_MAX_INTERFACES       8192
 #define L2MCD_DEFAULT_VRF_IDX      0
@@ -93,8 +93,8 @@ extern int applog_level_map[APP_LOG_LEVEL_MAX + 2];
 #define L2MCD_IFIDX_TYPE_BF(type) V2BF((type), L2MCD_IFIDX_TYPE_OFFSET, L2MCD_IFIDX_TYPE_MASK)
 #define L2MCD_IFIDX_IFID_BF(ifid) V2BF((ifid), L2MCD_IFIDX_IFID_OFFSET, L2MCD_IFIDX_IFID_MASK)
 
-#define L2MCD_VLAN_BM_POS(x) ((x) & 31)
-#define L2MCD_VLAN_BM_IDX(x) ((x) >> 5)
+#define L2MCD_VLAN_BM_POS(x) (x&31)
+#define L2MCD_VLAN_BM_IDX(x) (x>>5)
 #define L2MCD_IS_BIT_SET(val, pos) ((val) & (1<<(pos)))
 #define L2MCD_BIT_SET(val, pos)  ((val) |= (1<<(pos)))
 #define L2MCD_BIT_CLEAR(val, pos)  ((val) &= ~(1<<(pos)))
@@ -125,7 +125,7 @@ static inline void * M_AVLL_NEXT(L2MCD_AVL_TREE avl_tree, L2MCD_AVL_NODE node)
 #define M_AVLL_FIND    avl_find
 #define M_AVLL_DELETE  avl_delete
 #define M_AVLL_INSERT  avl_probe
-#define M_AVLL_DESTROY avl_destroy
+#define M_AVLL_DESTROY L2MCD_AVL_DESTROY
 #define M_AVLL_INIT_NODE(NODE)
 #define M_AVLL_SET_REBALANCE(TREE, FLAG)
 
@@ -386,10 +386,22 @@ static inline L2MCD_AVL_TREE L2MCD_AVL_CREATE(avl_comparison_func *func, void *p
     if (tree->trav == NULL)
     {
         L2MCD_LOG_ERR("%s Error: Failed to allocate memory for traversal structure\n", __FUNCTION__);
-        free(tree);
+        avl_destroy(tree, NULL);
         return NULL;
     }
     return tree;
+}
+
+static inline void L2MCD_AVL_DESTROY(L2MCD_AVL_TREE tree, avl_item_func *destroy)
+{
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    free(tree->trav);
+    tree->trav = NULL;
+    avl_destroy(tree, destroy);
 }
 
 int l2mcd_system_init(int flag);
@@ -425,3 +437,4 @@ int l3_time_freq_init(void);
 int l2mcd_port_list_update(char *pnames, int oper_state, int is_add);
 void igmp_process_pimv2_packet(char *sptr_ip6_hdr,  UINT16 vir_port_id, UINT32 phy_port_id);
 #endif
+

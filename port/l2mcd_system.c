@@ -1766,7 +1766,7 @@ struct event *l2mcd_igmprx_sock_init(int *fd, char *iname)
         L2MCD_INIT_LOG("%s sock_opt IP_PKTINFO set failed %s",FN,strerror(errno));
         return NULL;
     }
-    skmem=8*1024*1024;
+    skmem=16*1024*1024;
     if (setsockopt(*fd, SOL_SOCKET, SO_RCVBUF, &skmem, sizeof(int)) < 0) 
     {
         L2MCD_INIT_LOG("%s sock_opt BUF set failed %s",FN,strerror(errno));
@@ -2007,7 +2007,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
     }
 }
 
-#define MLD_RX_BUF_SIZE (8*1024*1024)
+#define MLD_RX_BUF_SIZE (16*1024*1024)
 struct sock_filter g_mld_filter[] = {
     // load ether type at 12
     BPF_STMT(BPF_LD  | BPF_H | BPF_ABS, 12),
