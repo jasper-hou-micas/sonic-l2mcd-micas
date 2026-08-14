@@ -175,6 +175,14 @@ int l2mcd_system_mrouter_notify(int vir_port, int phy_port_id, int is_static, in
     {
         memcpy(msg.port.pnames, l2mcd_if_tree->iname, sizeof(msg.port.pnames));
         msg.port_oper = l2mcd_if_tree->oper;
+        L2MCD_LOG_INFO("%s:%d:[vlan:%d] Mrouter notify resolved phy_port:%d port:%s oper:%d kif:%d po:%d",
+                FN, LN, vir_port, phy_port_id, msg.port.pnames, msg.port_oper,
+                l2mcd_if_tree->kif, l2mcd_if_tree->po_id);
+    }
+    else
+    {
+        L2MCD_LOG_INFO("%s:%d:[vlan:%d] Mrouter notify missing if_tree for phy_port:%d; APPDB key port will be empty",
+                FN, LN, vir_port, phy_port_id);
     }
 
     msg.op_code = insert;
@@ -358,7 +366,7 @@ int is_interface_up(char *ifname)
 
 void l2mcsyncd_send_notify(char *type, char *option, char *param)
 {
-    char params[20];
+    char params[64];
     sprintf(params, "%s|%s", option, param);
     l2mcsync_notify_config_done(type, params);
 }
@@ -544,9 +552,16 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, data->op_code? 1:0, -1, L2MCD_IPV4_AFI);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, data->op_code? 1:0, -1, L2MCD_IPV6_AFI);
                     if (data->op_code) 
-                        l2mcsyncd_send_notify(NOTIFY_PARAM_LINK_STATUS, "up", data->ports[i].pnames);
+                    {
+                        snprintf(param, sizeof(param), "%d", vlan_id);
+                        l2mcsyncd_send_notify(NOTIFY_PARAM_VLAN_MEMBER_READY,
+                                              data->ports[i].pnames, param);
+                    }
                     if (!data->op_code) 
                     {
+                        snprintf(param, sizeof(param), "%d", vlan_id);
+                        l2mcsyncd_send_notify(NOTIFY_PARAM_VLAN_MEMBER_REMOVED,
+                                              data->ports[i].pnames, param);
                         mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(L2MCD_IPV4_AFI, L2MCD_DEFAULT_VRF_IDX);
                         mld_protocol_port_state_notify(vlan_node, L2MCD_IPV4_AFI, mcgrp, ifidx, 0);
                         mcgrp = MCGRP_GET_INSTANCE_FROM_VRFINDEX(L2MCD_IPV6_AFI, L2MCD_DEFAULT_VRF_IDX);
@@ -684,6 +699,9 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                     L2MCD_VLAN_LOG_INFO(vlan_id, "[vlan:%d] vlan-member:%s ifindx:%d", vlan_id, data->ports[i].pnames, ifidx);
                     mld_map_port_vlan_state(vlan_id, ifidx, TRUE, MLD_VLAN, TRUE, lif_state, data->ports[i].tagged);
                     l2mcd_add_kif_to_if(data->ports[i].pnames, ifidx, -1, NULL, -1, vlan_id, 1, -1, afi);
+                    snprintf(param, sizeof(param), "%d", vlan_id);
+                    l2mcsyncd_send_notify(NOTIFY_PARAM_VLAN_MEMBER_READY,
+                                          data->ports[i].pnames, param);
                 }
 
                 sprintf(param, "%s|%d", NOTIFY_PARAM_ACTION_ENABLE, vlan_id);
@@ -724,6 +742,8 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
                 for (int i = 0; i < count; i++)
                 {
                     L2MCD_APP_TABLE_ENTRY *entry = &entries[i];
+                    memset(&grpaddr, 0, sizeof(grpaddr));
+                    memset(&srcaddr, 0, sizeof(srcaddr));
                     MADDR_ST src_addr;
                     MADDR_ST grp_addr;
                     uint8_t  sync_action = IS_EXCL;
@@ -841,6 +861,9 @@ static void l2mcd_process_ipc_msg(L2MCD_IPC_MSG *msg, int len, struct sockaddr_u
             vlan_id = data->vlan_id;
             iftype = L2MCD_IF_TYPE_PHYSICAL;
             vlan_node = mld_vdb_vlan_get(vlan_id, MLD_VLAN);
+            L2MCD_LOG_NOTICE("%s:%d:[vlan:%d] MROUTER IPC rx op:%d cnt:%d afi:%d msg_len:%u port[0]:%s vlan_node:%p",
+                    FN, LN, vlan_id, data->op_code, data->count, afi, msg->msg_len,
+                    data->ports[0].pnames, (void *)vlan_node);
             if (!is_interface_up(data->ports[0].pnames))
             {
                 L2MCD_LOG_NOTICE("Interface %s is not up or not in vlan %d", data->ports[0].pnames, data->vlan_id);

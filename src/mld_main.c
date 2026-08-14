@@ -121,7 +121,7 @@ void mld_vport_state_notify (UINT16   vir_port_id,
             }
         }
         /* notify l2mcmgr send pre-config static entry */
-        l2mcsyncd_send_notify(NOTIFY_PARAM_LINK_STATUS, "up", mld_get_if_name_from_ifindex(primary_phy_port));
+        //l2mcsyncd_send_notify(NOTIFY_PARAM_LINK_STATUS, "up", mld_get_if_name_from_ifindex(primary_phy_port));
     }
     else
     {
@@ -140,7 +140,7 @@ void mld_vport_state_notify (UINT16   vir_port_id,
         mcgrp_stop_phy_port(mld, mld_vport, mld_pport);
         mcgrp_delete_router_port(mld, mld_vport,  phy_port_id);
         /* notify l2mcmgr send pre-config static entry */
-        l2mcsyncd_send_notify(NOTIFY_PARAM_LINK_STATUS, "down", mld_get_if_name_from_ifindex(primary_phy_port));
+        //l2mcsyncd_send_notify(NOTIFY_PARAM_LINK_STATUS, "down", mld_get_if_name_from_ifindex(primary_phy_port));
     } /* if (up) ... else ... */
 
 } /* mld_vport_state_notify */

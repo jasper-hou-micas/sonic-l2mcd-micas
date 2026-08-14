@@ -174,36 +174,77 @@ l2mcd_if_tree_t* l2mcd_kif_to_rx_if(uint32_t kif)
 
 int l2mcd_portstate_update(int kif, int state, char *iname)
 {
-    l2mcd_if_tree_t *l2mcd_if_tree1, *l2mcd_if_tree2; 
+    l2mcd_if_tree_t *l2mcd_if_tree1 = NULL;
+    l2mcd_if_tree_t *l2mcd_if_tree2 = NULL;
     int prev_oper;
+    int recreated = FALSE;
 
     l2mcd_if_tree1 = l2mcd_kif_to_if(kif);
     if (l2mcd_if_tree1)
+        l2mcd_if_tree2 = l2mcd_if_to_kif(l2mcd_if_tree1->ifid);
+
+    if (!l2mcd_if_tree1 || !l2mcd_if_tree2)
     {
-        l2mcd_if_tree2=l2mcd_if_to_kif(l2mcd_if_tree1->ifid);
-    }
-    if (l2mcd_if_tree1 && l2mcd_if_tree2)
-    {
-        prev_oper = l2mcd_if_tree1->oper;
-        l2mcd_if_tree1->oper = state;
-        l2mcd_if_tree2->oper = state;
-        l2mcd_port_state_notify_handler(l2mcd_if_tree2, state);
-        if (prev_oper != state)
+        L2MCD_LOG_NOTICE(
+            "%s Port:%s kif:%d state:%d if_tree not found, recreate",
+            __FUNCTION__, iname, kif, state);
+
+        /*
+         * A corresponding IGMP/MLD port tree is created based on the iname.
+         */
+        if (l2mcd_port_list_update(iname, state, TRUE) != 0)
         {
-            L2MCD_LOG_NOTICE("%s kif:%d port:%s lif:%d kif:%d state:%s changed",
-                __FUNCTION__, kif, l2mcd_if_tree2->iname, l2mcd_if_tree2->ifid,l2mcd_if_tree2->kif, l2mcd_if_tree2->oper?"UP":"DOWN");
+            L2MCD_LOG_NOTICE(
+                "%s Port:%s kif:%d recreate port tree failed",
+                __FUNCTION__, iname, kif);
+            return -1;
         }
-        L2MCD_LOG_DEBUG("%s kif:%d port:%s lif:%d kif:%d state:%s prev_oper:%d",
-            __FUNCTION__, kif, l2mcd_if_tree2->iname, l2mcd_if_tree2->ifid,l2mcd_if_tree2->kif, l2mcd_if_tree2->oper?"UP":"DOWN",prev_oper);
-        return 0;
+
+        l2mcd_if_tree1 = l2mcd_kif_to_if(kif);
+        if (l2mcd_if_tree1)
+            l2mcd_if_tree2 = l2mcd_if_to_kif(l2mcd_if_tree1->ifid);
+
+        if (!l2mcd_if_tree1 || !l2mcd_if_tree2)
+        {
+            L2MCD_LOG_NOTICE(
+                "%s Port:%s kif:%d recreate succeeded but tree still missing",
+                __FUNCTION__, iname, kif);
+            return -1;
+        }
+
+        /*
+         * The port tree has just been rebuilt and needs to be forcibly synchronized once.
+         */
+        prev_oper = !state;
+        recreated = TRUE;
     }
     else
     {
-        L2MCD_LOG_NOTICE("%s Port:%s, kif:%d state:%d if_tree not found", __FUNCTION__, iname, kif, state);
+        prev_oper = l2mcd_if_tree1->oper;
     }
-    
-    return -1;
 
+    l2mcd_if_tree1->oper = state;
+    l2mcd_if_tree2->oper = state;
+
+    /*
+     * Notifications are only triggered when the state actually changes, or when the port tree has just been rebuilt.
+     */
+    if (recreated || prev_oper != state)
+    {
+        l2mcd_port_state_notify_handler(l2mcd_if_tree2, state);
+
+        l2mcsyncd_send_notify(
+            NOTIFY_PARAM_LINK_STATUS,
+            state ? "up" : "down",
+            l2mcd_if_tree2->iname);
+
+        L2MCD_LOG_NOTICE(
+            "%s kif:%d port:%s state:%s changed",
+            __FUNCTION__, kif, l2mcd_if_tree2->iname,
+            state ? "UP" : "DOWN");
+    }
+
+    return 0;
 }
 int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
 {

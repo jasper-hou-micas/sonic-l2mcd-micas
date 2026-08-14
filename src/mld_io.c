@@ -533,19 +533,19 @@ void l2mcd_mld_process_v2_report(IP6_RX_PKT_MSG* mld_pkt_msg)
     MCGRP_L3IF      *mld_vport = NULL;
     MADDR_ST        group_addr, src_addr;
 
-    //group 
-    MLDV2_GROUP_PACKET* mldv2_group_packet = (MLDV2_GROUP_PACKET*)(mld_pkt_msg->pkt_data);
-    MLDV2_REPORT_MESSAGE *mld_v2_report = &(mldv2_group_packet->mld_report);
-    USHORT rx_port_number = mld_pkt_msg->ip_param.rx_port_number;
-    UINT32 rx_phy_port_number = mld_pkt_msg->ip_param.rx_physical_port_number;
-    IPV6_ADDRESS* dest_ip = &mldv2_group_packet->ip_header.destination_ip_address;
-
     L2MCD_LOG_NOTICE("[MLD] v2 report received");
     if (NULL == mld_pkt_msg)
     {
         L2MCD_LOG_ERR("invalid input!");
         return;
     }
+
+    //group 
+    MLDV2_GROUP_PACKET* mldv2_group_packet = (MLDV2_GROUP_PACKET*)(mld_pkt_msg->pkt_data);
+    MLDV2_REPORT_MESSAGE *mld_v2_report = &(mldv2_group_packet->mld_report);
+    USHORT rx_port_number = mld_pkt_msg->ip_param.rx_port_number;
+    UINT32 rx_phy_port_number = mld_pkt_msg->ip_param.rx_physical_port_number;
+    IPV6_ADDRESS* dest_ip = &mldv2_group_packet->ip_header.destination_ip_address;
 
     UINT8 mldver = MLD_VERSION_2;
     mld_pkt_msg->ip_param.version = mldver;

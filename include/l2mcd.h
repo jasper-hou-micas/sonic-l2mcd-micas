@@ -435,6 +435,7 @@ void portdb_insert_addr_ipv6_list(L2MCD_AVL_TREE *portdb_tree, UINT32 port_index
 int l2mcd_portstate_update(int kif, int state, char *iname);
 int l3_time_freq_init(void);
 int l2mcd_port_list_update(char *pnames, int oper_state, int is_add);
+void l2mcsyncd_send_notify(char *type, char *option, char *param);
 void igmp_process_pimv2_packet(char *sptr_ip6_hdr,  UINT16 vir_port_id, UINT32 phy_port_id);
 #endif
 
