@@ -924,6 +924,15 @@ UINT32 ip_get_lowest_ip_address_on_port(UINT16 port_number, uint8_t type)
         else 
             ip_address = mld_portdb_get_port_lowest_ipv4_addr_from_list(port_number);
     }
+    if (!ip_address && vlan_node && vlan_node->type == MLD_VLAN) {
+        /* SONiC binds no VE to a VLAN: l2mcmgrd's INTERFACE_TABLE update keeps
+         * the VLAN interface's addresses in ve_portdb_tree under the VLAN id,
+         * while ve_ifindex ends up 0, the SVI ifindex or the bare VLAN id
+         * depending on the order of the VLAN, address and snooping updates
+         * (the bare id fails the SVI test and is looked up in mld_portdb_tree,
+         * which holds no address). Fall back to the VLAN id's entry. */
+        ip_address = ve_mld_portdb_get_port_lowest_ipv4_addr_from_list(vlan_node->gvid);
+    }
     if(ip_address < lowest_ip_address)
         lowest_ip_address = ip_address;
     return (lowest_ip_address);
@@ -1428,6 +1437,12 @@ void igmp_send_general_query( MCGRP_CLASS *igmp,
             sptr_addr_entry = (port_link_list_t *)(portdb_get_port_lowest_ipv4_addr_from_list(mld_portdb_tree, port_id));
             L2MCD_VLAN_LOG_DEBUG(tx_port_number, "%s:%d:[vlan:%d] Router ifindex:0x%x port:0x%x ", FN, LN, tx_port_number, vlan_node->ifindex,port_id);
         }
+    }
+    if (!sptr_addr_entry && vlan_node && vlan_node->type == MLD_VLAN) {
+        /* the VLAN interface's addresses by VLAN id, whatever ve_ifindex
+         * holds (see ip_get_lowest_ip_address_on_port). Without this every
+         * general query left from 0.0.0.0. */
+        sptr_addr_entry = (port_link_list_t *)(portdb_get_port_lowest_ipv4_addr_from_list(ve_mld_portdb_tree, vlan_node->gvid));
     }
 
 

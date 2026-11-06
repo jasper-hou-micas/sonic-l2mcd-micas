@@ -1149,6 +1149,8 @@ void mcgrp_vport_start_querier_process(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_v
 				//L2MCD_LOG_INFO("%s(%d): VE DB lookup port_id:%d ipv4_addr:0%x ", FN, LN, port_id, ipv4_addr);
 			}
 		}
+		if (!ipv4_addr && vlan_node->type == MLD_VLAN)	/* by VLAN id (see ip_get_lowest_ip_address_on_port) */
+			ipv4_addr = ve_mld_portdb_get_port_lowest_ipv4_addr_from_list(vlan_node->gvid);
 
 
 		if (!IPV4_ADDR_SAME(&ipv4_addr, &mcgrp_vport->querier_router.ip.v4addr)) {
@@ -1175,6 +1177,8 @@ void mcgrp_vport_start_querier_process(MCGRP_CLASS * mcgrp, MCGRP_L3IF * mcgrp_v
 				//L2MCD_LOG_INFO("%s(%d): VE DB lookup port_id:%d ipv4_addr:0%x ", FN, LN, port_id, ipv4_addr);
 			}
 		}
+		if (IP6_IS_ADDRESS_UNSPECIFIED(ipv6_addr.address) && vlan_node->type == MLD_VLAN)
+			ipv6_addr = ve_mld_portdb_get_port_lowest_ipv6_addr_from_list(vlan_node->gvid);
 
 
 		if (!IPV6_ADDR_SAME(&ipv6_addr, &mcgrp_vport->querier_router.ip.v6addr)) {

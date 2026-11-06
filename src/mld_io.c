@@ -76,6 +76,11 @@ IPV6_ADDRESS ip_get_lowest_ipv6_address_on_port(UINT16 port_number, uint8_t type
             ip6_address = mld_portdb_get_port_lowest_ipv6_addr_from_list(port_number);
         }
     }
+    if (vlan_node && vlan_node->type == MLD_VLAN && IP6_IS_ADDRESS_UNSPECIFIED(ip6_address.address)) {
+        /* the VLAN interface's addresses by VLAN id (see
+         * ip_get_lowest_ip_address_on_port) */
+        ip6_address = ve_mld_portdb_get_port_lowest_ipv6_addr_from_list(vlan_node->gvid);
+    }
     if (memcmp(&ip6_address, &lowest_ip6_address, 16))
         lowest_ip6_address = ip6_address;
     return lowest_ip6_address;
@@ -1292,7 +1297,7 @@ void mld_send_general_query(
     MCGRP_L3IF *mld_vport = NULL;
 
     IPV6_ADDRESS src_addr;
-    IPV6_ADDRESS src_address;
+    IPV6_ADDRESS src_address = IP6_ADDRESS_UNSPECIFIED_INIT;
 
     mld_vport = gMld.port_list[tx_port_number];
     if (mld_vport == NULL)
@@ -1328,6 +1333,11 @@ void mld_send_general_query(
                 "%s:%d:[vlan:%d] Router ipv6 lookup",
                 FN, LN, tx_port_number);
         }
+    }
+    if (vlan_node && vlan_node->type == MLD_VLAN && IP6_IS_ADDRESS_UNSPECIFIED(src_address.address)) {
+        /* the VLAN interface's addresses by VLAN id (see
+         * ip_get_lowest_ip_address_on_port) */
+        src_address = ve_mld_portdb_get_port_lowest_ipv6_addr_from_list(vlan_node->gvid);
     }
 
     L2MCD_VLAN_LOG_DEBUG(tx_port_number,

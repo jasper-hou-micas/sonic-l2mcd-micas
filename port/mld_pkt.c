@@ -138,6 +138,20 @@ void mld_tx_static_report_leave_on_mrtr_port(MCGRP_CLASS  *mld, MADDR_ST *grp_ad
 			}
 		}
 	}
+	if (vlan_node && vlan_node->type == MLD_VLAN) {
+		/* the VLAN interface's addresses by VLAN id (see
+		 * ip_get_lowest_ip_address_on_port in igmp_io.c) */
+		if (MCAST_IPV4_AFI == afi && !src_addr) {
+			port_link_list_t *ve_entry = (port_link_list_t *)portdb_get_port_lowest_ipv4_addr_from_list(ve_mld_portdb_tree, vlan_node->gvid);
+			if (ve_entry)
+				src_addr = ve_entry->value.ipaddress;
+		}
+		if (MCAST_IPV6_AFI == afi && IP6_IS_ADDRESS_UNSPECIFIED(src_addr6.address)) {
+			PORTDB_IP6_ADDRESS_ENTRY *ve_entry6 = (PORTDB_IP6_ADDRESS_ENTRY *)portdb_get_port_lowest_ipv6_addr_from_list(ve_mld_portdb_tree, vlan_node->gvid);
+			if (ve_entry6)
+				src_addr6 = ve_entry6->ipaddress;
+		}
+	}
 
 
 	source = rx_phy_port;
