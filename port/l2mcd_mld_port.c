@@ -3472,6 +3472,8 @@ BOOLEAN mcast_validate_igmp_packet(IGMP_MESSAGE * sptr_igmp_message,
 		break;
 
 	case IGMP_V3_MEMBERSHIP_REPORT_TYPE:
+		if (!igmpv3_report_fits(igmpv3_rep, igmp_pkt_size))
+			return FALSE;
 
 		num_grps = net_to_host_short(igmpv3_rep->num_grps);
 		grp_rec = igmpv3_rep->group_record;
@@ -3485,7 +3487,7 @@ BOOLEAN mcast_validate_igmp_packet(IGMP_MESSAGE * sptr_igmp_message,
 				num_srcs = net_to_host_short(grp_rec->num_srcs);
 				pkt_size =
 				    pkt_size + IGMPV3_GROUP_REC_HDR_SIZE +
-				    ((num_srcs) * sizeof (UINT32));
+				    ((num_srcs + grp_rec->aux_data_len) * sizeof (UINT32));
 			} else {
 				return FALSE;
 			}
@@ -3581,6 +3583,8 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
     mcast_set_ipv6_addr(&mldv2_addr, &mldv2);
     mld_vport = gMld.port_list[vir_port_id];
     vid = mld_l3_get_port_from_ifindex(vir_port_id, MLD_VLAN);
+    if (!icmp6h)    /* next header neither hop-by-hop nor ICMPv6 */
+        return FALSE;
     switch (icmp6h->type)
     {
     case MLD_MEMBERSHIP_QUERY_TYPE: // MLDv1v2 Query
@@ -3672,14 +3676,17 @@ BOOLEAN mcast_validate_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
             return FALSE;
         }
 
-        UINT16 offset = 0;
+        UINT32 offset = 0;
         UINT16 num_grps = ntohs(mesg->num_grps);
-        MLDV2_GROUP_RECORD *mldv2_group_rec = &mesg->group_record;
-        for (int n = 0; n < num_grps; n++)
+        MLDV2_GROUP_RECORD *mldv2_group_rec = mesg->group_record;
+        if (!mldv2_report_fits(mesg, mesg_size))
         {
-            int num_srcs = ntohs(mldv2_group_rec->num_srcs);
-            offset = offset + sizeof(MLDV2_GROUP_RECORD) + (num_srcs - 1) * sizeof(IPV6_ADDRESS);
-            mldv2_group_rec = (MLDV2_GROUP_RECORD *)((UINT8 *)mldv2_group_rec + offset);
+            mld->mld_stats[vir_port_id].recv_size_or_range_error++;
+            return FALSE;
+        }
+        for (int n = 0; n < num_grps; n++, mldv2_group_rec = MLDV2_NEXT_REC(mldv2_group_rec))
+        {
+            offset += (UINT8 *)MLDV2_NEXT_REC(mldv2_group_rec) - (UINT8 *)mldv2_group_rec;
         }
         if (mesg_size != offset + sizeof(MLDV2_REPORT_MESSAGE) - sizeof(MLDV2_GROUP_RECORD))
         {

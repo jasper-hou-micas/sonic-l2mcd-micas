@@ -223,6 +223,8 @@ typedef struct
     uint32_t no_aux;
     uint32_t no_tag;
     uint32_t inv_tags;
+    uint32_t malformed_igmp;    /* dropped: lengths or records past the packet */
+    uint32_t malformed_mld;
 } L2MCD_RX_SOCK_STATS;
 
 typedef struct L2MCD_CONTEXT {
@@ -328,6 +330,8 @@ extern L2MCD_CONTEXT l2mcd_context;
 #define g_rx_stats_tot_pkts               l2mcd_context.rx_stats.tot_pkts
 #define g_rx_stats_no_aux                 l2mcd_context.rx_stats.no_aux
 #define g_rx_stats_no_tag                 l2mcd_context.rx_stats.no_tag
+#define g_rx_stats_malformed_igmp         l2mcd_context.rx_stats.malformed_igmp
+#define g_rx_stats_malformed_mld          l2mcd_context.rx_stats.malformed_mld
 #define g_rx_stats_inv_tags               l2mcd_context.rx_stats.inv_tags
 #define g_portdb_pending_count            l2mcd_context.portdb_pending_count
 #define g_port_init_done                  l2mcd_context.port_init_done
@@ -423,6 +427,15 @@ int l2mcd_del_if_tree(uint32_t ifid);
 l2mcd_if_tree_t* l2mcd_if_to_kif(uint32_t ifid);
 l2mcd_if_tree_t* l2mcd_kif_to_if(uint32_t kif);
 l2mcd_if_tree_t* l2mcd_kif_to_rx_if(uint32_t kif);
+
+/* A malformed IGMP or MLD packet is dropped, counted in g_rx_stats_malformed_*
+ * and logged at most once per family every L2MCD_RX_DROP_LOG_SECS, with the
+ * number dropped since the last line: a flood of them cannot flood the log. */
+#define L2MCD_RX_DROP_COUNTERS
+#define L2MCD_IGMP_RX_LEN_CHECK
+int l2mcd_igmp_rx_len_ok(const uint8_t *ip, size_t len);
+#define L2MCD_RX_DROP_LOG_SECS 10
+void l2mcd_rx_drop(int afi, uint32_t vid, uint32_t port, const char *why);
 void l2mcd_set_loglevel(int level);
 void l2mcd_dump_cfg(int vid);
 void l2mcd_dump_custom(int id);

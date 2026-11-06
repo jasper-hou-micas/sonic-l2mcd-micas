@@ -159,6 +159,29 @@ l2mcd_if_tree_t* l2mcd_if_to_kif(uint32_t ifid)
     return(M_AVLL_FIND(g_l2mcd_if_to_kif_tree, &ifid));
 }
 
+void l2mcd_rx_drop(int afi, uint32_t vid, uint32_t port, const char *why)
+{
+    static struct timespec last[2];
+    static uint32_t since[2];
+    struct timespec now;
+    int v6 = (afi == L2MCD_IPV6_AFI);
+    char *ifname;
+
+    if (v6)
+        g_rx_stats_malformed_mld++;
+    else
+        g_rx_stats_malformed_igmp++;
+    since[v6]++;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    if ((last[v6].tv_sec || last[v6].tv_nsec) && now.tv_sec - last[v6].tv_sec < L2MCD_RX_DROP_LOG_SECS)
+        return;
+    ifname = portdb_get_ifname_from_portindex(port);
+    L2MCD_LOG_NOTICE("%s rx: dropped a malformed packet on Vlan%u port %s: %s (%u dropped since the last report)",
+                     v6 ? "MLD" : "IGMP", vid, ifname ? ifname : "?", why, since[v6]);
+    last[v6] = now;
+    since[v6] = 0;
+}
+
 l2mcd_if_tree_t* l2mcd_kif_to_rx_if(uint32_t kif)
 {
     l2mcd_if_tree_t *l2mcd_if_tree;

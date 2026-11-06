@@ -1489,6 +1489,23 @@ void l2mcd_nl_msg(evutil_socket_t fd, short what, void *arg)
     return; 
 }
 
+/* Whether an IPv4 packet of len bytes (from the IP header on) has lengths the
+ * IGMP path may trust: a 20-byte header at least, ihl inside tot_len and
+ * tot_len inside what was received (a padded frame may carry more). The IGMP
+ * code computes its message length from tot_len and ihl, and l2mcd_fwd_pkt()
+ * copies tot_len bytes to the router ports. */
+int l2mcd_igmp_rx_len_ok(const uint8_t *ip, size_t len)
+{
+    const struct iphdr *iph = (const struct iphdr *)ip;
+    size_t hl, tl;
+
+    if (len < sizeof(struct iphdr))
+        return 0;
+    hl = iph->ihl * 4;
+    tl = ntohs(iph->tot_len);
+    return hl >= sizeof(struct iphdr) && hl <= tl && tl <= len;
+}
+
 static int l2mcd_pkt_rx_batch_proc=1;
 #define  L2MCD_MM_SOCKET_BATCH_SIZE  500
 #define L2MCD_NSEC_PER_MSEC   1000000UL
@@ -1526,6 +1543,7 @@ void l2mcd_recv_igmp_msg(evutil_socket_t fd, short what, void *arg)
     int  msg_proc_thread=0;
     int num_pkts=0, i=0;
     struct iphdr *iph;
+    size_t pkt_len;
 
     if (!l2mcd_pkt_rx_batch_proc)
     {
@@ -1693,6 +1711,13 @@ void l2mcd_recv_igmp_msg(evutil_socket_t fd, short what, void *arg)
                 }
                 ip_param->rx_phy_port_number = l2mcd_if_tree->ifid;// l2mcd_if_tree1->po_id ? l2mcd_if_tree1->po_id:l2mcd_if_tree->ifid;
                 l2mcd_if_tree->rx_pkts++;
+                pkt_len = l2mcd_pkt_rx_batch_proc ? mmsg[i].msg_len : len;
+                if (pkt_len < sizeof(struct ether_header) ||
+                    !l2mcd_igmp_rx_len_ok((uint8_t *)iph, pkt_len - sizeof(struct ether_header)))
+                {
+                    l2mcd_rx_drop(L2MCD_IPV4_AFI, vid, l2mcd_if_tree->ifid, "IPv4 header lengths past the bytes received");
+                    continue;
+                }
                 if (iph->protocol == IPPROTO_IGMP)
                 {
                     g_rx_stats_igmp_pkts++;
@@ -1880,6 +1905,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         struct ethhdr *eth = (struct ethhdr *)buf6[i];
         uint16_t ether_type = ntohs(eth->h_proto);
         ssize_t len = mmsg6[i].msg_len;
+        size_t l2_len;
         uint16_t vlan_id = 0;
 
         if (ether_type == ETH_P_8021Q)
@@ -1890,7 +1916,8 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
             uint16_t real_proto = ntohs(vhdr->h_vlan_encapsulated_proto);
             if (real_proto == ETH_P_IPV6)
             {
-                ip6h = (IPV6_HEADER *)(buf6 + sizeof(struct vlan_ethhdr));
+                ip6h = (IPV6_HEADER *)(buf6[i] + sizeof(struct vlan_ethhdr));
+                l2_len = sizeof(struct vlan_ethhdr);
                 L2MCD_LOG_NOTICE("real_proto == ETH_P_IPV6: %d", real_proto);
             }
             else
@@ -1907,6 +1934,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         else 
         {
             ip6h = (IPV6_HEADER *)(buf6[i] + sizeof(struct ether_header));
+            l2_len = sizeof(struct ether_header);
         }
         L2MCD_LOG_INFO("packet size: %d", len);
 
@@ -2000,7 +2028,7 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
             L2MCD_LOG_ERR("vlan_node is not set");
             continue;
         }
-        if (len < sizeof(struct ethhdr) + sizeof(IPV6_HEADER) + sizeof(struct ipv6_hopopt_hdr) + sizeof(ICMP6_PSEUDO_HDR_MESSAGE))
+        if (len < l2_len + sizeof(IPV6_HEADER) + sizeof(struct ipv6_hopopt_hdr) + sizeof(ICMP6_PSEUDO_HDR_MESSAGE))
         {
             L2MCD_LOG_ERR("len < sizeof(struct ethhdr) + sizeof(IPV6_HEADER) + sizeof(struct ipv6_hopopt_hdr) + sizeof(ICMP6_PSEUDO_HDR_MESSAGE)");
             continue;
@@ -2021,8 +2049,8 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         memcpy(&ip6_rx_msg.ip_param.source_address, &ip6h->source_ip_address, sizeof(IPV6_ADDRESS));
         l2mcd_if_tree->rx_pkts++;
 
-        ip6_rx_msg.pkt_data = buf6[i] + sizeof(struct ether_header);
-        ip6_rx_msg.pkt_size = len - sizeof(struct ether_header);
+        ip6_rx_msg.pkt_data = (uint8_t *)ip6h;
+        ip6_rx_msg.pkt_size = len - l2_len;
         L2MCD_LOG_NOTICE("[MLD RX] if:%s ifindex:%d len=%zd pkt_len:%d", ifname, ifindex, len, ip6_rx_msg.pkt_size);
         g_rx_stats_mld_pkts++;
 

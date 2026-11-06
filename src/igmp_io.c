@@ -88,18 +88,64 @@ enum BOOLEAN igmp_check_if_checksum_is_valid (IGMP_MESSAGE  *sptr_igmp_message,
 {
     UINT16 calculated_checksum;
 
-    /* calculate checksum for the whole IGMP message */
+    /* calculate checksum for the whole IGMP message; a zero checksum field is
+     * not "no checksum" in IGMP, it is checked like any other */
+    calculated_checksum = calculate_ip_checksum (NULL, (BYTE *) sptr_igmp_message, message_size);
 
-    if (sptr_igmp_message->checksum != 0x0000)
+    if (calculated_checksum != 0x0000)
     {
-        calculated_checksum = calculate_ip_checksum (NULL, (BYTE *) sptr_igmp_message, message_size);
-
-        if (calculated_checksum != 0x0000)
-        {
-            return (FALSE);
-        }
+        return (FALSE);
     }
     return (TRUE);
+}
+
+/* Whether every record of an IGMPv3 report lies inside its len bytes: per
+ * record 8 bytes, then num_srcs sources and aux_data_len words (RFC 3376 4.2).
+ * Nothing past the report header is read before this has said yes. */
+enum BOOLEAN igmpv3_report_fits(IGMPV3_REPORT *rep, UINT32 len)
+{
+    UINT8 *p = (UINT8 *) rep->group_record;
+    UINT8 *end = (UINT8 *) rep + len;
+    UINT16 g, num_grps;
+
+    if (len < IGMPV3_REPORT_HDR_SIZE)
+        return FALSE;
+    num_grps = net_to_host_short(rep->num_grps);
+    for (g = 0; g < num_grps; g++)
+    {
+        IGMPV3_GROUP_RECORD *rec = (IGMPV3_GROUP_RECORD *) p;
+
+        if (end - p < IGMPV3_GROUP_REC_HDR_SIZE)
+            return FALSE;
+        if ((UINT32) (end - p - IGMPV3_GROUP_REC_HDR_SIZE) / sizeof(UINT32) <
+                (UINT32) net_to_host_short(rec->num_srcs) + rec->aux_data_len)
+            return FALSE;
+        p = (UINT8 *) NEXT_GRP_REC(rec);
+    }
+    return TRUE;
+}
+
+/* Why an IGMP message of size bytes cannot be parsed, or NULL if it can. */
+static const char *igmp_malformed(IGMP_MESSAGE *msg, UINT16 size)
+{
+    IGMPV3_MESSAGE *query = (IGMPV3_MESSAGE *) msg;
+
+    switch (msg->type)
+    {
+        case IGMP_MEMBERSHIP_QUERY_TYPE:
+            /* RFC 3376 7.1: 8 octets is v1/v2, 12 or more v3, 9-11 is ignored */
+            if (size != sizeof(IGMP_MESSAGE) && size < IGMPV3_QUERY_HDR_SIZE)
+                return "query of 9 to 11 bytes";
+            if (size >= IGMPV3_QUERY_HDR_SIZE &&
+                (size - IGMPV3_QUERY_HDR_SIZE) / sizeof(UINT32) < net_to_host_short(query->num_srcs))
+                return "IGMPv3 query listing more sources than it carries";
+            break;
+        case IGMP_V3_MEMBERSHIP_REPORT_TYPE:
+            if (!igmpv3_report_fits((IGMPV3_REPORT *) msg, size))
+                return "IGMPv3 report with records past its end";
+            break;
+    }
+    return NULL;
 }
 
 void igmp_warn_version_mismatch(MCGRP_PORT_ENTRY* igmp_pport, 
@@ -170,7 +216,7 @@ void igmp_process_query(MCGRP_CLASS *igmp,
     // Update stats
     if (group_address == 0)
         igmp->igmp_stats[vir_port_id].igmp_recv_gen_query_msg[igmpver-1]++;
-    else if (igmpver == IGMP_VERSION_2 || igmpv3_msg->num_srcs == 0)
+    else if (igmpver != IGMP_VERSION_3 || igmpv3_msg->num_srcs == 0)    /* v1 may be 8 bytes */
         igmp->igmp_stats[vir_port_id].igmp_recv_grp_query_msg++;
     else
         igmp->igmp_stats[vir_port_id].igmp_recv_grp_src_query_msg++;
@@ -311,7 +357,7 @@ void igmp_process_query(MCGRP_CLASS *igmp,
                 // This is a V3 source-specific query and the suppress bit is not set,
                 // so update the source's age
 
-                UINT16 s, num_srcs = igmpv3_msg->num_srcs;
+                UINT16 s, num_srcs = net_to_host_short(igmpv3_msg->num_srcs);
                 UINT32* p_srcaddr = igmpv3_msg->source_ary;
 
                 mcast_init_addr(&addr, IP_IPV4_AFI, MADDR_GET_FULL_PLEN(IP_IPV4_AFI));
@@ -403,7 +449,7 @@ void igmp_process_query(MCGRP_CLASS *igmp,
     mcast_set_ipv4_addr(&group_addr, group_address);
     if (igmpver == IGMP_VERSION_3)
     {
-        UINT16 s, num_srcs = igmpv3_msg->num_srcs;
+        UINT16 s, num_srcs = net_to_host_short(igmpv3_msg->num_srcs);
         UINT32* p_srcaddr = igmpv3_msg->source_ary;
         if (num_srcs)
         {
@@ -458,6 +504,14 @@ void igmp_process_v3_report (MCGRP_CLASS    *igmp,
         return;
     }
 
+    if (!igmpv3_report_fits(igmpv3_rep, len_report))
+    {
+        l2mcd_rx_drop(L2MCD_IPV4_AFI, mld_l3_get_port_from_ifindex(vir_port_id, MLD_VLAN), phy_port_id,
+                      "IGMPv3 report with records past its end");
+        igmp_stats->recv_size_or_range_error++;
+        return;
+    }
+
     mcast_init_addr(&clnt_ip, IP_IPV4_AFI, MADDR_GET_FULL_PLEN(IP_IPV4_AFI));
     mcast_set_ipv4_addr(&clnt_ip, clnt_src_ip);
     if (!num_grps)
@@ -465,8 +519,15 @@ void igmp_process_v3_report (MCGRP_CLASS    *igmp,
         L2MCD_VLAN_LOG_INFO(vir_port_id, "%s:%d:[vlan:%d] num_groups:%d port:%d", __FUNCTION__, LN, vir_port_id, igmpv3_rep->num_grps,phy_port_id);
     }
                    
-    for (g=0; g < num_grps; g++)
+    for (g=0; g < num_grps; g++, grp_rec = NEXT_GRP_REC(grp_rec))
     {
+        /* RFC 3376 4.2.12: a record type it does not know is ignored, and
+         * these index the per-type counters and labels */
+        if (grp_rec->type < IS_INCL || grp_rec->type > BLOCK_OLD)
+        {
+            igmp_stats->recv_size_or_range_error++;
+            continue;
+        }
          group_address = (UINT32) net_to_host_long(grp_rec->group_address);
          mcast_init_addr(&group_addr, IP_IPV4_AFI, MADDR_GET_FULL_PLEN(IP_IPV4_AFI));        
          mcast_set_ipv4_addr(&group_addr, group_address);
@@ -482,7 +543,7 @@ void igmp_process_v3_report (MCGRP_CLASS    *igmp,
             UINT16 eff_num_srcs = num_srcs;
             L2MCD_VLAN_LOG_INFO(vir_port_id,"%s:%d:[vlan:%d]: Type V3Rept Port %s,%s Grp: %s action %s. #Srcs %u source_ary:0x%x",FN,LN,
                     vir_port_id, mld_get_if_name_from_ifindex(phy_port_id), mld_get_if_name_from_port(vir_port_id), mcast_print_addr(&group_addr), mcgrp_action_label[grp_rec->type], num_srcs,
-                    grp_rec->source_address_ary[0]);
+                    num_srcs ? grp_rec->source_address_ary[0] : 0);  /* no sources: not in the packet */
             //Source address comes in Network byte order. Convert to host byte order.
             if(num_srcs != 0)
             {
@@ -566,7 +627,6 @@ void igmp_process_v3_report (MCGRP_CLASS    *igmp,
                     igmp->vrf_index, mld_get_if_name_from_ifindex(phy_port_id), mld_get_if_name_from_port(vir_port_id),
                     mcast_print_addr(&group_addr));
         }
-        grp_rec = NEXT_GRP_REC(grp_rec);
     }
 }
 
@@ -600,6 +660,7 @@ int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters)
     UINT64         init_time =0;
     static UINT32  v1rep_time, v2rep_time, v2leave_time, nreports, nleave;
     BOOLEAN       dbg_enabled = FALSE;
+    const char    *malformed = NULL;
 
     //init_time = read_tb_msec();
 
@@ -620,6 +681,20 @@ int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters)
     // Get a pointer to the IP and IGMP packets
     ip_hdr = (IP_HEADER *)&sptr_igmp_packet->ip_header;
     sptr_igmp_message = (IGMP_MESSAGE *) ((char *) ip_hdr + sptr_ip_parameters->header_length);
+
+    /* Nothing in the message is read before its length is known to cover it:
+     * the socket handler has held tot_len to the bytes received
+     * (l2mcd_igmp_rx_len_ok), this holds the message to tot_len. */
+    if (sptr_ip_parameters->header_length < sizeof(IP_HEADER) ||
+        sptr_ip_parameters->total_length < sptr_ip_parameters->header_length + sizeof(IGMP_MESSAGE) ||
+        (malformed = igmp_malformed(sptr_igmp_message, igmp_packet_size)) != NULL)
+    {
+        l2mcd_rx_drop(L2MCD_IPV4_AFI, sptr_ip_parameters->rx_vlan_id, rx_phy_port,
+                      malformed ? malformed : "IGMP message shorter than 8 bytes");
+        if (MCGRP_IS_VALID_INTF(rx_port_number))
+            igmp->igmp_stats[rx_port_number].recv_size_or_range_error++;
+        goto free_packet;
+    }
 
     group_address = (UINT32) net_to_host_long(sptr_igmp_message->group_address);
     //rx_max_resp_time = sptr_igmp_message->maximum_response_time;

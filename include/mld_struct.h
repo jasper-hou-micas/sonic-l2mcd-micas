@@ -120,6 +120,15 @@ typedef struct MLDV2_REPORT
 } MLDV2_REPORT_MESSAGE;
 
 // MLDv1 Packet (Query + Report + Leave)
+#define MLDV2_REPORT_HDR_SIZE       8     /* type .. num_grps */
+#define MLDV2_GROUP_REC_HDR_SIZE    20    /* type .. group_address */
+#define MLDV2_QUERY_HDR_SIZE        28    /* type .. num_srcs */
+
+/* The next record: past this one's sources and aux words (RFC 3810 5.2.6).
+ * Only safe once mldv2_report_fits() has said the records lie inside. */
+#define MLDV2_NEXT_REC(rec) ((MLDV2_GROUP_RECORD *)((UINT8 *)(rec) + MLDV2_GROUP_REC_HDR_SIZE + \
+                             ntohs((rec)->num_srcs) * sizeof(IPV6_ADDRESS) + (rec)->aux_data_len * 4))
+
 typedef struct MLD_PACKET
 {
     IPV6_HEADER                     ip_header;

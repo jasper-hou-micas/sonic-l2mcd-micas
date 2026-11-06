@@ -1295,6 +1295,10 @@ int l2mcd_system_mrouter_notify(int vir_port, int phy_port_id, int is_static, in
 void mcgrp_port_state_notify (UINT32 afi, VRF_INDEX vrf_index, UINT16 port_id, enum BOOLEAN  up);
 void mcgrp_delete_l3intf (MCGRP_CLASS  *mcgrp, UINT16        vir_port_id);
 enum BOOLEAN igmp_check_valid_range(UINT32  group_address);
+struct IGMPV3_REPORT;
+enum BOOLEAN igmpv3_report_fits(struct IGMPV3_REPORT *rep, UINT32 len);
+struct MLDV2_REPORT;
+BOOLEAN mldv2_report_fits(struct MLDV2_REPORT *rep, UINT32 len);
 enum BOOLEAN mld_check_valid_range(IPV6_ADDRESS  *group_address);
 unsigned short l3_get_port_from_bd_id(unsigned int bd_id);
 void igmp_reset_default_values(MCGRP_CLASS *igmp);

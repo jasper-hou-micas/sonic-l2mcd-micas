@@ -104,6 +104,8 @@ typedef struct IP_ROUTER_ALERT_OPTION_BODY
 
 
 #define IGMPV3_GROUP_REC_HDR_SIZE 8
+#define IGMPV3_REPORT_HDR_SIZE    8     /* type .. num_grps */
+#define IGMPV3_QUERY_HDR_SIZE     12    /* type .. num_srcs */
 
 enum IGMP_VERSION
 {
@@ -249,11 +251,13 @@ extern SORTED_LINKLIST_KEYINFO igmpv3_src_keyinfo;
 		res = IGMP_VERSION_NONE;                                    \
 }
 
+/* The next record: past this one's sources and its aux data (aux_data_len is
+ * one byte counting 32-bit words, RFC 3376 4.2.6 -- not a 16-bit field). Only
+ * safe once igmpv3_report_fits() has said the records lie inside the packet. */
 #define NEXT_GRP_REC(grp_rec)  (IGMPV3_GROUP_RECORD*)                                          \
 								( (unsigned long) (grp_rec)->source_address_ary                         \
-									+ ((net_to_host_short( \
-									((grp_rec)->num_srcs)) \
-									+ net_to_host_short((grp_rec)->aux_data_len)) << 2) );											  	  
+									+ ((net_to_host_short((grp_rec)->num_srcs) \
+									+ (grp_rec)->aux_data_len) << 2) )
 
 
 typedef struct IGMP_STATS

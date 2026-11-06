@@ -2012,7 +2012,9 @@ MCGRP_MBRSHP *mcgrp_update_group_address_table(MCGRP_CLASS *mcgrp,
 
         if (!mbrshp_del)
         {
-            for (i = 0; i <= src_cnt; i++)
+            /* once with no sources (the (*,G) entry), else once per source:
+             * i <= src_cnt read one source past the report's list */
+            for (i = 0; i < (src_cnt ? src_cnt : 1); i++)
             {
                 /* 
                  * If the type of (S,G) /(*,G) entry is changed between remote to dynamic or viceversa, 

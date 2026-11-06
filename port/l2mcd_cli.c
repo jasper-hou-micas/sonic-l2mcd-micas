@@ -415,8 +415,9 @@ void l2mcd_print_global_var()
 	L2MCD_CLI_PRINT("Global Config Version=%d",gIgmp.cfg_version);
 	L2MCD_CLI_PRINT("Snooping Vlan Count=%d",gIgmp.mld_snp_vlan_count);
 	L2MCD_CLI_PRINT("Global Mac=0x%x:0x%x:0x%x:0x%x:0x%x:0x%x",gIgmp.mac[0],gIgmp.mac[1],gIgmp.mac[2],gIgmp.mac[3],gIgmp.mac[4],gIgmp.mac[5]);
-	L2MCD_CLI_PRINT("Pkt Recv-Stats: Total:%d igmp:%d, pim:%d, non-igmp:%d, no_aux:%d, no_tag:%d, inv-tag:%d",
-		 g_rx_stats_tot_pkts, g_rx_stats_igmp_pkts, g_rx_stats_pim_pkts, g_rx_stats_non_igmp_pkts,  g_rx_stats_no_aux, g_rx_stats_no_tag, g_rx_stats_inv_tags);
+	L2MCD_CLI_PRINT("Pkt Recv-Stats: Total:%d igmp:%d, pim:%d, non-igmp:%d, no_aux:%d, no_tag:%d, inv-tag:%d, malformed-igmp:%u, malformed-mld:%u",
+		 g_rx_stats_tot_pkts, g_rx_stats_igmp_pkts, g_rx_stats_pim_pkts, g_rx_stats_non_igmp_pkts,  g_rx_stats_no_aux, g_rx_stats_no_tag, g_rx_stats_inv_tags,
+		 g_rx_stats_malformed_igmp, g_rx_stats_malformed_mld);
     L2MCD_CLI_PRINT("Log Level : %d, Flags: vlanlog_to_syslog:%d, vlanlog_mask:0x%x, vlan_dbg_log_all:%d g_l2mcd_pkt_fp:%p",
      g_curr_dbg_level, g_l2mcd_vlan_dbg_to_sys_log,g_l2mcd_vlan_log_mask,g_l2mcd_dbg_vlan_log_all,g_l2mcd_pkt_fp);
     L2MCD_CLI_PRINT("g_portdb_pending_count:%d, libev_no_of_sockets:%d",g_portdb_pending_count,g_l2mcd_stats_libev_no_of_sockets);
