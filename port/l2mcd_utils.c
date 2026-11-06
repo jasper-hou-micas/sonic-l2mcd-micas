@@ -317,9 +317,9 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
         if_tree = NULL;
     }
 
-    if (if_tree && if_tree->sock_fd)
+    if (if_tree && if_tree->igmp_sock_fd)
     {
-        L2MCD_INIT_LOG("IGMP socket already exists for %s, if:%d, fd:%d", pnames, kif, if_tree->mld_sock_fd);
+        L2MCD_INIT_LOG("IGMP socket already exists for %s, if:%d, fd:%d", pnames, kif, if_tree->igmp_sock_fd);
     }
     else
     {
