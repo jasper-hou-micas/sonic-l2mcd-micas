@@ -759,9 +759,10 @@ void L2mcSync::dumpL2mcVlanEntry(DUMP_L2MCD_APP_TABLE_ENTRY *msg)
         }
         entry.vlan_id   = vlanid;
         entry.is_igmp = (afi == 1) ? TRUE : FALSE;
-        memcpy(entry.port.pnames, port_alias.c_str() , L2MCD_IFNAME_SIZE);
-        memcpy(entry.gaddr,group_addr.c_str(), L2MCD_IP_ADDR_STR_SIZE);
-        memcpy(entry.saddr,source_addr.c_str(), L2MCD_IP_ADDR_STR_SIZE);
+        /* entry is zeroed above: copy at most size - 1 so the NUL stays */
+        strncpy(entry.port.pnames, port_alias.c_str(), L2MCD_IFNAME_SIZE - 1);
+        strncpy(entry.gaddr, group_addr.c_str(), L2MCD_IP_ADDR_STR_SIZE - 1);
+        strncpy(entry.saddr, source_addr.c_str(), L2MCD_IP_ADDR_STR_SIZE - 1);
 
         idx++;
 
@@ -820,7 +821,7 @@ void L2mcSync::dumpL2mcVlanEntry(DUMP_L2MCD_APP_TABLE_ENTRY *msg)
         }
         entry.vlan_id   = vlanid;
         entry.is_igmp = (afi == 1) ? TRUE : FALSE;
-        memcpy(entry.port.pnames, port_alias.c_str() , L2MCD_IFNAME_SIZE);
+        strncpy(entry.port.pnames, port_alias.c_str(), L2MCD_IFNAME_SIZE - 1);
         
         idx++;
         
