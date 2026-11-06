@@ -205,12 +205,22 @@ void igmp_process_query(MCGRP_CLASS *igmp,
     // Update our operating version if needed
     myver = igmp_vport->oper_version;
 
+    /* A query of an older version than ours is still a querier on the
+     * VLAN (RFC 3376 section 7, RFC 4541 section 2.1.1): elect against it
+     * and learn its port as a router port. Only a query we cannot parse,
+     * or one newer than our version, is dropped. Dropping every
+     * mismatch left a v3 snooper beside an IGMPv2 querier with no router
+     * port and querying as if alone. */
     if (igmpver != igmp_vport->oper_version)
     {
         igmp->igmp_stats[vir_port_id].igmp_wrong_ver_query++;
         igmp_warn_version_mismatch(igmp_pport, igmpver, clnt_src_ip);
-        L2MCD_VLAN_LOG_ERR(vir_port_id, "%s:%d IGMP version mismatch %d !=%d",FN,LN,igmp_vport->oper_version,igmpver);
-        return;
+        if (igmpver == IGMP_VERSION_NONE || igmpver > igmp_vport->oper_version)
+        {
+            L2MCD_VLAN_LOG_ERR(vir_port_id, "%s:%d IGMP version mismatch %d !=%d",FN,LN,igmp_vport->oper_version,igmpver);
+            return;
+        }
+        L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d IGMPv%d query on a v%d VLAN processed",FN,LN,igmpver,igmp_vport->oper_version);
     }
 
 
