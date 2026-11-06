@@ -220,6 +220,7 @@ typedef struct
     uint32_t pim_pkts;
     uint32_t non_igmp_pkts;
     uint32_t non_mld_pkts;
+    uint32_t mld_off;           /* IPv6 frames on a VLAN without MLD snooping */
     uint32_t no_aux;
     uint32_t no_tag;
     uint32_t inv_tags;
@@ -322,6 +323,7 @@ extern L2MCD_CONTEXT l2mcd_context;
 #define g_l2mcd_rx_is_l2_sock             l2mcd_context.rx_is_l2_sock
 #define g_rx_stats_non_igmp_pkts          l2mcd_context.rx_stats.non_igmp_pkts
 #define g_rx_stats_non_mld_pkts           l2mcd_context.rx_stats.non_mld_pkts
+#define g_rx_stats_mld_off                l2mcd_context.rx_stats.mld_off
 #define g_rx_stats_igmp_pkts              l2mcd_context.rx_stats.igmp_pkts
 #define g_rx_stats_mld_pkts               l2mcd_context.rx_stats.mld_pkts
 #define g_rx_stats_pim_pkts               l2mcd_context.rx_stats.pim_pkts
@@ -348,29 +350,35 @@ extern L2MCD_CONTEXT l2mcd_context;
 
 #define L2MCD_INIT_LOG(...)        applog_write(APP_LOG_LEVEL_NOTICE, __VA_ARGS__)
 #define L2MCD_INIT_LOG_INFO(...)        applog_write(APP_LOG_LEVEL_INFO, __VA_ARGS__)
+/* The per-VLAN debug lines (l2mcd -n 1, "vlan debug all") reach syslog at
+ * INFO. They are per packet, and l2mcmgrd sets l2mcd's level to its own swss
+ * level (NOTICE by default) at start: at NOTICE every one of them went to the
+ * remote log host. swssloglevel -l INFO -c l2mcmgrd (then an l2mcd restart)
+ * or l2mcd_ctl -s <file> -d 6 shows them again. */
+#define L2MCD_VLAN_LOG_SYSLOG_LEVEL APP_LOG_LEVEL_INFO
 #define L2MCD_VLAN_LOG_ERR(vlan,...)        do {\
             if (g_l2mcd_pkt_fp && g_l2mcd_pkt_log[vlan&0xFFF]) {\
             fprintf(g_l2mcd_pkt_fp,"[%d] ", vlan);fprintf(g_l2mcd_pkt_fp, ##__VA_ARGS__);fprintf(g_l2mcd_pkt_fp,"\n"); fflush(g_l2mcd_pkt_fp);}\
             if (g_l2mcd_vlan_dbg_to_sys_log && g_l2mcd_pkt_log[vlan&0xFFF] && (g_l2mcd_vlan_log_mask&L2MCD_LOG_MASK_INFO)) {\
-                applog_write(APP_LOG_LEVEL_NOTICE, __VA_ARGS__);}\
+                applog_write(L2MCD_VLAN_LOG_SYSLOG_LEVEL, __VA_ARGS__);}\
             }while(0)
 #define L2MCD_VLAN_LOG_INFO(vlan,...)        do {\
             if (g_l2mcd_pkt_fp && g_l2mcd_pkt_log[vlan&0xFFF] && (g_l2mcd_vlan_log_mask&L2MCD_LOG_MASK_INFO)) {\
             fprintf(g_l2mcd_pkt_fp,"[%d] ", vlan);fprintf(g_l2mcd_pkt_fp, ##__VA_ARGS__);fprintf(g_l2mcd_pkt_fp,"\n"); fflush(g_l2mcd_pkt_fp);}\
             if (g_l2mcd_vlan_dbg_to_sys_log && g_l2mcd_pkt_log[vlan&0xFFF] && (g_l2mcd_vlan_log_mask&L2MCD_LOG_MASK_INFO)) {\
-                applog_write(APP_LOG_LEVEL_NOTICE, __VA_ARGS__);}\
+                applog_write(L2MCD_VLAN_LOG_SYSLOG_LEVEL, __VA_ARGS__);}\
             }while(0)
 #define L2MCD_PKT_PRINT(vlan, ...)        do {\
             if (g_l2mcd_pkt_fp && g_l2mcd_pkt_log[vlan&0xFFF] && (g_l2mcd_vlan_log_mask&L2MCD_LOG_MASK_PKT)) {\
             fprintf(g_l2mcd_pkt_fp,"[%d] ", vlan);fprintf(g_l2mcd_pkt_fp, ##__VA_ARGS__);fprintf(g_l2mcd_pkt_fp,"\n"); fflush(g_l2mcd_pkt_fp);}\
             if (g_l2mcd_vlan_dbg_to_sys_log && g_l2mcd_pkt_log[vlan&0xFFF] && (g_l2mcd_vlan_log_mask&L2MCD_LOG_MASK_PKT)) {\
-                applog_write(APP_LOG_LEVEL_NOTICE, __VA_ARGS__);}\
+                applog_write(L2MCD_VLAN_LOG_SYSLOG_LEVEL, __VA_ARGS__);}\
             }while(0)
 #define L2MCD_VLAN_LOG_DEBUG(vlan,...)        do {\
             if (g_l2mcd_pkt_fp && g_l2mcd_pkt_log[vlan&0xFFF] && (g_l2mcd_vlan_log_mask&L2MCD_LOG_MASK_DEBUG)) {\
             fprintf(g_l2mcd_pkt_fp,"[%d] ", vlan);fprintf(g_l2mcd_pkt_fp, ##__VA_ARGS__);fprintf(g_l2mcd_pkt_fp,"\n"); fflush(g_l2mcd_pkt_fp);}\
             if (g_l2mcd_vlan_dbg_to_sys_log && g_l2mcd_pkt_log[vlan&0xFFF] && (g_l2mcd_vlan_log_mask&L2MCD_LOG_MASK_DEBUG)) {\
-                applog_write(APP_LOG_LEVEL_NOTICE,__VA_ARGS__);}\
+                applog_write(L2MCD_VLAN_LOG_SYSLOG_LEVEL,__VA_ARGS__);}\
             }while(0)
 
 static inline L2MCD_AVL_TREE L2MCD_AVL_CREATE(avl_comparison_func *func, void *ptr, void *a)

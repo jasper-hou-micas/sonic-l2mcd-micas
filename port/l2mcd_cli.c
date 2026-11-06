@@ -420,6 +420,7 @@ void l2mcd_print_global_var()
     L2MCD_CLI_PRINT("Log Level : %d, Flags: vlanlog_to_syslog:%d, vlanlog_mask:0x%x, vlan_dbg_log_all:%d g_l2mcd_pkt_fp:%p",
      g_curr_dbg_level, g_l2mcd_vlan_dbg_to_sys_log,g_l2mcd_vlan_log_mask,g_l2mcd_dbg_vlan_log_all,g_l2mcd_pkt_fp);
     L2MCD_CLI_PRINT("g_portdb_pending_count:%d, libev_no_of_sockets:%d",g_portdb_pending_count,g_l2mcd_stats_libev_no_of_sockets);
+	L2MCD_CLI_PRINT("Pkt Recv-Stats IPv6: non-mld:%u, mld-off:%u", g_rx_stats_non_mld_pkts, g_rx_stats_mld_off);
     L2MCD_CLI_PRINT("Entry Count:");
     L2MCD_CLI_PRINT("\tkif_to_if:%zu, if_to_kif:%zu", L2MCD_AVL_ENTRY_COUNT(g_l2mcd_kif_to_if_tree),L2MCD_AVL_ENTRY_COUNT(g_l2mcd_if_to_kif_tree));
     L2MCD_CLI_PRINT("\tvdb_tree:%zu, ve_portdb_tree:%zu", L2MCD_AVL_ENTRY_COUNT(mld_vlan_db.vdb_tree),L2MCD_AVL_ENTRY_COUNT(gMld.ve_portdb_tree));

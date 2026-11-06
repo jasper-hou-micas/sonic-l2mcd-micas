@@ -1921,7 +1921,8 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         uint8_t nexthdr = ip6h->next_header;
         if (nexthdr != IPPROTO_ICMPV6 && nexthdr != IPPROTO_HOPOPTS) // 0 is HOPOPT
         {
-            L2MCD_LOG_ERR("hbh nexthdr is not IPPROTO_ICMPV6 or IPPROTO_HOPOPTS, payload_len %d, next %d", ip6h->payload_length, nexthdr);
+            /* per frame: counted (non-mld), not an error to syslog */
+            L2MCD_LOG_DEBUG("hbh nexthdr is not IPPROTO_ICMPV6 or IPPROTO_HOPOPTS, payload_len %d, next %d", ip6h->payload_length, nexthdr);
             g_rx_stats_non_mld_pkts++;
             continue;
         }
@@ -1997,7 +1998,10 @@ void l2mcd_recv_mld_msg(evutil_socket_t fd, short what, void *arg)
         }
         if (!mld_is_flag_set(vlan_node, L2MCD_IPV6_AFI, MLD_SNOOPING_ENABLED))
         {
-            L2MCD_LOG_ERR("vlan_node is not set");
+            /* every IPv6 multicast frame the chip traps on a VLAN that snoops
+             * IGMP only: counted, not an error to syslog */
+            g_rx_stats_mld_off++;
+            L2MCD_LOG_DEBUG("vlan %d: MLD snooping off, IPv6 frame not snooped", vlan_id);
             continue;
         }
         if (len < sizeof(struct ethhdr) + sizeof(IPV6_HEADER) + sizeof(struct ipv6_hopopt_hdr) + sizeof(ICMP6_PSEUDO_HDR_MESSAGE))
