@@ -1298,7 +1298,7 @@ void l2mcd_100ms_timer(evutil_socket_t fd, short what, void *arg)
 void l2mcd_libevent_destroy(struct event *ev)
 {
     g_l2mcd_stats_libev_no_of_sockets--;
-    event_del(ev);
+    event_free(ev);     /* event_del() and the event's own memory */
 }
 
 /*
