@@ -246,9 +246,47 @@ int l2mcd_portstate_update(int kif, int state, char *iname)
 
     return 0;
 }
+
+/*
+ * The port index for a name portdb does not hold, as when a breakout deleted
+ * the port and creates it again. An EthernetN is given the index that
+ * port_ifname_db_init() gives it at start, 4096 + N, so it gets its own index
+ * back. The kernel's ifindex is no basis for a front-panel port: 4096 + ifindex
+ * is the start index of Ethernet<ifindex>, and a port l2mcmgrd reports before
+ * its netdev exists has ifindex 0, which is Ethernet0's. Any other name
+ * (PortChannelN) is numbered by its ifindex as before, but only once its netdev
+ * exists and only when no other name holds that index.
+ */
+static int l2mcd_port_index_for(const char *pnames, int kif)
+{
+    char canon[L2MCD_IFNAME_SIZE];
+    char *holder;
+    unsigned long n;
+    int ifidx;
+
+    if (!strncmp(pnames, "Ethernet", 8) && pnames[8] >= '0' && pnames[8] <= '9') {
+        n = strtoul(pnames + 8, NULL, 10);
+        snprintf(canon, sizeof(canon), "Ethernet%lu", n);
+        if (n < L2MCD_PORTDB_PHYIF_MAX_IDX && !strcmp(canon, pnames))
+            return L2MCD_PORTDB_PHYIF_START_IDX + n;
+    }
+    if (kif <= 0)
+        return NO_SUCH_PORT;
+    if (strstr(pnames, "PortChannel"))
+        ifidx = L2MCD_PORTDB_LAGIF_START_IDX + kif;
+    else
+        ifidx = L2MCD_PORTDB_PHYIF_START_IDX + kif;
+    holder = portdb_get_ifname_from_portindex(ifidx);
+    if (holder && strcmp(holder, pnames)) {
+        L2MCD_LOG_NOTICE("%s port:%s kif:%d: index %d is %s's", __FUNCTION__, pnames, kif, ifidx, holder);
+        return NO_SUCH_PORT;
+    }
+    return ifidx;
+}
+
 int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
 {
-    int ifidx, kif, rc = 0;
+    int ifidx, kif, old_kif, rc = 0;
     l2mcd_if_tree_t *if_tree = NULL;
     struct event *igmp_rx_event = NULL;
     struct event *mld_rx_event = NULL;
@@ -258,10 +296,11 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
 
     if ((ifidx <= 0) || (ifidx == NO_SUCH_PORT)) {
         kif = if_nametoindex(pnames);
-        if (strstr(pnames, "PortChannel")) {
-            ifidx = L2MCD_PORTDB_LAGIF_START_IDX + kif;
-        } else {
-            ifidx = L2MCD_PORTDB_PHYIF_START_IDX + kif;
+        ifidx = l2mcd_port_index_for(pnames, kif);
+        if (ifidx == NO_SUCH_PORT) {
+            /* no netdev yet: its link event (l2mcd_portstate_update) comes back here */
+            L2MCD_LOG_NOTICE("%s port:%s kif:%d is_add:%d: no index yet", __FUNCTION__, pnames, kif, is_add);
+            return is_add ? -1 : 0;
         }
         rc = portdb_add_ifname(pnames, strlen(pnames)+1, ifidx);
         L2MCD_LOG_NOTICE("%s portdb add port:%s, index:%d rc:%d", __FUNCTION__, pnames, ifidx, rc);
@@ -304,16 +343,24 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
         return -1;
     }
 
-    // breakout
+    // breakout: the port was deleted and created again, a new netdev. The tree
+    // at its index is its old one (the index is the name's own): close the old
+    // netdev's sockets and drop the tree; the name keeps its index. A tree of
+    // another name there is that port's, and is left alone.
     if (if_tree && if_tree->kif != kif) {
+        if (strncmp(if_tree->iname, pnames, L2MCD_IFNAME_SIZE)) {
+            L2MCD_LOG_NOTICE("%s port:%s kif:%d: index %d is %s's (kif %d), left alone",
+                             __FUNCTION__, pnames, kif, ifidx, if_tree->iname, if_tree->kif);
+            return -1;
+        }
         if (if_tree->igmp_sock_fd)
             l2mcd_igmprx_sock_close(pnames, if_tree->igmp_sock_fd, if_tree->igmp_rx_event);
         if (if_tree->mld_sock_fd)
             l2mcd_mldrx_sock_close(pnames, if_tree->mld_sock_fd, if_tree->mld_rx_event);
 
+        old_kif = if_tree->kif;
         l2mcd_del_if_tree(ifidx);
-        rc = portdb_delete_ifname(pnames);
-        L2MCD_LOG_NOTICE("%s portdb delete2 port:%s, index:%d rc:%d", __FUNCTION__, pnames, ifidx, rc);
+        L2MCD_LOG_NOTICE("%s port:%s, index:%d: new interface kif:%d (was %d)", __FUNCTION__, pnames, ifidx, kif, old_kif);
         if_tree = NULL;
     }
 
