@@ -622,7 +622,6 @@ void mcgrp_stop_phy_port (MCGRP_CLASS       *mcgrp,
 
     MCGRP_ENTRY         *mcgrp_entry, *next_entry;
     MCGRP_MBRSHP        *mcgrp_mbrshp;
-    MCGRP_STATIC_ENTRY  *mcgrp_static_entry;
     UINT16               vir_port_id = mcgrp_vport->vir_port_id;
     UINT32               phy_port_id = mcgrp_pport->phy_port_id;
 
@@ -647,17 +646,11 @@ void mcgrp_stop_phy_port (MCGRP_CLASS       *mcgrp,
         mcgrp_notify_phy_port_del(mcgrp, &mcgrp_entry->group_address,
                 mcgrp_vport, phy_port_id, TRUE);
 
-        //Stop wheeltimer on static group 
-        mcgrp_static_entry = mcgrp_find_l2_staticGroup(mcgrp, vir_port_id, &mcgrp_entry->group_address);
-        if (mcgrp_static_entry != NULL)
-        {
-             if (WheelTimerSuccess == WheelTimer_IsElementEnqueued
-                                        (&mcgrp_static_entry->l2_static_grp_tmr.mcgrp_wte))
-            {
-                WheelTimer_DelElement(mcgrp->mcgrp_wtid,  &mcgrp_static_entry->l2_static_grp_tmr.mcgrp_wte);
-                L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] Wheeltimer deleted from static Port:%d ", FN, LN, vir_port_id, phy_port_id);
-            }
-        }
+        // The static group's refresh timer is left running: it renews every
+        // port of the static group, not only this one, and stopping it here
+        // let the other ports' static memberships age out. The refresh skips
+        // a port that is not up (mcgrp_refresh_l2_static_group); this port's
+        // static membership comes back when it does (mld_static_grp_replay_confg).
 
         // Remove this port from the group membership
         L2MCD_VLAN_LOG_DEBUG(vir_port_id, "%s:%d:[vlan:%d] pim_snoop_mbrship:%d  w_g:%d %d ", FN, LN,vir_port_id,

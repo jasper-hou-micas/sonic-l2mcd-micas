@@ -2193,6 +2193,7 @@ MCGRP_STATIC_ENTRY * mcgrp_add_l2_staticGroup(MCGRP_CLASS * mcgrp,
 int mld_sg_porttree_addport(L2MCD_AVL_TREE *port_tree, uint32_t port)
 {
 	sg_port_t *sg_port;
+	void **slot;
    	sg_port = calloc(1,sizeof(sg_port_t));
     if(sg_port == NULL) {
 		L2MCD_LOG_ERR("%s alloc sg_port fail port:0x%x", FN, port);
@@ -2200,11 +2201,17 @@ int mld_sg_porttree_addport(L2MCD_AVL_TREE *port_tree, uint32_t port)
     }
 	M_AVLL_INIT_NODE(sg_port->node); 
     sg_port->ifindex = port;
-    if (!M_AVLL_INSERT(*port_tree,sg_port)){
+    slot = M_AVLL_INSERT(*port_tree,sg_port);
+    if (!slot){
 		L2MCD_LOG_NOTICE("%s insert sg_port to avl fail port:0x%x",FN, port);
        	free(sg_port);
        	return (-1);
     }
+    /* avl_probe() returns the port already in the tree, and leaves the new
+     * one out: a static port stays in the tree while its link is down, and
+     * its link-up replays the add (mld_static_grp_replay_confg()) */
+    if (*slot != sg_port)
+        free(sg_port);
     return 0;
 }
 
@@ -2518,7 +2525,15 @@ void mcgrp_refresh_l2_static_group(MCGRP_CLASS * mcgrp,
     {
 
         MCGRP_MBRSHP      *mcgrp_mbrshp = NULL;
+        MCGRP_PORT_ENTRY  *mcgrp_pport;
 		phy_port_id = sg_port->ifindex;
+        /* Only a port that is up is refreshed, as mcgrp_update_l2_static_group()
+         * makes the membership only for one: the timer keeps running while a
+         * port of the group is down (mcgrp_stop_phy_port()), and the port's
+         * static membership comes back with its link (mld_static_grp_replay_confg()). */
+        mcgrp_pport = mcgrp_find_phy_port_entry(mcgrp, mcgrp_vport, phy_port_id);
+        if (mcgrp_pport == NULL || !mcgrp_pport->is_up)
+            continue;
          // On update, the PIM/DVMRP functions get the port# from this data struct
         mcgrp_mbrshp = mcgrp_find_mbrshp_entry_for_grpaddr(mcgrp,
                                                            group_address,
