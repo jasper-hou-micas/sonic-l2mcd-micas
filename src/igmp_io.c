@@ -643,6 +643,17 @@ int receive_igmp_packet (IP_PARAMETERS  *sptr_ip_parameters)
             FN,LN, sptr_igmp_message->type, sptr_ip_parameters->rx_phy_port_number, portdb_get_ifname_from_portindex(sptr_ip_parameters->rx_phy_port_number),
             mcast_print_addr(&group_addr), dest_ip,clnt_src_ip);
     }
+    /* A report or leave from a port the port db does not name is dropped: the
+     * report and leave paths below pass the name to l2mcd_is_peerlink(), which
+     * makes a std::string of it, and NULL throws std::logic_error, which nothing
+     * catches. Such a port is one numbered under an index that has lost its name
+     * (a port re-created at another port's index); a query takes no name. */
+    if (!if_name && sptr_igmp_message->type != IGMP_MEMBERSHIP_QUERY_TYPE) {
+        L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] igmp_type:0x%x rx_port_num:%d: the port has no name in the port db. Dropping packet",
+            FN, LN, vid, sptr_igmp_message->type, sptr_ip_parameters->rx_phy_port_number);
+        igmp->rx_bad_if++;
+        goto free_packet;
+    }
 
     if (!MCGRP_IS_VALID_INTF(rx_port_number))
     {

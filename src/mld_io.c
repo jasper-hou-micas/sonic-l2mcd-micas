@@ -1541,6 +1541,16 @@ int receive_mld_packet(IP6_RX_PKT_MSG *mld_pkt_msg)
     }
     mld_pkt_msg->ip_param.hopbyhop_length = hbh_len;
 
+    /* As in receive_igmp_packet(): the report and done handlers pass the port's
+     * name to l2mcd_is_peerlink(), and a NULL name throws std::logic_error. */
+    if (!ifname && icmp6h->type != MLD_MEMBERSHIP_QUERY_TYPE)
+    {
+        L2MCD_VLAN_LOG_ERR(vid, "%s:%d:[vlan:%d] mld_type:%d rx_port_num:%u: the port has no name in the port db. Dropping packet",
+                           FN, LN, vid, icmp6h->type, rx_phy_port);
+        mld->rx_bad_if++;
+        return 0;
+    }
+
     switch (icmp6h->type)
     {
     case MLD_MEMBERSHIP_QUERY_TYPE: // MLDv1v2 Query
