@@ -57,10 +57,34 @@ int ip6_addr_cmp(void *val1, void *val2) {
     return memcmp(&p1->ipaddress, &p2->ipaddress, sizeof(IP6_IPV6_ADDRESS));
 }
 
+/*
+ * A name and its index are held once each way: the name's string is a key of
+ * one map and the value of the other, and portdb_delete_ifname() frees the
+ * value of the index its name maps to. A second name at a named index left
+ * the first name a key of that index, and deleting the first name then freed
+ * the second name's string while it was still a key; a name added at a
+ * second index left the first index named. Either is refused here and the
+ * name and the index keep what they had; the name already at its own index
+ * is no change (mld_if_snoop_set() adds a VLAN's name once per address
+ * family, which lost the first string).
+ */
 int portdb_add_ifname(char *ifname, int name_len, unsigned int port_index)
 {
     int ret;
     char *interface_name; 
+    char *holder = portdb_get_ifname_from_portindex(port_index);
+    unsigned int held = portdb_get_portindex_from_ifname(ifname);
+
+    if (holder || held != NO_SUCH_PORT) {
+        if (holder && held == port_index && !strcmp(holder, ifname))
+            return 0;
+        if (holder && strcmp(holder, ifname))
+            L2MCD_LOG_NOTICE("%s port:%s index:%u refused: the index is %s's", __FUNCTION__, ifname, port_index, holder);
+        else
+            L2MCD_LOG_NOTICE("%s port:%s index:%u refused: the name has index %u", __FUNCTION__, ifname, port_index, held);
+        return -1;
+    }
+
     if( !(interface_name = (char *)malloc(name_len + 1)) )
         return -1;
 
@@ -70,6 +94,7 @@ int portdb_add_ifname(char *ifname, int name_len, unsigned int port_index)
     if(!ret)
     {
         L2MCD_LOG_NOTICE("%s index:%d to portname:%s ret:%d", __FUNCTION__, port_index, interface_name, ret);
+        free(interface_name);
         return -1; //Failed to add interface name to hash table;
     }
 
@@ -77,6 +102,8 @@ int portdb_add_ifname(char *ifname, int name_len, unsigned int port_index)
     if(!ret)
     {
         L2MCD_LOG_NOTICE("%s index:%d from portname:%s ret:%d", __FUNCTION__, port_index, interface_name,ret);
+        hashGrowGenericDelete(portdb_portindex_to_ifname_hash, port_index, NULL);
+        free(interface_name);
         return -1; //Failed to add interface name to hash table;
     }
 

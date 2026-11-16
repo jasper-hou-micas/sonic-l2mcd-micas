@@ -265,6 +265,8 @@ int l2mcd_port_list_update(char *pnames, int oper_state, int is_add)
         }
         rc = portdb_add_ifname(pnames, strlen(pnames)+1, ifidx);
         L2MCD_LOG_NOTICE("%s portdb add port:%s, index:%d rc:%d", __FUNCTION__, pnames, ifidx, rc);
+        if (rc) /* the index is another port's: leave that port alone */
+            return is_add ? -1 : 0;
     }
 
     if_tree = l2mcd_if_to_kif(ifidx);
