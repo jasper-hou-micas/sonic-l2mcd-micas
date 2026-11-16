@@ -691,7 +691,11 @@ void mcgrp_stop_phy_port (MCGRP_CLASS       *mcgrp,
 
     } /* while (grp_entry) */
     mcgrp_pport->is_up = FALSE;
-    if (is_ip_tnnl_port(vir_port_id))
+    // A VLAN is not a tunnel: is_ip_tnnl_port() is the range 2048..10240,
+    // which holds the VLAN ids 2048..4094 too. Without the first test a port
+    // of such a VLAN lost its index here and stayed in phy_port_list under
+    // PORT_INDEX_INVALID, and its link-up made a second entry.
+    if (!is_virtual_port(vir_port_id) && is_ip_tnnl_port(vir_port_id))
         mcgrp_pport->phy_port_id = PORT_INDEX_INVALID;  
 }
 
